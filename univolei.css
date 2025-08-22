@@ -1,0 +1,77 @@
+/* Container e títulos */
+.block-container { padding-top: .25rem; padding-bottom: .25rem; max-width: 1600px; }
+h1, h2, h3 { margin: .1rem 0 .2rem 0; }
+
+.header-title { 
+  font-size: 1.6rem; font-weight: 900; display:flex; align-items:center; gap:8px; 
+  margin: 0.1rem 0 .2rem 0;
+}
+
+/* Cartão de seção */
+.sectionCard { 
+  border:1px solid #e1e6ef; background:#fff; border-radius:10px; padding:6px 8px; margin:6px 0; overflow: hidden;
+}
+
+/* Controles gerais */
+.stButton button, .stTextInput input, .stSelectbox, .stNumberInput input, .stRadio, .stDataFrame { font-size: .9rem; }
+.stTextInput > div > div > input { padding-top: .16rem; padding-bottom: .16rem; }
+.stSelectbox > div > div { padding-top: .12rem; padding-bottom: .12rem; }
+.stNumberInput input { padding-top: .12rem; padding-bottom: .12rem; }
+.stButton button { white-space: nowrap; font-size: .9rem; padding: .28rem .6rem; }
+
+/* Radios */
+div[role="radiogroup"] > label { margin-right: .45rem; font-size: .9rem; }
+
+/* Badges */
+.badge { background:#f5f7fb; border:1px solid #e1e6ef; border-radius:999px; padding:4px 8px; font-size:.95rem; white-space:nowrap; }
+.badge b { font-weight:800; }
+
+/* Tabelas */
+.custom-table { width: 100%; border-collapse: collapse; margin: 4px 0; font-size: .83rem; }
+.custom-table th { background:#f0f2f6; padding: 5px; text-align: left; border: 1px solid #ddd; }
+.custom-table td { padding: 5px; border: 1px solid #ddd; }
+.custom-table tr:nth-child(even) { background:#f9f9f9; }
+
+/* Lista de jogadoras (botões numéricos super compactos) */
+.jogadoras-container { display:flex; flex-wrap:wrap; gap:4px; margin:2px 0 4px 0; }
+.jogadoras-container button {
+  padding: .18rem .35rem !important;
+  min-width: 2.0rem;
+  width: auto !important;   /* não ocupar 100% da coluna */
+  line-height: 1.1;
+  border-radius: 10px;
+}
+
+/* Atalhos (mini) */
+.atalhos-container { display:flex; flex-wrap:wrap; gap:4px; margin:2px 0; }
+.small-btn .stButton button { padding:.18rem .32rem !important; font-size:.78rem !important; }
+
+/* Placar */
+.score-box { text-align:center; }
+.score-team { font-size: 12px; font-weight: 700; }
+.score-points { font-size: 44px; font-weight: 900; line-height: 1; }
+.score-x { font-size: 28px; font-weight: 900; padding-top: 12px; }
+
+/* KPIs */
+.kpi { display:flex; flex-direction:column; gap:2px; border:1px solid #e1e6ef; border-radius:8px; padding:6px 8px; }
+.kpi .v { font-size:1.2rem; font-weight:900; }
+.kpi .t { font-size:.80rem; opacity:.85; }
+
+/* Colunas com menos espaçamento lateral */
+.stColumn { padding-left: 4px; padding-right: 4px; }
+
+/* Ajustes gerais de espaçamentos entre elementos */
+.block-container div[data-testid="stVerticalBlock"] > div:has(> div.element-container) { margin: 0; }
+
+/* ===== Responsivo para celular ===== */
+@media (max-width: 480px) {
+  .header-title { font-size: 1.2rem; }
+  .badge { font-size: .85rem; padding: 3px 6px; }
+  .custom-table { font-size: .78rem; }
+  .stButton button { padding: .22rem .46rem; font-size: .85rem; }
+  .score-team { font-size: 11px; }
+  .score-points { font-size: 36px; }
+  .score-x { font-size: 22px; padding-top: 8px; }
+  .jogadoras-container { gap: 3px; }
+  .jogadoras-container button { min-width: 1.8rem; padding: .16rem .3rem !important; }
+}

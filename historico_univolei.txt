@@ -1,0 +1,1362 @@
+GPT 5
+Você disse:
+Vou atuar em um jogo de vôlei como uma espécie de coaching, anotando a pontuação das nossas jogadoras. Por exemplo, a atacante número 9 pontuou na entrada de rede na diagonal. A atacante oposta errou para fora. O bloqueio adversário fez ponto. Enfim, gostaria de documentar isso no ChatGPT, criar um projeto para isso. Hoje você irá documentar isso e me enviar já uma análise prévia do jogo, dos principais erros e acertos e sugestões de como melhorar. E para os próximos dias, você irá gerar um código Python que receberá essas informações que eu lhe passar e gerar um relatório para análise após a partida.
+O ChatGPT disse:
+
+Pensou por 14s
+sensacional — vamos fazer isso virar um “projeto de scout” simples e eficiente aqui no chat e já deixar tudo pronto pra você usar em quadra. Criei um canvas com um template de registro de lances (linha por lance), dicionário de códigos e um quadro rápido de análise pós-set. Você pode abrir aí do lado e já sair anotando durante o jogo.
+
+O que já deixei pronto pra hoje
+Um modelo de anotação padrão com: tempo; set; rotação; número; posição; fundamento; subtipo; origem; destino; resultado; observações.
+
+Um dicionário de valores (ex.: ATAQUE/DIAGONAL, SAQUE/FLOTO, zonas 1–6) pra manter tudo consistente.
+
+Uma planilha pronta (tabela) que você pode copiar/colar no Excel/Sheets se preferir.
+
+Uma checklist de análise rápida pós-set (maiores acertos, principais erros, ajustes imediatos).
+
+Se você colar aqui alguns lances de exemplo (mesmo poucos), eu já devolvo análise imediata dos principais acertos/erros e ajustes práticos (ex.: “direcionar saque na levantadora”, “acelerar chute no meio quando recepção ★/◔”, “cobertura reforçada na ponta”).
+
+Script Python (MVP) para gerar o relatório pós-jogo
+Abaixo está a primeira versão do script. Ele lê um CSV (ou texto colado em arquivo .csv) seguindo o cabeçalho do template, calcula métricas por jogadora e por fundamento, e gera um relatório Markdown e HTML com os destaques (eficiência de ataque, erros não forçados, pontos de bloqueio, alvos de saque, runs de pontuação e side-out aproximado).
+
+Requisitos: Python 3.10+ e pandas (instale com pip install pandas).
+
+Salve como scout_volei.py e rode com:
+
+python scout_volei.py --input lances.csv --out-prefix relatorio_partida
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+scout_volei.py – MVP de análise pós-jogo de vôlei
+Autor: você :)
+Uso:
+  python scout_volei.py --input lances.csv --out-prefix relatorio_partida
+
+CSV esperado (header):
+tempo,set,rotacao,numero,posicao,fundamento,subtipo,origem,destino,resultado,observacoes
+Exemplo de linhas:
+03:12,2,R3,9,PONTA,ATAQUE,DIAGONAL,4,5,PONTO,bola rápida
+03:44,2,R3,18,OPPOSTA,ATAQUE,LINHA,1,1,ERRO_FORA,pressão do bloqueio
+04:02,2,-,ADVERSÁRIO,BLOQUEIO,SIMPLES,-,-,PONTO,bloqueio na ponta
+"""
+
+from __future__ import annotations
+import argparse
+import pandas as pd
+from pathlib import Path
+from datetime import datetime
+
+# -------------------------------
+# Configurações e mapeamentos
+# -------------------------------
+RESULTADOS_PONTO = {"PONTO", "ACE", "BLOQUEIO_PONTO"}
+RESULTADOS_ERRO_ATAQUE = {"ERRO_FORA", "ERRO_REDE", "BLOQUEADO"}
+RESULTADOS_ERRO_GERAL = {"ERRO_FORA", "ERRO_REDE", "FALTA", "TOQUE_REDE", "ERRO_SAQUE", "ERRO_RECEPCAO"}
+
+FUNDAMENTOS_ATAQUE = {"ATAQUE"}
+FUNDAMENTOS_SAQUE = {"SAQUE"}
+FUNDAMENTOS_RECEPCAO = {"RECEPÇÃO", "RECEPCAO"}  # aceita ambos
+FUNDAMENTOS_BLOQUEIO = {"BLOQUEIO"}
+
+POSICOES_VALIDAS = {"LEV","LÍB","LIB","PONTA","OPPOSTA","CENTRO","SACA","ADVERSÁRIO","ADVERSARIO"}
+
+def normaliza_col(df: pd.DataFrame) -> pd.DataFrame:
+    for col in ["fundamento","subtipo","resultado","posicao","rotacao","numero"]:
+        if col in df.columns:
+            df[col] = df[col].astype(str).str.strip().str.upper()
+    # normaliza recepção
+    if "fundamento" in df.columns:
+        df["fundamento"] = df["fundamento"].replace({"RECEPCAO":"RECEPÇÃO"})
+    # normaliza posicao
+    if "posicao" in df.columns:
+        df["posicao"] = df["posicao"].replace({"LIB":"LÍB","ADVERSARIO":"ADVERSÁRIO"})
+    # zonas para inteiro quando possível
+    for z in ["origem","destino","set"]:
+        if z in df.columns:
+            df[z] = df[z].replace({"-":None,"—":None}).astype("Int64")
+    return df
+
+def carrega_csv(path: Path) -> pd.DataFrame:
+    df = pd.read_csv(path)
+    df.columns = [c.strip().lower() for c in df.columns]
+    esperadas = ["tempo","set","rotacao","numero","posicao","fundamento","subtipo","origem","destino","resultado","observacoes"]
+    faltantes = [c for c in esperadas if c not in df.columns]
+    if faltantes:
+        raise ValueError(f"Colunas faltando no CSV: {faltantes}")
+    return normaliza_col(df)
+
+def eficiencia_ataque(grp: pd.DataFrame) -> float:
+    tentativas = len(grp)
+    pontos = (grp["resultado"].isin(RESULTADOS_PONTO)).sum()
+    erros = (grp["resultado"].isin(RESULTADOS_ERRO_ATAQUE)).sum()
+    return ((pontos - erros) / tentativas) if tentativas else 0.0
+
+def sumariza_ataque(df: pd.DataFrame) -> pd.DataFrame:
+    atq = df[df["fundamento"].isin(FUNDAMENTOS_ATAQUE)].copy()
+    if atq.empty:
+        return pd.DataFrame(columns=["numero","posicao","tentativas","pontos","erros","eficiencia","diag","linha","pipe"])
+    atq["is_ponto"] = atq["resultado"].isin(RESULTADOS_PONTO)
+    atq["is_erro"] = atq["resultado"].isin(RESULTADOS_ERRO_ATAQUE)
+    atq["diag"] = (atq["subtipo"] == "DIAGONAL").astype(int)
+    atq["linha"] = (atq["subtipo"] == "LINHA").astype(int)
+    atq["pipe"] = (atq["subtipo"] == "PIPE").astype(int)
+    agg = atq.groupby(["numero","posicao"], dropna=False).agg(
+        tentativas=("resultado","count"),
+        pontos=("is_ponto","sum"),
+        erros=("is_erro","sum"),
+        diag=("diag","sum"),
+        linha=("linha","sum"),
+        pipe=("pipe","sum"),
+    ).reset_index()
+    # eficiência por grupo
+    eff_list = []
+    for _, g in atq.groupby(["numero","posicao"]):
+        eff_list.append(eficiencia_ataque(g))
+    agg["eficiencia"] = eff_list
+    return agg.sort_values(["eficiencia","pontos"], ascending=[False,False])
+
+def sumariza_saque(df: pd.DataFrame) -> pd.DataFrame:
+    sq = df[df["fundamento"].isin(FUNDAMENTOS_SAQUE)].copy()
+    if sq.empty:
+        return pd.DataFrame(columns=["numero","tentativas","aces","erros","series_2plus","alvos_populares"])
+    sq["ace"] = (sq["resultado"] == "ACE").astype(int)
+    sq["erro"] = (sq["resultado"] == "ERRO_SAQUE").astype(int)
+    base = sq.groupby("numero", dropna=False).agg(
+        tentativas=("resultado","count"),
+        aces=("ace","sum"),
+        erros=("erro","sum"),
+    ).reset_index()
+    # séries de saque consecutivas por jogadora
+    series = []
+    for num, g in sq.sort_values("tempo").groupby("numero"):
+        count = 0
+        max_series = 0
+        for _ in g["resultado"]:
+            count += 1
+            if count > max_series:
+                max_series = count
+        series.append((num, max_series))
+    series_df = pd.DataFrame(series, columns=["numero","series_2plus"])
+    series_df["series_2plus"] = series_df["series_2plus"].apply(lambda x: 1 if x >= 2 else 0)
+    # alvos populares (destino)
+    alvos = sq.groupby(["numero","destino"], dropna=False).size().reset_index(name="qtd")
+    top_alvos = alvos.sort_values(["numero","qtd"], ascending=[True,False]).groupby("numero").head(1)
+    base = base.merge(series_df, on="numero", how="left")
+    base = base.merge(top_alvos.rename(columns={"destino":"alvo_top","qtd":"alvo_qtd"}), on="numero", how="left")
+    return base.sort_values(["aces","series_2plus"], ascending=[False,False])
+
+def sumariza_bloqueio(df: pd.DataFrame) -> pd.DataFrame:
+    bl = df[df["fundamento"].isin(FUNDAMENTOS_BLOQUEIO)].copy()
+    if bl.empty:
+        return pd.DataFrame(columns=["numero","pontos","toques","atrasos"])
+    bl["ponto"] = (bl["resultado"].isin({"PONTO","BLOQUEIO_PONTO"})).astype(int)
+    bl["toque_util"] = (bl["subtipo"].str.contains("TOQUE") | bl["resultado"].eq("CONTINUA")).astype(int)
+    bl["atrasado"] = bl["observacoes"].str.contains("atras", case=False, na=False).astype(int)
+    agg = bl.groupby("numero", dropna=False).agg(
+        pontos=("ponto","sum"),
+        toques=("toque_util","sum"),
+        atrasos=("atrasado","sum"),
+    ).reset_index()
+    return agg.sort_values(["pontos","toques"], ascending=[False,False])
+
+def sideout_aproximado(df: pd.DataFrame) -> float:
+    """Aproxima side-out: lance seguinte a um saque adversário que termina em 'PONTO' nosso na primeira posse."""
+    # assumimos que resultado 'ACE' adversário quebra side-out; precisamos da coluna posicao/numero para identificar adversário
+    temp = df.copy().reset_index(drop=True)
+    temp["is_saque_adv"] = (temp["fundamento"].isin(FUNDAMENTOS_SAQUE)) & (temp["posicao"]=="ADVERSÁRIO")
+    so = 0
+    tot = 0
+    for i, row in temp.iterrows():
+        if row["is_saque_adv"]:
+            tot += 1
+            # procura próximo lance nosso que finalize a posse
+            j = i + 1
+            while j < len(temp) and temp.loc[j, "posicao"] == "ADVERSÁRIO":
+                j += 1
+            if j < len(temp):
+                if temp.loc[j, "resultado"] in RESULTADOS_PONTO:
+                    so += 1
+    return (so / tot) if tot else 0.0
+
+def runs_pontuacao(df: pd.DataFrame) -> dict:
+    """Calcula maiores sequências de pontos a favor e contra, pela coluna 'resultado' e posicao 'ADVERSÁRIO'."""
+    score = 0
+    best_plus = 0
+    worst_minus = 0
+    for _, row in df.iterrows():
+        if row["posicao"] == "ADVERSÁRIO":
+            # ponto deles
+            if row["resultado"] in RESULTADOS_PONTO:
+                score -= 1
+            # nossos erros que geram ponto pra eles
+            if row["resultado"] in RESULTADOS_ERRO_GERAL:
+                score -= 1
+        else:
+            if row["resultado"] in RESULTADOS_PONTO:
+                score += 1
+        best_plus = max(best_plus, score)
+        worst_minus = min(worst_minus, score)
+    return {"maior_run_nosso": best_plus, "maior_run_adversario": -worst_minus}
+
+def gera_relatorio(df: pd.DataFrame, out_prefix: Path) -> None:
+    # Ordena por set e tempo (se tempo estiver no formato mm:ss, ordena lexicalmente ok para <10min; para robustez, converte)
+    def parse_t(s: str) -> int:
+        try:
+            m, ss = str(s).split(":")
+            return int(m)*60 + int(ss)
+        except Exception:
+            return 0
+    df = df.copy()
+    df["t_seconds"] = df["tempo"].astype(str).apply(parse_t)
+    df = df.sort_values(["set","t_seconds"]).reset_index(drop=True)
+
+    # Sumários
+    atq = sumariza_ataque(df)
+    sq = sumariza_saque(df)
+    bl = sumariza_bloqueio(df)
+    so = sideout_aproximado(df)
+    runs = runs_pontuacao(df)
+
+    # Destaques (heurísticas simples)
+    destaques = []
+    if not atq.empty:
+        top = atq.head(1).iloc[0]
+        destaques.append(f"Ponta/Atacante #{top['numero']} em destaque no ataque: eficiência {top['eficiencia']:.2f} ({int(top['pontos'])} pts, {int(top['erros'])} erros).")
+    if not sq.empty:
+        top_saq = sq.sort_values(['aces','series_2plus','tentativas'], ascending=[False,False,False]).head(1).iloc[0]
+        alvo_info = f\" (alvo mais frequente: zona {int(top_saq['alvo_top'])})\" if pd.notna(top_saq.get('alvo_top')) else ''
+        destaques.append(f"Saque #{top_saq['numero']}: {int(top_saq['aces'])} aces, séries 2+ {int(top_saq['series_2plus'])}{alvo_info}.")
+    if not bl.empty:
+        top_bl = bl.head(1).iloc[0]
+        destaques.append(f"Bloqueio #{top_bl['numero']}: {int(top_bl['pontos'])} pontos de bloqueio, {int(top_bl['toques'])} toques úteis.")
+    destaques.append(f\"Side-out aproximado: {so:.0%}. Maior run nosso: +{runs['maior_run_nosso']}; maior run deles: +{runs['maior_run_adversario']}.\")  # noqa
+
+    # Principais erros (heurística)
+    erros_nao_forcados = df[df['resultado'].isin(RESULTADOS_ERRO_GERAL)]
+    erros_por_jog = erros_nao_forcados.groupby(['numero','fundamento']).size().reset_index(name='erros').sort_values('erros', ascending=False)
+    sugestoes = []
+    if not erros_por_jog.empty:
+        row = erros_por_jog.head(1).iloc[0]
+        fundament = row['fundamento'].title()
+        sugestoes.append(f"Reduzir erros de **{fundament}** da jogadora #{row['numero']} (treinar consistência e tomada de decisão).")
+    # Ajustes táticos simples
+    if not atq.empty and 'diag' in atq.columns and atq['diag'].sum() > atq['linha'].sum():
+        sugestoes.append("Explorar **diagonal curta** na entrada (4→5) quando a recepção for ★/◔; variar com linha após 2 bolas na diagonal.")
+    if not bl.empty and bl['atrasos'].sum() > 0:
+        sugestoes.append("Sincronizar **tempo de bloqueio** (atraso detectado); alinhar chamada com levantadora.")
+    if not sq.empty and sq['erros'].sum() > 0:
+        sugestoes.append("Diminuir **erros de saque** em momentos de virada; optar por flutuante direcionado na levantadora.")
+
+    # Tabelas para Markdown
+    def md_table(df: pd.DataFrame) -> str:
+        if df is None or df.empty:
+            return "_Sem dados._"
+        df_show = df.copy()
+        # limitar casas
+        for col in df_show.columns:
+            if df_show[col].dtype.kind in "fc":
+                df_show[col] = df_show[col].map(lambda x: f"{x:.2f}")
+        # construir markdown
+        header = "| " + " | ".join(map(str, df_show.columns)) + " |\n"
+        sep = "| " + " | ".join(["---"]*len(df_show.columns)) + " |\n"
+        body = ""
+        for _, r in df_show.iterrows():
+            body += "| " + " | ".join(map(str, r.values)) + " |\n"
+        return header + sep + body
+
+    md = []
+    md.append(f"# Relatório da Partida – {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+    md.append("## Destaques")
+    md.extend([f"- {d}" for d in destaques])
+    md.append("\n## Ataque por Jogadora")
+    md.append(md_table(atq))
+    md.append("\n## Saque por Jogadora")
+    md.append(md_table(sq))
+    md.append("\n## Bloqueio por Jogadora")
+    md.append(md_table(bl))
+    md.append("\n## Principais Erros")
+    if erros_por_jog.empty:
+        md.append("_Sem dados._")
+    else:
+        md.append(md_table(erros_por_jog.head(10)))
+    md.append("\n## Sugestões de Ajuste")
+    if sugestoes:
+        md.extend([f"- {s}" for s in sugestoes])
+    else:
+        md.append("_Sem sugestões automáticas._")
+
+    out_md = Path(f\"{out_prefix}.md\")
+    out_html = Path(f\"{out_prefix}.html\")
+    out_md.write_text(\"\\n\".join(md), encoding=\"utf-8\")
+    # HTML simples
+    html = \"\"\"\n<!doctype html><html lang=\"pt-br\"><meta charset=\"utf-8\"><title>Relatório de Vôlei</title>\n<body style=\"font-family:Arial,Helvetica,sans-serif;max-width:900px;margin:24px auto;line-height:1.5\">\n\"\"\" + \"\\n\".join([f\"<p>{ln}</p>\" if not ln.startswith(\"#\") and not ln.startswith(\"|\") else ln for ln in md]).replace(\"\\n\",\"<br>\") + \"</body></html>\"\n    out_html.write_text(html, encoding=\"utf-8\")\n    print(f\"Relatórios salvos em: {out_md} e {out_html}\")\n\n# -------------------------------\n# CLI\n# -------------------------------\nif __name__ == \"__main__\":\n    ap = argparse.ArgumentParser()\n    ap.add_argument(\"--input\", required=True, help=\"Caminho do CSV com os lances\")\n    ap.add_argument(\"--out-prefix\", default=\"relatorio_partida\", help=\"Prefixo dos arquivos de saída\")\n    args = ap.parse_args()\n\n    df = carrega_csv(Path(args.input))\n    gera_relatorio(df, Path(args.out_prefix))\n```
+
+## Como usar agora
+1) Registre os lances no canvas (ou copie para um `.csv` com o cabeçalho do template).  
+2) Se quiser, já me cole aqui alguns lances (mesmo 10–20 linhas) e eu **entrego na hora** um diagnóstico com acertos, erros e 3–5 ajustes táticos claros.  
+3) Depois do jogo, rode o script para gerar o relatório em `.md` e `.html`.
+
+Se quiser, na próxima mensagem já mando uma **planilha CSV de exemplo** com 30–40 lances realistas para você testar o script.
+Você disse:
+Se eu enviar hj ou aqui em uma ia dessa forma que vou exemplificar vc conseguiria interpretar e adequar como precisa ? Ou ate no próprio código interpretar desta forma?
+Ex: todas as linhas que eu colocar adv na frente significa que é o time adversário. Sem adv é o nosso time
+
+Adv ponteira ataque diagonal (1 ponto adv) 
+Adv erro recepcao ( 1 ponto nosso)
+Levantadora erro levantamento (ponto adv)
+Levantadora 2 ponto de segunda (ponto nosso)
+Ponteira 9  ataque diagonal...
+
+E assim sucessivamente. Depois da posição da jogadora tentarei colocar a numeração dela para vc ir registrando. Importante que registre a jogadora, a pontuação para que lado foi, se acertou ou errou para depois gerar o relatório final.. ficou claro? Posso seguir assim?
+
+Obs: as informacoes em parênteses nao vou enviar. Vc é quem terá que interpretar.
+O ChatGPT disse:
+
+Pensou por 36s
+Sim — pode seguir exatamente assim. Eu consigo interpretar esse “taquigrafado” e transformar em dados estruturados. Melhor: já adaptei o script para aceitar linhas de texto livre nesse formato (além de CSV). Você poderá me colar as linhas aqui que eu já analiso, e depois usar o mesmo texto no script para gerar o relatório.
+
+A lógica que vou aplicar nas suas frases curtas é esta (sem precisar dos parênteses):
+
+Time: se a linha começar com adv → é adversário. Se não tiver adv no início → é nosso time.
+
+Posição: “ponteira”→PONTA, “oposta”→OPPOSTA, “central/meio”→CENTRO, “levantadora”→LEV, “líbero/libero”→LÍB.
+
+Número: se vier logo após a posição (ex.: ponteira 9), eu registro.
+
+Fundamento: palavras como “ataque”, “saque”, “recepção”, “levantamento”, “bloqueio”, “defesa”.
+
+Subtipo: “diagonal”, “linha”, “pipe”, “segunda” (ataque de segunda da levantadora), etc.
+
+Resultado (inferência):
+
+Se aparecer “ponto” → PONTO para o time citado (se for adv, o ponto é deles; sem adv, é nosso).
+
+Se aparecer “erro …” (erro de saque/recepção/levantamento/rede/fora) → ERRO_… e o ponto vai para o outro time.
+
+Se aparecer “bloqueio” + “ponto” → BLOQUEIO_PONTO para o time da linha.
+
+Se não aparecer “ponto” nem “erro”, marco como CONTINUA (lance em progresso).
+
+Exemplos que você citou (como eu vou interpretar):
+
+Adv ponteira ataque diagonal → Adversário, PONTA, ATAQUE/DIAGONAL, CONTINUA (sem “ponto”/“erro”, não assumo ponto).
+
+Adv erro recepcao → Adversário com ERRO_RECEPCAO ⇒ ponto nosso.
+
+Levantadora erro levantamento → Nosso ERRO_LEVANTAMENTO ⇒ ponto do adversário.
+
+Levantadora 2 ponto de segunda → Nossa LEV #2, ATAQUE/SEGUNDA, PONTO nosso.
+
+Ponteira 9 ataque diagonal → Nossa PONTA #9, ATAQUE/DIAGONAL, CONTINUA (a menos que você escreva “ponto” ou “erro”).
+
+Script completo (CSV ou texto livre)
+Salve como scout_volei.py. Ele:
+
+Lê CSV no padrão que te passei ou um .txt com uma linha por lance no seu estilo.
+
+Gera relatório .md e .html com destaques, tabelas e sugestões.
+
+Uso:
+
+# Texto livre:
+python scout_volei.py --free-text lances.txt --out-prefix relatorio
+
+# CSV estruturado:
+python scout_volei.py --input lances.csv --out-prefix relatorio
+Requisitos: pip install pandas
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+scout_volei.py – aceita CSV estruturado OU texto livre “taquigrafado”
+Exemplos:
+  python scout_volei.py --free-text lances.txt --out-prefix relatorio
+  python scout_volei.py --input lances.csv --out-prefix relatorio
+"""
+
+from __future__ import annotations
+import argparse
+import re
+import pandas as pd
+from pathlib import Path
+from datetime import datetime
+
+RESULTADOS_PONTO = {"PONTO", "ACE", "BLOQUEIO_PONTO"}
+RESULTADOS_ERRO_ATAQUE = {"ERRO_FORA", "ERRO_REDE", "BLOQUEADO"}
+RESULTADOS_ERRO_GERAL = {"ERRO_FORA", "ERRO_REDE", "FALTA", "TOQUE_REDE", "ERRO_SAQUE", "ERRO_RECEPCAO", "ERRO_LEVANTAMENTO"}
+
+FUNDAMENTOS_ATAQUE = {"ATAQUE"}
+FUNDAMENTOS_SAQUE = {"SAQUE"}
+FUNDAMENTOS_RECEPCAO = {"RECEPÇÃO", "RECEPCAO"}
+FUNDAMENTOS_BLOQUEIO = {"BLOQUEIO"}
+
+POSICOES_MAP = {
+    r"\bponteir[ao]?\b": "PONTA",
+    r"\bopost[ao]?\b": "OPPOSTA",
+    r"\bcentral\b|\bmeio\b": "CENTRO",
+    r"\blevantador[ao]?\b": "LEV",
+    r"\blíber[oa]\b|\bliber[oa]\b": "LÍB",
+}
+
+FUND_MAP = {
+    r"\bataque\b": ("ATAQUE", None),
+    r"\bsaque\b": ("SAQUE", None),
+    r"\brecep(c|ç)ao\b|\brecep(c|ç)ão\b": ("RECEPÇÃO", None),
+    r"\blevantamento\b": ("LEVANTAMENTO", None),
+    r"\bbloqueio\b": ("BLOQUEIO", None),
+    r"\bdefesa\b": ("DEFESA", None),
+}
+
+SUBTIPOS = {
+    r"\bdiagonal\b": "DIAGONAL",
+    r"\blinha\b": "LINHA",
+    r"\bpipe\b": "PIPE",
+    r"\bsegunda\b": "SEGUNDA",
+    r"\blob\b": "LOB",
+    r"\bchute\b": "CHUTE",
+    r"\bbola alta\b|\bbola_alta\b": "BOLA_ALTA",
+    r"\bflot(o|u)\b|\bflutuante\b": "FLOTO",
+    r"\bfor(ç|c)a\b": "FORÇA",
+}
+
+def _re_search_any(text: str, patterns: dict) -> str | None:
+    for pat, val in patterns.items():
+        if re.search(pat, text, flags=re.IGNORECASE):
+            return val
+    return None
+
+def parse_free_line(line: str, default_set: int | None = None) -> dict | None:
+    raw = line.strip()
+    if not raw:
+        return None
+    text = raw.lower()
+
+    # time (assumimos desconhecido no texto livre)
+    tempo = ""
+    setnum = default_set
+
+    # time: adv no início ⇒ adversário
+    adversario = bool(re.match(r"^\s*adv\b", text))
+
+    # posição
+    posicao = _re_search_any(text, POSICOES_MAP) or ("ADVERSÁRIO" if adversario else None)
+    # número (se vier após posição ou em qualquer lugar)
+    mnum = re.search(r"\b(\d{1,2})\b", text)
+    numero = mnum.group(1) if mnum else ""
+
+    # fundamento
+    fundamento = None
+    for pat, (fund, _) in FUND_MAP.items():
+        if re.search(pat, text, flags=re.IGNORECASE):
+            fundamento = fund
+            break
+    # subtipo
+    subtipo = _re_search_any(text, SUBTIPOS)
+
+    # heurística especial: “ponto de segunda” => ataque de segunda
+    if fundamento in (None, "LEVANTAMENTO") and re.search(r"\bsegunda\b", text):
+        fundamento = "ATAQUE"
+        subtipo = "SEGUNDA"
+
+    # resultado por palavras-chave
+    resultado = "CONTINUA"
+    # erros específicos
+    if re.search(r"\berro\b.*\brecep(c|ç)ao\w*", text):
+        resultado = "ERRO_RECEPCAO"
+    elif re.search(r"\berro\b.*\b(saques?|saque)\b|\berrou\s+saque\b", text):
+        resultado = "ERRO_SAQUE"
+    elif re.search(r"\berro\b.*\blevantamento\b|\berrou\s+levantamento\b", text):
+        resultado = "ERRO_LEVANTAMENTO"
+    elif re.search(r"\bfora\b", text):
+        resultado = "ERRO_FORA"
+    elif re.search(r"\brede\b", text) and re.search(r"\berro\b|\btoque\b", text):
+        resultado = "ERRO_REDE"
+    # pontos
+    if re.search(r"\bponto\b|\bmarcou\b|\bfez\b\s*ponto", text):
+        # se for bloqueio, considere BLOQUEIO_PONTO
+        if re.search(r"\bbloqueio\b", text):
+            resultado = "BLOQUEIO_PONTO"
+        else:
+            resultado = "PONTO"
+    # ace de saque
+    if re.search(r"\bace\b", text):
+        fundamento = fundamento or "SAQUE"
+        resultado = "ACE"
+
+    # origem/destino desconhecidos no texto livre
+    origem = pd.NA
+    destino = pd.NA
+
+    # posicao padrão se não encontrou (nosso time): tenta inferir por fundamento
+    if not posicao and not adversario:
+        if fundamento == "SAQUE":
+            posicao = "SACA"
+        elif fundamento in ("RECEPÇÃO","DEFESA","LEVANTAMENTO","ATAQUE","BLOQUEIO"):
+            posicao = ""  # desconhecida, mas nosso time
+    if adversario and posicao != "ADVERSÁRIO":
+        # se ele escreveu “adv ponteira”, fica “PONTA”; é válido.
+        pass
+
+    # observações: mantém a linha original
+    observ = raw
+
+    # “quem ganhou o ponto?” será deduzido no relatório; aqui registramos apenas o resultado.
+    # No CSV padrão, posicao 'ADVERSÁRIO' já indica quem executou o lance.
+
+    return {
+        "tempo": tempo,
+        "set": setnum,
+        "rotacao": "",
+        "numero": numero,
+        "posicao": posicao if posicao else ("ADVERSÁRIO" if adversario else ""),
+        "fundamento": fundamento if fundamento else "",
+        "subtipo": subtipo if subtipo else "",
+        "origem": pd.NA,
+        "destino": pd.NA,
+        "resultado": resultado,
+        "observacoes": observ,
+    }
+
+def parse_free_file(path: Path, default_set: int | None = None) -> pd.DataFrame:
+    rows = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        parsed = parse_free_line(line, default_set=default_set)
+        if parsed:
+            rows.append(parsed)
+    if not rows:
+        return pd.DataFrame(columns=["tempo","set","rotacao","numero","posicao","fundamento","subtipo","origem","destino","resultado","observacoes"])
+    df = pd.DataFrame(rows)
+    return normaliza_col(df)
+
+def normaliza_col(df: pd.DataFrame) -> pd.DataFrame:
+    # normaliza textos
+    for col in ["fundamento","subtipo","resultado","posicao","rotacao","numero"]:
+        if col in df.columns:
+            df[col] = df[col].astype(str).str.strip().str.upper()
+    if "fundamento" in df.columns:
+        df["fundamento"] = df["fundamento"].replace({"RECEPCAO":"RECEPÇÃO"})
+    if "posicao" in df.columns:
+        df["posicao"] = df["posicao"].replace({"LIB":"LÍB","ADVERSARIO":"ADVERSÁRIO"})
+    for z in ["origem","destino","set"]:
+        if z in df.columns:
+            df[z] = pd.to_numeric(df[z], errors="coerce").astype("Int64")
+    return df
+
+def carrega_csv(path: Path) -> pd.DataFrame:
+    df = pd.read_csv(path)
+    df.columns = [c.strip().lower() for c in df.columns]
+    esperadas = ["tempo","set","rotacao","numero","posicao","fundamento","subtipo","origem","destino","resultado","observacoes"]
+    faltantes = [c for c in esperadas if c not in df.columns]
+    if faltantes:
+        raise ValueError(f"Colunas faltando no CSV: {faltantes}")
+    return normaliza_col(df)
+
+# ====== Métricas e relatório (iguais ao MVP, com pequenos ajustes) ======
+def eficiencia_ataque(grp: pd.DataFrame) -> float:
+    tentativas = len(grp)
+    pontos = (grp["resultado"].isin(RESULTADOS_PONTO)).sum()
+    erros = (grp["resultado"].isin(RESULTADOS_ERRO_ATAQUE)).sum()
+    return ((pontos - erros) / tentativas) if tentativas else 0.0
+
+def sumariza_ataque(df: pd.DataFrame) -> pd.DataFrame:
+    atq = df[df["fundamento"].isin(FUNDAMENTOS_ATAQUE)].copy()
+    if atq.empty:
+        return pd.DataFrame(columns=["numero","posicao","tentativas","pontos","erros","eficiencia","diag","linha","pipe","segunda"])
+    atq["is_ponto"] = atq["resultado"].isin(RESULTADOS_PONTO)
+    atq["is_erro"] = atq["resultado"].isin(RESULTADOS_ERRO_ATAQUE)
+    atq["diag"] = (atq["subtipo"] == "DIAGONAL").astype(int)
+    atq["linha"] = (atq["subtipo"] == "LINHA").astype(int)
+    atq["pipe"] = (atq["subtipo"] == "PIPE").astype(int)
+    atq["segunda"] = (atq["subtipo"] == "SEGUNDA").astype(int)
+    agg = atq.groupby(["numero","posicao"], dropna=False).agg(
+        tentativas=("resultado","count"),
+        pontos=("is_ponto","sum"),
+        erros=("is_erro","sum"),
+        diag=("diag","sum"),
+        linha=("linha","sum"),
+        pipe=("pipe","sum"),
+        segunda=("segunda","sum"),
+    ).reset_index()
+    # eficiência
+    eff = []
+    for _, g in atq.groupby(["numero","posicao"]):
+        eff.append(eficiencia_ataque(g))
+    agg["eficiencia"] = eff
+    return agg.sort_values(["eficiencia","pontos"], ascending=[False,False])
+
+def sumariza_saque(df: pd.DataFrame) -> pd.DataFrame:
+    sq = df[df["fundamento"].isin(FUNDAMENTOS_SAQUE)].copy()
+    if sq.empty:
+        return pd.DataFrame(columns=["numero","tentativas","aces","erros","series_2plus","alvo_top","alvo_qtd"])
+    sq["ace"] = (sq["resultado"] == "ACE").astype(int)
+    sq["erro"] = (sq["resultado"] == "ERRO_SAQUE").astype(int)
+    base = sq.groupby("numero", dropna=False).agg(
+        tentativas=("resultado","count"),
+        aces=("ace","sum"),
+        erros=("erro","sum"),
+    ).reset_index()
+    # séries mínimas (aproximação)
+    series = []
+    for num, g in sq.reset_index(drop=True).groupby("numero"):
+        series.append((num, 1 if len(g) >= 2 else 0))
+    series_df = pd.DataFrame(series, columns=["numero","series_2plus"])
+    # alvo_top não é inferível do texto livre; ficará vazio
+    base = base.merge(series_df, on="numero", how="left")
+    base["alvo_top"] = pd.NA
+    base["alvo_qtd"] = pd.NA
+    return base.sort_values(["aces","series_2plus"], ascending=[False,False])
+
+def sumariza_bloqueio(df: pd.DataFrame) -> pd.DataFrame:
+    bl = df[df["fundamento"].isin(FUNDAMENTOS_BLOQUEIO)].copy()
+    if bl.empty:
+        return pd.DataFrame(columns=["numero","pontos","toques","atrasos"])
+    bl["ponto"] = (bl["resultado"].isin({"PONTO","BLOQUEIO_PONTO"})).astype(int)
+    bl["toque_util"] = (bl["resultado"].eq("CONTINUA")).astype(int)
+    bl["atrasado"] = bl["observacoes"].str.contains("atras", case=False, na=False).astype(int)
+    agg = bl.groupby("numero", dropna=False).agg(
+        pontos=("ponto","sum"),
+        toques=("toque_util","sum"),
+        atrasos=("atrasado","sum"),
+    ).reset_index()
+    return agg.sort_values(["pontos","toques"], ascending=[False,False])
+
+def sideout_aproximado(df: pd.DataFrame) -> float:
+    temp = df.copy().reset_index(drop=True)
+    temp["is_saque_adv"] = (temp["fundamento"].isin(FUNDAMENTOS_SAQUE)) & (temp["posicao"]=="ADVERSÁRIO")
+    so, tot = 0, 0
+    for i, row in temp.iterrows():
+        if row["is_saque_adv"]:
+            tot += 1
+            j = i + 1
+            while j < len(temp) and temp.loc[j, "posicao"] == "ADVERSÁRIO":
+                j += 1
+            if j < len(temp):
+                if temp.loc[j, "resultado"] in RESULTADOS_PONTO:
+                    so += 1
+    return (so / tot) if tot else 0.0
+
+def runs_pontuacao(df: pd.DataFrame) -> dict:
+    score = 0
+    best_plus = 0
+    worst_minus = 0
+    for _, row in df.iterrows():
+        if row["posicao"] == "ADVERSÁRIO":
+            if row["resultado"] in RESULTADOS_PONTO or row["resultado"] in RESULTADOS_ERRO_GERAL:
+                score -= 1
+        else:
+            if row["resultado"] in RESULTADOS_PONTO:
+                score += 1
+        best_plus = max(best_plus, score)
+        worst_minus = min(worst_minus, score)
+    return {"maior_run_nosso": best_plus, "maior_run_adversario": -worst_minus}
+
+def _md_table(df: pd.DataFrame) -> str:
+    if df is None or df.empty:
+        return "_Sem dados._"
+    df_show = df.copy()
+    for col in df_show.columns:
+        if df_show[col].dtype.kind in "fc":
+            df_show[col] = df_show[col].map(lambda x: f"{x:.2f}")
+    header = "| " + " | ".join(map(str, df_show.columns)) + " |\n"
+    sep = "| " + " | ".join(["---"]*len(df_show.columns)) + " |\n"
+    body = ""
+    for _, r in df_show.iterrows():
+        body += "| " + " | ".join(map(str, r.values)) + " |\n"
+    return header + sep + body
+
+def gera_relatorio(df: pd.DataFrame, out_prefix: Path) -> None:
+    def parse_t(s: str) -> int:
+        try:
+            m, ss = str(s).split(":")
+            return int(m)*60 + int(ss)
+        except Exception:
+            return 0
+    df = df.copy()
+    if "tempo" in df.columns:
+        df["t_seconds"] = df["tempo"].astype(str).apply(parse_t)
+        sort_cols = ["set","t_seconds"] if "set" in df.columns else ["t_seconds"]
+        df = df.sort_values(sort_cols).reset_index(drop=True)
+
+    atq = sumariza_ataque(df)
+    sq = sumariza_saque(df)
+    bl = sumariza_bloqueio(df)
+    so = sideout_aproximado(df)
+    runs = runs_pontuacao(df)
+
+    destaques = []
+    if not atq.empty:
+        top = atq.head(1).iloc[0]
+        destaques.append(f"Ponta/Atacante #{top['numero']} em destaque no ataque: eficiência {top['eficiencia']:.2f} ({int(top['pontos'])} pts, {int(top['erros'])} erros).")
+    if not sq.empty:
+        top_saq = sq.sort_values(['aces','series_2plus','tentativas'], ascending=[False,False,False]).head(1).iloc[0]
+        destaques.append(f"Saque #{top_saq['numero']}: {int(top_saq['aces'])} aces, séries 2+ {int(top_saq['series_2plus'])}.")
+    if not bl.empty:
+        top_bl = bl.head(1).iloc[0]
+        destaques.append(f"Bloqueio #{top_bl['numero']}: {int(top_bl['pontos'])} pontos de bloqueio, {int(top_bl['toques'])} toques úteis.")
+    destaques.append(f"Side-out aproximado: {so:.0%}. Maior run nosso: +{runs['maior_run_nosso']}; maior run deles: +{runs['maior_run_adversario']}.")
+
+    erros_nao_forcados = df[df['resultado'].isin(RESULTADOS_ERRO_GERAL)]
+    erros_por_jog = erros_nao_forcados.groupby(['numero','fundamento']).size().reset_index(name='erros').sort_values('erros', ascending=False)
+
+    sugestoes = []
+    if not erros_por_jog.empty:
+        row = erros_por_jog.head(1).iloc[0]
+        fundament = row['fundamento'].title()
+        num = str(row['numero']) if pd.notna(row['numero']) and str(row['numero']) != "" else "?"
+        sugestoes.append(f"Reduzir erros de **{fundament}** da jogadora #{num} (treinar consistência/decisão).")
+    if not atq.empty and 'diag' in atq.columns and atq['diag'].sum() > atq['linha'].sum():
+        sugestoes.append("Explorar **diagonal curta** na entrada (4→5) quando recepção ★/◔; variar com linha após 2 bolas na diagonal.")
+    if not bl.empty and bl['atrasos'].sum() > 0:
+        sugestoes.append("Sincronizar **tempo de bloqueio**; alinhar chamada e leitura da levantadora adversária.")
+    if not sq.empty and sq['erros'].sum() > 0:
+        sugestoes.append("Diminuir **erros de saque** em pontos de virada; priorizar flutuante direcionado na levantadora.")
+
+    md = []
+    md.append(f"# Relatório da Partida – {datetime.now().strftime('%d/%m/%Y %H:%M')}")
+    md.append("## Destaques")
+    md.extend([f"- {d}" for d in destaques])
+    md.append("\n## Ataque por Jogadora")
+    md.append(_md_table(atq))
+    md.append("\n## Saque por Jogadora")
+    md.append(_md_table(sq))
+    md.append("\n## Bloqueio por Jogadora")
+    md.append(_md_table(bl))
+    md.append("\n## Principais Erros")
+    md.append("_Sem dados._" if erros_por_jog.empty else _md_table(erros_por_jog.head(10)))
+    md.append("\n## Sugestões de Ajuste")
+    md.extend([f"- {s}" for s in sugestoes]) if sugestoes else md.append("_Sem sugestões automáticas._")
+
+    out_md = Path(f"{out_prefix}.md")
+    out_html = Path(f"{out_prefix}.html")
+    out_md.write_text("\n".join(md), encoding="utf-8")
+    html = """<!doctype html><html lang="pt-br"><meta charset="utf-8"><title>Relatório de Vôlei</title>
+<body style="font-family:Arial,Helvetica,sans-serif;max-width:900px;margin:24px auto;line-height:1.5">""" + "\n".join(
+        [f"<p>{ln}</p>" if not ln.startswith("#") and not ln.startswith("|") else ln for ln in md]
+    ).replace("\n","<br>") + "</body></html>"
+    out_html.write_text(html, encoding="utf-8")
+    print(f"Relatórios salvos em: {out_md} e {out_html}")
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--input", help="CSV estruturado")
+    ap.add_argument("--free-text", help="Arquivo .txt com uma linha por lance (texto livre)")
+    ap.add_argument("--set-default", type=int, help="Set padrão para texto livre (opcional)")
+    ap.add_argument("--out-prefix", default="relatorio_partida", help="Prefixo dos arquivos de saída")
+    args = ap.parse_args()
+
+    if args.input and args.free_text:
+        raise SystemExit("Use apenas --input (CSV) OU --free-text (texto), não ambos.")
+    if not args.input and not args.free_text:
+        raise SystemExit("Informe --input CSV ou --free-text TXT.")
+
+    if args.input:
+        df = carrega_csv(Path(args.input))
+    else:
+        df = parse_free_file(Path(args.free_text), default_set=args.set_default)
+
+    gera_relatorio(df, Path(args.out_prefix))
+
+if __name__ == "__main__":
+    main()
+Pode começar já
+Manda aqui 5–15 linhas no seu formato (exatamente como você escreveu nos exemplos), e eu já te devolvo a análise imediata (acertos, erros e 3–5 ajustes práticos). Depois é só salvar as mesmas linhas num .txt e rodar o script com --free-text.
+
+Você disse:
+No dia de hoje nao vou mexer em códigos mas quero que vc me gere oa resultados conforme o código que fez para que eu ja valide o resultado, ok?
+Pode ja começar a impelemtar a página de tabelas dinâmicas com as maiores pontuações e erros, por exemplo.. incluindo tb geração de alguns 3 gráficos principais para melhorias da nossa equipe..  nao precisa ficar me enviando o código hj, apenas vá anotando as minhas solicitações e amanha vc irá gerar esse projeto final, ok? Importante é que vá evoluindo sempre e nao esqueça ou erre em coisas que ja pedi ou definimos
+O ChatGPT disse:
+
+Pensou por 50s
+Scout & Análise De Jogo – Vôlei (projeto)
+
+Scout & Análise de Jogo – Vôlei
+Use este documento durante a partida para registrar lances e, ao final, gerar uma análise rápida.
+
+1) Como registrar cada lance (linha única por lance)
+Formato sugerido (separado por ponto e vírgula ;):
+
+minuto:segundo; set; rotação; nº_jogadora; posição; fundamento; subtipo; origem(zona); destino(zona); resultado; observações
+Exemplo:
+
+03:12;2;R3;9;PONTA;ATAQUE;DIAGONAL;4;5;PONTO;bola rápida, defesa atrasada
+03:44;2;R3;18;OPPOSTA;ATAQUE;LINHA;1;1;ERRO_FORA;pressão do bloqueio duplo
+04:02;2;—;ADVERSÁRIO;BLOQUEIO;SIMPLES;—;—;PONTO;bloqueio na ponta
+Dicionário de valores (padronize para facilitar a análise)
+posição: LEV (levantadora), LÍB (líbero), PONTA (entrada), OPPOSTA (saída), CENTRO (meio), SACA (sacadora em ação)
+
+fundamento: SAQUE, RECEPÇÃO, LEVANTAMENTO, ATAQUE, BLOQUEIO, DEFESA, COBERTURA, ERRO_TÁTICO
+
+subtipo (exemplos):
+
+SAQUE: FLOTO, VIROLA, FORÇA
+
+ATAQUE: DIAGONAL, LINHA, LOB, PIPE, CHUTE, BOLA_ALTA
+
+BLOQUEIO: SIMPLES, DUPLO, TRIPLO, TOQUE_REDE (se for erro)
+
+RECEPÇÃO: PERFEITA, BOA, FORA_DO_ALVO, ERRO
+
+zona: use 1–6 (padrão internacional). Ex.: origem 4 (entrada), destino 5 (diagonal cruzada curta).
+
+resultado (exemplos): PONTO, ERRO_FORA, ERRO_REDE, BLOQUEADO, CONTRA_ATAQUE, CONTINUA
+
+Dica: Se não souber a rotação, deixe "—" e siga.
+
+2) Planilha rápida (para copiar/colar no Excel/Sheets)
+tempo	set	rotacao	numero	posicao	fundamento	subtipo	origem	destino	resultado	observacoes
+00:00	1	R1	9	PONTA	ATAQUE	DIAGONAL	4	5	PONTO	
+00:25	1	R1	18	OPPOSTA	ATAQUE	LINHA	1	1	ERRO_FORA	
+00:40	1	—	ADVERSÁRIO	BLOQUEIO	SIMPLES	—	—	PONTO	bloqueio na ponta
+3) Marcadores rápidos (para notas ao longo do set)
+Transição ataque (contra-ataque): ✅ boa | ⚠️ lenta | ❌ desorganizada
+
+Saque alvo: LÍB | PONTA | OPPOSTA | LEV | CENTRO
+
+Recepção: ★ (perfeita) | ◔ (boa) | ◑ (regular) | ✕ (erro)
+
+Bloqueio: + (toque útil) | # (ponto direto) | – (atrasado)
+
+4) Análise Rápida Pós-Set (preencher)
+Maiores acertos:
+
+
+
+Principais erros:
+
+
+
+Ajustes imediatos (próximo set):
+
+
+
+5) Indicadores para o relatório (o script irá calcular)
+Ataque por jogadora/posição: tentativas, pontos, erros, "eficiência" = (pontos − erros) / tentativas
+
+Mapa por zona de origem (1–6) e subtipo (diagonal/linha/pipe)
+
+Saque: aces, erros, séries >2 saques, alvo preferido
+
+Recepção: distribuição e qualidade (★, ◔, ◑, ✕)
+
+Bloqueio: pontos diretos (#), toques úteis (+)
+
+Sequências: runs de pontos ganhos/perdidos, viradas de bola (side-out)
+
+6) Como usar com o script (resumo)
+Durante o jogo, preencha a Planilha rápida ou salve os lances em .csv seguindo o cabeçalho acima ou anote em texto livre (ex.: adv ponteira ataque diagonal ponto, ponteira 9 ataque diagonal, levantadora 2 ponto de segunda).
+
+Após a partida, o script Python (já escrito) gera um relatório em Markdown/HTML com indicadores e sugestões.
+
+7) Prévia de Resultados (amostra ilustrativa)
+Baseado em 15 lances de exemplo (texto livre). Use apenas para validar o formato de saída.
+
+7.1 Destaques
+Ponta #9 em destaque no ataque: eficiência 0,33 (2 pts, 1 erro).
+
+Saque #9: 1 ace.
+
+Bloqueio #7: 1 ponto.
+
+Side-out (aprox.): 0% nesta amostra (houve 1 ace adversário); amostra pequena.
+
+7.2 Ataque por Jogadora
+numero	posicao	tentativas	pontos	erros	diagonal	linha	pipe	segunda	eficiencia
+2	LEV	1	1	0	0	0	0	1	1,00
+9	PONTA	3	2	1	3	0	0	0	0,33
+18	OPPOSTA	2	1	1	0	2	0	0	0,00
+7.3 Saque por Jogadora
+numero	tentativas	aces	erros	series_2plus
+9	1	1	0	0
+18	1	0	1	0
+7.4 Bloqueio por Jogadora
+numero	pontos	toques	atrasos
+7	1	0	0
+7.5 Principais Erros (nossos)
+numero	fundamento	erros
+18	SAQUE	1
+18	ATAQUE	1
+9	ATAQUE	1
+7.6 Sugestões de Ajuste (derivadas da amostra)
+Manter diagonal na ponta #9, mas alternar com linha após bloqueio sofrido.
+
+Reduzir erros da oposta #18 (linha) – foco em tomada de decisão na bola alta.
+
+Saque #18: priorizar segurança em pontos de virada; direcionar flutuante na levantadora adversária.
+
+Reforçar cobertura de ataque na ponta (houve 1 bloqueio ponto contra).
+
+Treinar side-out contra saque forte (houve 1 ace adversário nesta sequência curta).
+
+8) Dashboard Analítico (sem código hoje)
+Tabelas dinâmicas (com filtros de set, jogadora, posição, fundamento):
+
+Top Pontuadoras (Ataque) – métricas: tentativas, pontos, erros, eficiência, distribuição por subtipo (diag/linha/pipe/segunda).
+
+Erros por Jogadora × Fundamento – erros não forçados (saque, recepção, levantamento, ataque, rede).
+
+Saque – resumo – tentativas, aces, erros, séries ≥2, alvo mais frequente (se disponível).
+
+Gráficos principais:
+
+Barras: Eficiência de ataque por jogadora.
+
+Barras empilhadas: Erros não forçados por fundamento (por jogadora).
+
+Linha: Side-out% por set (ou por blocos de 10 lances quando o set não estiver marcado).
+
+Roadmap de amanhã (entrega do projeto final, sem mudar nada já definido):
+
+Implementar página única com filtros (Set, Jogadora, Posição, Fundamento) e as 3 tabelas/3 gráficos acima.
+
+Exportação do relatório em MD/HTML + opção de CSV dos agregados.
+
+Importar tanto CSV estruturado quanto texto livre.
+
+Persistência simples de presets de filtro (JSON).
+
+perfeito — entendi o pedido: hoje você quer resultados e o desenho da página analítica, sem receber código; amanhã a gente empacota tudo em projeto final. Eu não consigo “ir evoluindo em background para amanhã”, então já deixei toda a especificação e uma prévia de resultados pronta no canvas agora mesmo, baseada numa amostra ilustrativa de 15 lances no seu formato “taquigrafado”. Lá você vê:
+
+Destaques (eficiência de ataque, aces, bloqueio ponto, side-out%).
+
+Tabelas dinâmicas planejadas:
+
+Top Pontuadoras (Ataque)
+
+Erros por Jogadora × Fundamento
+
+Saque – resumo
+
+3 gráficos principais: barras (eficiência de ataque por jogadora), barras empilhadas (erros não forçados por fundamento), linha (side-out% por set).
+
+Sugestões táticas já geradas a partir da amostra (ex.: alternar diagonal/linha na #9, reduzir erros da #18, reforçar cobertura na ponta, treinar side-out vs saque forte).
+
+se quiser validar com dados reais de hoje, me manda aqui 10–30 linhas no seu estilo (ex.: adv ponteira ataque diagonal ponto, ponteira 9 ataque diagonal, levantadora 2 ponto de segunda, etc.). Eu já replugo e te entrego na hora uma análise com os mesmos quadros e recomendações — sem te enviar código.
+
+Você disse:
+Regra: quando vc receber as linhas, saiba que a linha 1 foi o ponto 1 e assim sucessivamente. Com esta confirmação vc poderá gerar tabelas e gráficos de quem foi pontuando, nos ou o time adversário com o histórico de ponto ao longo do set , mais pontos em sequência e outros informacoes do tipo 
+O ChatGPT disse:
+Perfeito 👍
+então vamos combinar assim:
+
+Linha 1 = ponto 1, linha 2 = ponto 2, … até o final.
+
+Cada linha que você mandar será entendida como um rally completo, cujo resultado é +1 no placar de um dos lados (nós ou adversário).
+
+Com isso, eu consigo construir:
+
+Histórico ponto a ponto do set (sequência temporal de quem pontuou).
+
+Placar acumulado ao longo das jogadas.
+
+Runs (maiores sequências de pontos seguidos de cada lado).
+
+Gráficos:
+
+Linha do placar (nosso x adversário ponto a ponto).
+
+Barras de “runs” (maior sequência de pontos consecutivos).
+
+Pizza ou barra horizontal mostrando a proporção de pontos nossos vs erros deles (e vice-versa).
+
+Assim, basta você me colar aqui as linhas no formato que definimos (adv ..., ponteira 9 ataque diagonal, levantadora erro levantamento, etc.), que eu gero o relatório com as tabelas e os 3 gráficos já simulando o que o sistema final fará.
+
+👉 Pode mandar já um trecho do set de hoje (10–20 jogadas) que eu devolvo a análise completa com histórico, runs e gráficos. Quer que eu simule já com uma sequência fictícia para você ver como vai ficar antes de usar seus dados reais?
+
+Você disse:
+O que acha de eu usar 0 ou 1 na frente da linha para indicar 0 =adv e 1 = nosso time?
+Ex:
+0 ponteira 9 diagonal ( ponto delas )
+1 oposta meio ( ponto da nossa oposta atacando no meio da quadra adv)
+1 erro central (quando indicar erro = fora ou rede) 
+1 erro central bloqueio ....
+Me avise se entendeu e gere uma tabela e gráfico simples deste exemplo que enviei  
+O ChatGPT disse:
+Histórico de pontos
+
+
+Evolução do placar (exemplo)
+Agora interativos! (Beta)
+Imagem resultante
+Entendi perfeitamente ✅
+Usando 0 = adversário e 1 = nosso time, consigo interpretar direto: se a linha for erro, o ponto vai pro outro lado; se for execução normal, o ponto vai pra quem fez a ação.
+
+Acabei de processar o seu mini-exemplo. Veja a tabela de histórico ponto a ponto (já com placar acumulado) e o gráfico de evolução do set ao longo dos rallies.
+
+Quer que eu amplie essa lógica para calcular também runs (sequências de pontos seguidos) e proporções (pontos nossos × erros deles, etc.) quando você enviar uma sequência maior? 
+
+Você disse:
+Essas análises extras vamos deixar pra amanha como comentei, so quero uma imagem da tabela com o resultado do exemplo que te passei ? Pode ser texto aqui tb
+O ChatGPT disse:
+Aqui está a tabela em texto do seu exemplo (0 = adversário, 1 = nosso time). Cada linha é um rally e mostra quem pontuou e o placar acumulado:
+
+Rally	Ação	Quem Pontuou	Placar Nós	Placar Adversário
+1	ponteira 9 diagonal	Adversário	0	1
+2	oposta meio	Nós	1	1
+3	erro central	Adversário	1	2
+4	erro central bloqueio	Adversário	1	3
+👉 Resultado do mini-set de exemplo: Nós 1 × 3 Adversário.
+
+Se preferir, amanhã posso gerar essa mesma tabela em imagem estilizada (tipo print de tabela dinâmica) junto com os gráficos extras que combinamos. Quer que eu prepare esse modelo de tabela já no formato visual (imagem) para ficar parecido com relatório final?
+
+Você disse:
+Posição da jogadora, numeração delas posição de pontuação ou erro ou ataque tem qhe ser colunas separadas.. Tb mostre a coluna final o placar atual. Gere nova tabela e armazene essas informacoes 
+O ChatGPT disse:
+Histórico detalhado de rallies
+
+
+Aqui está a tabela revisada com as colunas separadas (posição, numeração, ação, resultado) e a coluna final mostrando o placar acumulado:
+
+Rally	Time	Posição	Número	Ação	Resultado	Quem Pontuou	Placar Atual
+1	Adversário	PONTEIRA	9	diagonal	PONTO_ADV	Adversário	0-1
+2	Nós	OPOSTA		meio	PONTO	Nós	1-1
+3	Nós	ERRO		central	ERRO	Adversário	1-2
+4	Nós	ERRO		central bloqueio	ERRO	Adversário	1-3
+✅ Agora cada rally guarda: posição, número da jogadora, ação, resultado e placar atualizado.
+Quer que eu já deixe essa estrutura fixa para todos os próximos sets, assim você só manda as linhas brutas e eu devolvo direto essa tabela? 
+
+Você disse:
+As duas últimas linhas foram ações da central no centro da quadra, preciso que entenda isso. Ajuste novamente e armazene
+O ChatGPT disse:
+Histórico detalhado corrigido
+
+
+Agora ajustei ✅: as duas últimas linhas foram corretamente interpretadas como ações da central (não mais como “ERRO” posição).
+
+Aqui está a tabela final do seu exemplo:
+
+Rally	Time	Posição	Número	Ação	Resultado	Quem Pontuou	Placar Atual
+1	Adversário	PONTEIRA	9	diagonal	PONTO_ADV	Adversário	0-1
+2	Nós	OPOSTA		meio	PONTO	Nós	1-1
+3	Nós	CENTRAL			ERRO	Adversário	1-2
+4	Nós	CENTRAL		bloqueio	ERRO	Adversário	1-3
+📌 A partir de agora, qualquer linha que você registrar como “erro central …” será entendida como Central cometendo erro (fora, rede, bloqueio, etc.), e o ponto vai para o adversário.
+
+Quer que eu já padronize essa lógica para todas as posições (ponta, oposta, central, levantadora, líbero), tratando o “erro” como ação e não como posição? 
+
+Você disse:
+Para o nosso código, armazene que vou ter uma planilha base de cadastro do nome da equipe, do nome e numeração das jogadoras, e você irá ler, ponto. Meu código terá uma página inicial que eu poderei cadastrar a data do amistoso e a equipe oposta, o nome da equipe, e o registro daquele dia, dos setes e desta histórico que estamos fazendo, irá ficar armazenado neste amistoso, neste registro. Você deverá armazenar estas informações em um Excel que servirá como base de dados para que sempre seja lido. Exemplo, o amistoso de hoje, 18-08, será contra a equipe Águias. Nós ganhamos de 4 a 1, vai ter o histórico dos pontos, ao final você vai salvar o histórico. Irá armazenar no Excel, e em outro dia eu irei conseguir consultar os dados deste amistoso de 18-08 contra o Águias, ok?
+O ChatGPT disse:
+
+Pensou por 12s
+perfeito — registrei os requisitos e já deixei a base de dados em Excel pronta para esse fluxo:
+
+equipes: cadastro dos times (inclui “Nosso Time” e “Águias”).
+
+jogadoras: nome, número e posição (adicione suas atletas aqui).
+
+amistosos: data, times, placar em sets, observações.
+
+sets: pontuação por set (um registro por set).
+
+rallies: histórico ponto a ponto (quem executou, posição, nº, ação, quem pontuou e placar acumulado).
+
+Incluí um exemplo pré-preenchido do amistoso de 18/08 contra o Águias (placar 4×1) e o Set 1 com as 4 jogadas do nosso mini-exemplo.
+
+👉 Baixe a planilha-base para usar/editar:
+Download do Excel de base
+
+Quando você atualizar essa planilha com suas atletas e novos amistosos, eu leio exatamente desse arquivo para gerar relatórios e dashboards. Se quiser, me diga se prefere mudar nomes de abas/colunas agora (ex.: “nossa equipe” em vez de “Nosso Time”), que eu já ajusto na base. 
+
+Você disse:
+1 central ponto
+0 erro recepção
+
+Com essas informações atualize a tabela 
+O ChatGPT disse:
+Atualizei o histórico de rallies no Excel com as duas novas jogadas:
+
+1 central ponto → ponto da nossa central (placar foi a 2-3).
+
+0 erro recepção → erro de recepção do adversário, ponto nosso (placar 3-3).
+
+✅ O arquivo volei_base_dados.xlsx já foi salvo novamente com essas informações na aba rallies.
+
+Quer que eu também atualize automaticamente a aba sets (placar total do set) a cada jogada ou você prefere só ao final do set? 
+
+Você disse:
+Gere novamente o Excel base
+O ChatGPT disse:
+Preview - Amistosos (regerado)
+
+
+Preview - Sets (regerado)
+
+
+Preview - Rallies (regerado)
+
+
+Prontinho — redeclarei do zero o Excel base com o amistoso de 18/08 contra o Águias e o Set 1 atualizado com as 6 jogadas (placar do set no momento: 3–3). As abas estão assim:
+
+equipes – cadastro de times
+
+jogadoras – elenco (placeholders para você completar)
+
+amistosos – registro do jogo de 18/08 (4×1 em sets, conforme você pediu)
+
+sets – set 1 com placar derivado do histórico (3–3 por enquanto)
+
+rallies – ponto a ponto com os 6 rallies, incluindo “1 central ponto” e “0 erro recepção”
+
+Baixe a versão regenerada aqui:
+Download do Excel de base
+
+Se quiser, já posso incluir mais sets ou atualizar o placar final do set 1 quando você mandar as próximas linhas. 
+
+Você disse:
+Gere um zip dos códigos python que quero fazer uma v1.. faça o seu máximo para gerar tudo que pedi e sem erros
+O ChatGPT disse:
+
+Pensou por 42s
+aí está sua V1 completa, empacotada e pronta pra rodar 👇
+
+⬇️ Baixar o projeto (volei_v1.zip)
+
+O pacote inclui:
+
+src/cli.py — CLI para criar/atualizar a base Excel, cadastrar amistosos/sets, ingerir lances (texto livre ou CSV) e gerar relatórios (MD/HTML + gráfico PNG).
+
+src/scout_parser.py — parser robusto para linhas no seu formato (prefixos 0/1 ou adv, posições, numeração, “erro” ⇒ ponto do outro lado, etc.).
+
+src/db_excel.py — leitura/escrita da base Excel com abas: equipes, jogadoras, amistosos, sets, rallies.
+
+src/report_generator.py — geração de relatório (destaques, eficiência simples por jogadora, erros por jogadora, evolução do placar).
+
+src/app_streamlit.py — dashboard com tabelas dinâmicas e 3 gráficos principais:
+
+Eficiência de ataque por jogadora (barras)
+
+Erros não forçados por jogadora (barras)
+
+Evolução do placar ponto a ponto (linha)
+
+requirements.txt — dependências mínimas (pandas, openpyxl, XlsxWriter, matplotlib, streamlit).
+
+sample_data/lances_exemplo.txt — seu exemplo de lances.
+
+volei_base_dados.xlsx — base inicial com o amistoso de 18/08 vs Águias e o Set 1 (3–3 no histórico atual).
+
+Como rodar (resumo)
+# 1) criar ambiente
+python -m venv .venv
+# Windows: .venv\Scripts\activate
+# Linux/Mac:
+source .venv/bin/activate
+pip install -r requirements.txt
+
+# 2) (opcional) criar/garantir base
+python src/cli.py init-db --db volei_base_dados.xlsx --team "Nosso Time"
+
+# 3) ingerir lances de texto
+python src/cli.py ingest --db volei_base_dados.xlsx --match-id 101 --set-number 1 --free-text sample_data/lances_exemplo.txt
+
+# 4) gerar relatório
+python src/cli.py report --db volei_base_dados.xlsx --match-id 101 --set-number 1 --out-prefix relatorios/amistoso_101
+
+# 5) dashboard
+streamlit run src/app_streamlit.py -- --db volei_base_dados.xlsx
+Se quiser, já me manda um bloco de lances reais que eu processso aqui e te devolvo a análise com as mesmas tabelas/gráficos — e se algo precisar ajustar, eu atualizo o código da V1 pra ficar redondinho. 
+
+Você disse:
+O principal arquivo a ser executado e o cliente.py?
+O ChatGPT disse:
+Boa pergunta 👍
+
+No pacote que gerei, o principal arquivo para rodar via terminal (modo linha de comando) é o:
+
+src/cli.py
+Coloquei esse nome porque a ideia era ser uma CLI (Command Line Interface).
+Se você preferir, eu posso renomear para cliente.py (ou main.py), sem problema — fica até mais intuitivo para você rodar.
+
+👉 Então hoje:
+
+Terminal → rode python src/cli.py ...
+
+Dashboard → rode streamlit run src/app_streamlit.py -- --db volei_base_dados.xlsx
+
+Quer que eu já ajuste o projeto para que o arquivo principal se chame cliente.py (e você rodar sempre python cliente.py ...), em vez de cli.py?
+
+Você disse:
+vc gerou uma v1 mas que faz com que eu tenha que gerar comandos para startar db, iniciar partida etc.. nao é isso que quero, quero que vc gere um index que vai carregar e inicialmente inserir a partida e a partir do momento que inserir a partida, irei digitando o scout e vc armazenando dados e ja me mostrando online os resultados, tabelas e graficos do que lhe enviei, ficou mais claro (interrogacao)
+
+refaca com essa abordagem, e assim que carregar o index e eu inserir as informacoes vc por baixo do backend starte o bd, armazene a partida e já vá para segunda tela que eu vou comecar a registrar as informacoes de scout do set 1
+O ChatGPT disse:
+perfeito — refiz no modelo “index único”: você abre uma página, cadastra o amistoso e imediatamente entra na tela de scout ao vivo, registrando linha a linha e vendo tabelas e gráficos atualizarem na hora. O app inicializa a base por baixo dos panos, salva tudo em Excel e mantém o amistoso/set ativo.
+
+⬇️ Baixe a V1 live (index único):
+volei_live_v1.zip
+
+Como usar
+Crie o venv e instale:
+
+python -m venv .venv
+# Windows: .venv\Scripts\activate
+# Linux/Mac:
+source .venv/bin/activate
+pip install -r requirements.txt
+Inicie o app:
+
+streamlit run index.py
+No index:
+
+Se quiser, ajuste o caminho do Excel (se não existir, ele cria).
+
+Preencha Data do amistoso, Nossa equipe e Adversário → clique em “Criar amistoso e iniciar Set 1”.
+
+Vá para o bloco Scout ao vivo e digite uma linha por rally. Exemplos:
+
+1 central ponto
+
+0 ponteira 9 diagonal
+
+1 erro central bloqueio
+
+adv erro recepcao
+
+A cada Registrar rally, o placar, as tabelas (top pontuadoras, erros por jogadora) e os gráficos (eficiência, erros, evolução do placar) se atualizam instantaneamente.
+
+Clique em “Encerrar set e abrir próximo” para iniciar o Set 2 e assim por diante.
+
+O que acontece por trás (sem você precisar rodar scripts):
+Cria/abre a base volei_base_dados.xlsx com abas equipes, jogadoras, amistosos, sets, rallies.
+
+Registra o amistoso e o Set 1 ao confirmar no index.
+
+Cada linha do scout é interpretada automaticamente:
+
+Prefixo: 1 = nosso time, 0/adv = adversário.
+
+Reconhece posição (ponteira/oposta/central/levantadora/líbero), número (se informado) e ação (diagonal, linha, meio, bloqueio, segunda, etc.).
+
+Regra de erro: se a linha contiver “erro”, o ponto vai para o outro lado.
+
+Atualiza placar do set e salva tudo no Excel.
+
+Se quiser trocar o nome das abas/colunas, adicionar cadastro de elenco e numeração diretamente pela UI, ou ajustar qualquer métrica/visual, me diga que eu já itero nessa base. 
+# Histórico de Conversa - Projeto Vôlei Scout UniVolei
+
+---
+
+👤 **Usuário:**  
+nao quero criar um venv, como faco para executar  
+
+🤖 **Assistente:**  
+... (resposta sobre instalar streamlit sem venv)  
+
+---
+
+👤 **Usuário:**  
+PS G:\Meu Drive\...> streamlit run index.py  
+streamlit : O termo 'streamlit' não é reconhecido...  
+
+🤖 **Assistente:**  
+... (resposta sobre adicionar ao PATH ou usar python -m streamlit run index.py)  
+
+---
+
+👤 **Usuário:**  
+ficou muito bom, ja inseri a primeira partida e agora quero entrar nela para conseguir continuar, faça uma forma facil...  
+
+🤖 **Assistente:**  
+... (resposta com código de continuidade de partidas e refresh automático)  
+
+---
+
+👤 **Usuário:**  
+perfeito! agora insira o placar atual da partida e uma tabelinha de historico de ponto nosso, ponto delas...  
+
+🤖 **Assistente:**  
+... (resposta com código de placar + tabela de histórico)  
+
+---
+
+👤 **Usuário:**  
+KeyError: 'match_id' ...  
+
+🤖 **Assistente:**  
+... (resposta explicando erro e ajuste no index.py para acessar frames corretamente)  
+
+---
+
+👤 **Usuário:**  
+qual seria sua sugestao de menor e mais compacta forma de registrar os pontos...  
+
+🤖 **Assistente:**  
+... (resposta sugerindo codificação simples: equipe, jogadora, ação, resultado, posição)  
+
+---
+
+👤 **Usuário:**  
+crie uma especie de tutorial com essas informacoes e um html novo...  
+
+🤖 **Assistente:**  
+... (resposta com tutorial.html e exemplo de link no index)  
+
+---
+
+👤 **Usuário:**  
+ERRO NO TUTORIAL.HTML OSError: [WinError 433] Foi especificado um dispositivo inexistente: 'volei_base_dados.xlsx'  
+
+🤖 **Assistente:**  
+... (resposta explicando necessidade de criar arquivo base e path correto)  
+
+---
+
+👤 **Usuário:**  
+me mande o index completo mas tb com estes ajustes todos:  
+1. título próximo ao topo  
+2. botão tutorial etc...  
+
+🤖 **Assistente:**  
+... (resposta com index reorganizado, títulos, botões lado a lado, otimização de layout)  
+
+---
+
+👤 **Usuário:**  
+novos ajustes: volte o ícone, botão tutorial não ficou bom, ...  
+
+🤖 **Assistente:**  
+... (resposta com reorganização de header, título, links, placar maior, botões de jogadoras etc.)  
+
+---
+
+👤 **Usuário:**  
+minha nossa, parece que está tudo piorando, título sumiu...  
+
+🤖 **Assistente:**  
+... (resposta com debug expander e prints de DataFrames para investigar)  
+
+---
+
+👤 **Usuário:**  
+[DEBUG] jogadoras shape=(11,4)... mas não aparece nada no browser!  
+
+🤖 **Assistente:**  
+... (resposta mostrando que dados carregaram, mas frontend não exibia, proposta de revisar st.session_state e UI)  
+
+---
+
+👤 **Usuário:**  
+ao clicar nas jogadoras Erro ao carregar jogadoras: st.session_state.line_input cannot be modified...  
+
+🤖 **Assistente:**  
+... (resposta corrigindo fluxo, usando callback separado para seleção de jogadora)  
+
+---
+
+👤 **Usuário:**  
+vc consegue exportar todo esse historico de chat prompt ppara um arquivo...  
+
+🤖 **Assistente:**  
+... (resposta: não posso exportar automático, mas posso gerar arquivo .md com histórico)  
+
+---
+
+👤 **Usuário:**  
+gere  
+
+🤖 **Assistente:**  
+(gerando este arquivo `historico_univolei.md`)  
+
+---
+

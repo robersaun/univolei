@@ -1,0 +1,30 @@
+﻿o que é o gráfico de “Eficiência por Jogadora (ataque)”?
+
+Ele mede, por jogadora, o quão produtiva foi a participação dela nas ações de ataque (Diagonal, Paralela, Meio, Pipe, Segunda, Largada):
+
+Efici
+e
+ˆ
+ncia
+=
+Pontos de ataque
+−
+Erros de ataque
+Tentativas de ataque
+Efici
+e
+ˆ
+ncia=
+Tentativas de ataque
+Pontos de ataque−Erros de ataque
+	​
+
+
+Tentativas = quantos rallies em que aquela jogadora finalizou com uma dessas ações de ataque;
+
+Pontos = desses, quantos viraram ponto;
+
+Erros = desses, quantos foram erro (ex.: para fora, rede etc.).
+
+O valor vai de -1 a +1; quanto maior, melhor (positivo indica mais pontos que erros).
+Se preferir, posso trocar por %Ponto por jogadora ou quebrar por tipo de ataque.
