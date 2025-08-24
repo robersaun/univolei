@@ -59,7 +59,7 @@ def save_all(db_path: Path, frames: dict[str, pd.DataFrame]) -> None:
     """Grava todas as abas no Excel (sobrescreve)."""
     db_path = Path(db_path)
     db_path.parent.mkdir(parents=True, exist_ok=True)
-    with pd.ExcelWriter(db_path, engine="xlsxwriter") as wr:
+    with pd.ExcelWriter(db_path, engine="openpyxl") as wr:
         for s, df in frames.items():
             df.to_excel(wr, index=False, sheet_name=s)
 
