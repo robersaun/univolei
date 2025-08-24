@@ -1,115 +1,160 @@
 /* Container e títulos */
-.block-container { padding-top: .15rem; padding-bottom: .15rem; max-width: 1600px; }
-h1, h2, h3 { margin: .05rem 0 .1rem 0; }
+.block-container { padding-top: .1rem; padding-bottom: .1rem; max-width: 1600px; }
+h1, h2, h3 { margin: .04rem 0 .08rem 0; }
 
 .header-title { 
-  font-size: 1.6rem; font-weight: 900; display:flex; align-items:center; gap:6px; 
-  margin: 0.05rem 0 .1rem 0;
+  font-size: 1.4rem; font-weight: 900; display:flex; align-items:center; gap:4px; 
+  margin: 0.04rem 0 .08rem 0;
 }
 
 /* Cartão de seção */
 .sectionCard { 
-  border:1px solid #e1e6ef; background:#fff; border-radius:8px; padding:4px 6px; margin:4px 0; overflow: hidden;
+  border:1px solid #e1e6ef; background:#fff; border-radius:6px; padding:3px 4px; margin:3px 0; overflow: hidden;
 }
 
 /* Controles gerais */
-.stButton button, .stTextInput input, .stSelectbox, .stNumberInput input, .stRadio, .stDataFrame { font-size: .85rem; }
-.stTextInput > div > div > input { padding-top: .12rem; padding-bottom: .12rem; }
-.stSelectbox > div > div { padding-top: .10rem; padding-bottom: .10rem; }
-.stNumberInput input { padding-top: .10rem; padding-bottom: .10rem; }
-.stButton button { white-space: nowrap; font-size: .85rem; padding: .22rem .5rem; }
+.stButton button, .stTextInput input, .stSelectbox, .stNumberInput input, .stRadio, .stDataFrame { font-size: .8rem; }
+.stTextInput > div > div > input { padding-top: .08rem; padding-bottom: .08rem; }
+.stSelectbox > div > div { padding-top: .06rem; padding-bottom: .06rem; }
+.stNumberInput input { padding-top: .06rem; padding-bottom: .06rem; }
+.stButton button { white-space: nowrap; font-size: .8rem; padding: .16rem .4rem; }
 
 /* Versão ultra-compacta para botões específicos */
 .btn-xxs .stButton button {
-  padding: .08rem .20rem !important;
-  font-size: .70rem !important;
+  padding: .05rem .14rem !important;
+  font-size: .65rem !important;
   line-height: 1 !important;
   min-height: auto !important;
   min-width: auto !important;
 }
 
-/* Radios */
-div[role="radiogroup"] > label { margin-right: .35rem; font-size: .85rem; }
+/* Radios - EXTREMAMENTE compactos */
+div[role="radiogroup"] { gap: 2px !important; }
+div[role="radiogroup"] > label { 
+  margin-right: .2rem; 
+  font-size: .75rem; 
+  padding: 2px 4px !important;
+  min-height: unset !important;
+}
 
 /* Badges */
-.badge { background:#f5f7fb; border:1px solid #e1e6ef; border-radius:999px; padding:3px 6px; font-size:.90rem; white-space:nowrap; }
+.badge { background:#f5f7fb; border:1px solid #e1e6ef; border-radius:999px; padding:2px 4px; font-size:.82rem; white-space:nowrap; }
 .badge b { font-weight:800; }
 
 /* Tabelas */
-.custom-table { width: 100%; border-collapse: collapse; margin: 3px 0; font-size: .78rem; }
-.custom-table th { background:#f0f2f6; padding: 4px; text-align: left; border: 1px solid #ddd; }
-.custom-table td { padding: 4px; border: 1px solid #ddd; }
+.custom-table { width: 100%; border-collapse: collapse; margin: 2px 0; font-size: .72rem; }
+.custom-table th { background:#f0f2f6; padding: 3px; text-align: left; border: 1px solid #ddd; }
+.custom-table td { padding: 3px; border: 1px solid #ddd; }
 .custom-table tr:nth-child(even) { background:#f9f9f9; }
 
-/* Lista de jogadoras (botões numéricos super compactos) */
-.jogadoras-container { display:flex; flex-wrap:wrap; gap:2px; margin:1px 0 2px 0; }
+/* Lista de jogadoras (botões numéricos ultra compactos) */
+.jogadoras-container { display:flex; flex-wrap:wrap; gap:1px; margin:1px 0 2px 0; }
 .jogadoras-container button {
-  padding: .12rem .25rem !important;
-  min-width: 1.6rem !important;
+  padding: .08rem .16rem !important;
+  min-width: 1.4rem !important;
   width: auto !important;
-  line-height: 1 !important;
-  border-radius: 6px;
-  font-size: .75rem !important;
+  line-height: 0.9 !important;
+  border-radius: 4px;
+  font-size: .7rem !important;
+  margin: 0 !important;
 }
 
 /* Atalhos (mini) */
-.atalhos-container { display:flex; flex-wrap:wrap; gap:2px; margin:1px 0; }
-.small-btn .stButton button { padding:.12rem .25rem !important; font-size:.72rem !important; }
+.atalhos-container { display:flex; flex-wrap:wrap; gap:1px; margin:1px 0; }
+.small-btn .stButton button { padding:.08rem .16rem !important; font-size:.68rem !important; }
 
 /* Placar */
 .score-box { text-align:center; }
-.score-team { font-size: 11px; font-weight: 700; }
-.score-points { font-size: 40px; font-weight: 900; line-height: 1; }
-.score-x { font-size: 24px; font-weight: 900; padding-top: 10px; }
+.score-team { font-size: 10px; font-weight: 700; margin-bottom: 2px; }
+.score-points { font-size: 32px; font-weight: 900; line-height: 0.9; }
+.score-x { font-size: 18px; font-weight: 900; padding-top: 6px; }
 
 /* KPIs */
-.kpi { display:flex; flex-direction:column; gap:1px; border:1px solid #e1e6ef; border-radius:6px; padding:4px 6px; }
-.kpi .v { font-size:1.1rem; font-weight:900; }
-.kpi .t { font-size:.75rem; opacity:.85; }
+.kpi { display:flex; flex-direction:column; gap:1px; border:1px solid #e1e6ef; border-radius:5px; padding:3px 4px; margin:2px 0; }
+.kpi .v { font-size:1rem; font-weight:900; }
+.kpi .t { font-size:.70rem; opacity:.85; }
 
 /* Colunas com menos espaçamento lateral */
-.stColumn { padding-left: 2px; padding-right: 2px; }
+.stColumn { padding-left: 1px; padding-right: 1px; }
 
 /* Ajustes gerais de espaçamentos entre elementos */
 .block-container div[data-testid="stVerticalBlock"] > div:has(> div.element-container) { margin: 0; }
 
 /* ===== Responsivo para celular ===== */
 @media (max-width: 480px) {
-  .header-title { font-size: 1.1rem; gap:4px; }
-  .badge { font-size: .78rem; padding: 2px 4px; }
-  .custom-table { font-size: .72rem; margin: 2px 0; }
-  .custom-table th, .custom-table td { padding: 3px; }
-  .stButton button { padding: .18rem .40rem; font-size: .78rem; }
-  .btn-xxs .stButton button { padding: .06rem .16rem !important; font-size: .65rem !important; }
-  .score-team { font-size: 10px; }
-  .score-points { font-size: 32px; }
-  .score-x { font-size: 20px; padding-top: 6px; }
-  .jogadoras-container { gap: 2px; }
+  .header-title { font-size: 1rem; gap:3px; margin: 0.02rem 0 .05rem 0; }
+  .badge { font-size: .72rem; padding: 1px 3px; }
+  .custom-table { font-size: .68rem; margin: 1px 0; }
+  .custom-table th, .custom-table td { padding: 2px; }
+  .stButton button { padding: .12rem .30rem; font-size: .72rem; }
+  .btn-xxs .stButton button { padding: .04rem .12rem !important; font-size: .60rem !important; }
+  .score-team { font-size: 9px; margin-bottom: 1px; }
+  .score-points { font-size: 28px; }
+  .score-x { font-size: 16px; padding-top: 4px; }
+  .jogadoras-container { gap: 1px; margin: 0 0 1px 0; }
   .jogadoras-container button { 
-    min-width: 1.4rem !important; 
-    padding: .10rem .20rem !important; 
-    font-size: .68rem !important;
+    min-width: 1.2rem !important; 
+    padding: .06rem .12rem !important; 
+    font-size: .64rem !important;
+    border-radius: 3px;
   }
-  .sectionCard { padding: 3px 4px; border-radius:6px; }
-  .kpi { padding: 3px 4px; border-radius:5px; }
-  .kpi .v { font-size: 1rem; }
-  .kpi .t { font-size: .70rem; }
+  .sectionCard { 
+    padding: 2px 3px; 
+    border-radius:4px; 
+    margin: 2px 0;
+  }
+  .kpi { 
+    padding: 2px 3px; 
+    border-radius:4px; 
+    margin: 1px 0;
+  }
+  .kpi .v { font-size: .9rem; }
+  .kpi .t { font-size: .65rem; }
   
   /* Reduzir ainda mais o espaçamento entre elementos no mobile */
-  .block-container { padding-top: .10rem; padding-bottom: .10rem; }
-  .stColumn { padding-left: 1px; padding-right: 1px; }
+  .block-container { padding-top: .06rem; padding-bottom: .06rem; }
+  .stColumn { padding-left: 0.5px; padding-right: 0.5px; }
   
   /* Ajustes específicos para a área de registro */
   .stTextInput > div > div > input { 
-    padding-top: .08rem !important; 
-    padding-bottom: .08rem !important; 
-    font-size: .80rem !important;
+    padding-top: .05rem !important; 
+    padding-bottom: .05rem !important; 
+    font-size: .75rem !important;
   }
   
-  /* Reduzir margens dos rádios */
+  /* Radios ultra compactos para mobile */
+  div[role="radiogroup"] { gap: 1px !important; }
   div[role="radiogroup"] > label { 
-    margin-right: .25rem; 
-    font-size: .78rem; 
-    padding: 2px 4px !important;
+    margin-right: .15rem; 
+    font-size: .70rem; 
+    padding: 1px 3px !important;
+    min-height: unset !important;
   }
+  
+  /* Atalhos ainda mais compactos */
+  .atalhos-container { gap: 1px; margin: 0; }
+  .small-btn .stButton button { 
+    padding:.06rem .12rem !important; 
+    font-size:.64rem !important;
+  }
+  
+  /* Container principal mais compacto */
+  .main .block-container { max-width: 100%; padding: 0.25rem 0.5rem; }
+  
+  /* Elementos de formulário mais compactos */
+  .stSelectbox > div > div { padding-top: .04rem !important; padding-bottom: .04rem !important; }
+  
+  /* Labels mais compactos */
+  .stCaption { font-size: .7rem !important; margin-bottom: 1px !important; }
 }
+
+/* Estilos específicos para a área de controle de rally */
+.control-row { margin: 1px 0 !important; }
+.control-label { font-size: .7rem !important; margin-bottom: 1px !important; }
+
+/* Forçar compactação máxima em todos os elementos Streamlit */
+[data-testid="stVerticalBlock"] > div:nth-child(n) { margin: 0 !important; padding: 0 !important; }
+.st-emotion-cache-1y4p8pa { padding: 0.5rem 0.5rem !important; }
+
+/* Ajuste específico para o seletor de ação */
+div[data-testid="stSelectbox"] > div { min-height: unset !important; }

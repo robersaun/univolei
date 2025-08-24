@@ -33,6 +33,24 @@ window.addEventListener('beforeunload', ()=>{sessionStorage.setItem(KEY, window.
 """, height=0)
 
 # =========================
+# NOVO: Função para detectar mobile
+# =========================
+def is_mobile():
+    """Detecta se o usuário está em dispositivo mobile"""
+    try:
+        # Tenta detectar mobile via user agent
+        user_agent = st.get_user_agent()
+        if user_agent:
+            ua_string = str(user_agent).lower()
+            mobile_keywords = ['mobile', 'android', 'iphone', 'ipad', 'webos', 'blackberry', 'windows phone']
+            if any(keyword in ua_string for keyword in mobile_keywords):
+                return True
+    except:
+        # Se falhar, assume que não é mobile
+        pass
+    return False
+
+# =========================
 # Função para carregar CSS externo (univolei.css)
 # =========================
 BASE_DIR = Path(__file__).parent.resolve()
@@ -45,7 +63,7 @@ def load_css(filename: str = "univolei.css"):
 
 load_css("univolei.css")
 
-# Título com SVG da bola (robusto mesmo sem emoji)
+# Título avec SVG da bola (robusto mesmo sem emoji)
 st.markdown(
     '''
     <div class="header-title">
@@ -713,7 +731,6 @@ with st.container():
         st.markdown(f"<div class='score-box'><div class='score-team'>{away_name}</div><div class='score-points'>{away_pts}</div></div>", unsafe_allow_html=True)
     with pc4:
         st.markdown(f"<div class='set-summary'>Sets: <b>{home_sets_w}</b> × <b>{away_sets_w}</b> &nbsp;|&nbsp; Set atual: <b>{st.session_state.set_number}</b></div>", unsafe_allow_html=True)
-
     left, right = st.columns([1.25, 1.0])
 
     # -------- ESQUERDA: INPUTS --------
@@ -745,55 +762,113 @@ with st.container():
 
         st.caption("Jogadoras (selecione):")
         nums = resolve_our_roster_numbers(frames)
-        if nums:
-            st.markdown('<div class="jogadoras-container">', unsafe_allow_html=True)
-            jcols = st.columns(min(12, max(1, len(nums))))
-            for i, n in enumerate(nums):
-                with jcols[i % len(jcols)]:
-                    st.button(f"{n}", key=f"pill_main_{n}", on_click=lambda n=n: st.session_state.__setitem__("last_selected_player", n), use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-            sel = st.session_state.get("last_selected_player")
-            if sel is not None:
-                st.caption(f"Selecionada: **#{sel}**")
+        
+        # NOVO: Layout adaptativo para mobile/desktop
+        if is_mobile():
+            # LAYOUT MOBILE - tudo compacto
+            mobile_col1, mobile_col2 = st.columns([1, 1])
+            
+            with mobile_col1:
+                st.caption("Equipe:")
+                st.session_state.q_side = st.radio("Equipe", options=["Nós","Adv"], horizontal=True, index=0,
+                                                   key="q_side_radio_mobile", label_visibility="collapsed")
+            
+            with mobile_col2:
+                st.caption("Resultado:")
+                st.session_state.q_result = st.radio("Resultado", options=["Acerto","Erro"], horizontal=True, index=0,
+                                                     key="q_result_radio_mobile", label_visibility="collapsed")
+            
+            # Jogadoras em grid compacto
+            if nums:
+                st.caption("Jogadoras:")
+                st.markdown('<div class="jogadoras-container">', unsafe_allow_html=True)
+                # Mais colunas para mobile (6 colunas)
+                jcols = st.columns(6)
+                for i, n in enumerate(nums):
+                    with jcols[i % 6]:
+                        st.button(f"{n}", key=f"pill_mobile_{n}", 
+                                 on_click=lambda n=n: st.session_state.__setitem__("last_selected_player", n), 
+                                 use_container_width=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+                sel = st.session_state.get("last_selected_player")
+                if sel is not None:
+                    st.caption(f"Selecionada: **#{sel}**")
+            
+            # Ação e atalhos
+            action_col1, action_col2 = st.columns([1.5, 2])
+            
+            with action_col1:
+                st.caption("Ação:")
+                action_options = list(ACT_MAP.values())
+                current_action = ACT_MAP.get(st.session_state.q_action, "Diagonal")
+                st.selectbox("Ação", action_options, index=action_options.index(current_action),
+                             label_visibility="collapsed", key="q_action_select_mobile", 
+                             on_change=on_action_change)
+            
+            with action_col2:
+                st.caption("Atalhos:")
+                st.markdown('<div class="atalhos-container small-btn">', unsafe_allow_html=True)
+                acols = st.columns(5)  # 5 colunas para atalhos no mobile
+                codes = ["d","l","m","lob","seg","pi","re","b","sa"]
+                for i, code in enumerate(codes):
+                    with acols[i % 5]:
+                        label = ACT_MAP.get(code, code)[:3]
+                        st.button(label, key=f"quick_mobile_{code}",
+                                  on_click=lambda code=code: register_current(action=code), 
+                                  use_container_width=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+        
         else:
-            st.caption("Sem jogadoras")
+            # LAYOUT DESKTOP (mantém o original)
+            if nums:
+                st.markdown('<div class="jogadoras-container">', unsafe_allow_html=True)
+                jcols = st.columns(min(12, max(1, len(nums))))
+                for i, n in enumerate(nums):
+                    with jcols[i % len(jcols)]:
+                        st.button(f"{n}", key=f"pill_main_{n}", on_click=lambda n=n: st.session_state.__setitem__("last_selected_player", n), use_container_width=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+                sel = st.session_state.get("last_selected_player")
+                if sel is not None:
+                    st.caption(f"Selecionada: **#{sel}**")
+            else:
+                st.caption("Sem jogadoras")
 
-        row2 = st.columns([1.0, 1.0, 0.6])
-        with row2[0]:
-            st.caption("Equipe:")
-            st.session_state.q_side = st.radio("Equipe", options=["Nós","Adv"], horizontal=True, index=0,
-                                               key="q_side_radio_main", label_visibility="collapsed")
-        with row2[1]:
-            st.caption("Resultado:")
-            st.session_state.q_result = st.radio("Resultado", options=["Acerto","Erro"], horizontal=True, index=0,
-                                                 key="q_result_radio_main", label_visibility="collapsed")
+            row2 = st.columns([1.0, 1.0, 0.6])
+            with row2[0]:
+                st.caption("Equipe:")
+                st.session_state.q_side = st.radio("Equipe", options=["Nós","Adv"], horizontal=True, index=0,
+                                                   key="q_side_radio_main", label_visibility="collapsed")
+            with row2[1]:
+                st.caption("Resultado:")
+                st.session_state.q_result = st.radio("Resultado", options=["Acerto","Erro"], horizontal=True, index=0,
+                                                     key="q_result_radio_main", label_visibility="collapsed")
 
-        def on_action_change():
-            selected_label = st.session_state.get("q_action_select_main", None)
-            if not selected_label: return
-            code = REVERSE_ACT_MAP.get(selected_label, "d")
-            st.session_state["q_action"] = code
-            if st.session_state.get("last_selected_player") is None:
-                st.warning("Selecione uma jogadora antes de escolher a ação."); return
-            register_current(action=code)
+            def on_action_change():
+                selected_label = st.session_state.get("q_action_select_main", None)
+                if not selected_label: return
+                code = REVERSE_ACT_MAP.get(selected_label, "d")
+                st.session_state["q_action"] = code
+                if st.session_state.get("last_selected_player") is None:
+                    st.warning("Selecione uma jogadora antes de escolher a ação."); return
+                register_current(action=code)
 
-        with row2[2]:
-            st.caption("Ação:")
-            action_options = list(ACT_MAP.values())
-            current_action = ACT_MAP.get(st.session_state.q_action, "Diagonal")
-            st.selectbox("Ação", action_options, index=action_options.index(current_action),
-                         label_visibility="collapsed", key="q_action_select_main", on_change=on_action_change)
+            with row2[2]:
+                st.caption("Ação:")
+                action_options = list(ACT_MAP.values())
+                current_action = ACT_MAP.get(st.session_state.q_action, "Diagonal")
+                st.selectbox("Ação", action_options, index=action_options.index(current_action),
+                             label_visibility="collapsed", key="q_action_select_main", on_change=on_action_change)
 
-        st.caption("Atalhos:")
-        st.markdown('<div class="atalhos-container small-btn">', unsafe_allow_html=True)
-        acols = st.columns(12)
-        codes = ["d","l","m","lob","seg","pi","re","b","sa"]
-        for i, code in enumerate(codes):
-            with acols[i % len(acols)]:
-                label = ACT_MAP.get(code, code)[:3]
-                st.button(label, key=f"quick_main_{code}",
-                          on_click=lambda code=code: register_current(action=code), use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+            st.caption("Atalhos:")
+            st.markdown('<div class="atalhos-container small-btn">', unsafe_allow_html=True)
+            acols = st.columns(12)
+            codes = ["d","l","m","lob","seg","pi","re","b","sa"]
+            for i, code in enumerate(codes):
+                with acols[i % len(acols)]:
+                    label = ACT_MAP.get(code, code)[:3]
+                    st.button(label, key=f"quick_main_{code}",
+                              on_click=lambda code=code: register_current(action=code), use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
 
         # Tabelas compactas
         tt1, tt2, tt3 = st.columns([1.0, 1.0, 1.2])
@@ -889,7 +964,7 @@ with st.container():
             att = att.copy()
             if st.session_state.graph_filter == "Nós":
                 att["is_ponto"] = ((att["who_scored"]=="NOS") & (att["result"]=="PONTO")).astype(int)
-                att["is_erro"]  = ((att["who_scored"]=="ADV") & (att["result"]=="ERRO")).astype(int)
+                att["is_erro"]  = ((att["who_scored"]=="ADV") & (att["result"]=="ERRO")).ast(int)
             elif st.session_state.graph_filter == "Adversário":
                 att["is_ponto"] = ((att["who_scored"]=="ADV") & (att["result"]=="PONTO")).astype(int)
                 att["is_erro"]  = ((att["who_scored"]=="NOS") & (att["result"]=="ERRO")).astype(int)
@@ -1081,7 +1156,7 @@ def _player_efficiency_attacks(df):
         pontos=("is_ponto","sum"),
         erros=("is_erro","sum")
     ).reset_index()
-    g["eficiencia"] = (g["pontos"] - g["erros"]) / g["tentativas"].replace(0, 1)
+    g["eficidade"] = (g["pontos"] - g["erros"]) / g["tentativas"].replace(0, 1)
     return g
 
 def _team_eff_by_set(frames, match_id):
