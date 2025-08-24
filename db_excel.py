@@ -147,7 +147,11 @@ def last_open_match(frames: dict[str, pd.DataFrame]) -> int | None:
     mt = frames["amistosos"]
     if mt.empty:
         return None
-    open_rows = mt[mt["status"].fillna("OPEN") == "OPEN"].sort_values("match_id", ascending=False)
+    # Adiciona a coluna status se não existir
+    if "status" not in mt.columns:
+        mt["status"] = "OPEN"
+        
+    open_rows = mt[mt["status"] == "OPEN"].sort_values("match_id", ascending=False)
     if open_rows.empty:
         return None
     return int(open_rows.iloc[0]["match_id"])
