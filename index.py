@@ -1,4 +1,3 @@
-# index.py — UniVolei Live Scout (compacto, estável e com KPIs por lado)
 from __future__ import annotations
 
 from pathlib import Path
@@ -130,8 +129,9 @@ st.session_state.setdefault("last_selected_player", None)
 st.session_state.setdefault("show_cadastro", False)
 st.session_state.setdefault("show_tutorial", False)
 st.session_state.setdefault("show_config_team", False)
-st.session_state.setdefault("line_input_text", "")  # chave única p/ input
-st.session_state.setdefault("perf_logs", [])        # logs de perf visíveis quando PERF_DEBUG=True
+st.session_state.setdefault("line_input_text_pre", "")
+st.session_state.setdefault("line_input_text_main", "")
+st.session_state.setdefault("perf_logs", [])
 
 # ===== Diagnóstico opcional de performance =====
 PERF_DEBUG = False  # ative/desative aqui
@@ -266,7 +266,7 @@ def undo_last_rally_current_set():
         st.warning("Não há rallies para desfazer neste set."); return
     last_rally_id = sub.iloc[-1]["rally_id"]
     rl = rl[rl["rally_id"] != last_rally_id]; fr["rallies"] = rl
-    recompute_set_score_fields(fr, match_id, set_number)  # recálculo completo no desfazer
+    recompute_set_score_fields(fr, match_id, set_number)
     save_all(Path(st.session_state.db_path), fr)
     st.session_state.data_rev += 1
     st.success("Último rally desfeito e placar recalculado.")
@@ -343,7 +343,7 @@ def register_current(number: int | None = None, action: str | None = None):
     act = action if action is not None else st.session_state.get("q_action", "d")
     num_val = number if number is not None else st.session_state.get("last_selected_player", None)
     if num_val is None:
-        raw = st.session_state.get("line_input_text", "")
+        raw = st.session_state.get("line_input_text_main", "")
         m = re.findall(r"\b(\d{1,2})\b", raw)
         num_val = int(m[-1]) if m else None
     quick_register_click(side_code, num_val, act, is_err)
@@ -368,7 +368,7 @@ if st.session_state.match_id is not None:
     away_name = team_name_by_id(frames, mrow["away_team_id"])
     date_str = str(mrow["date"])
 
-# topo (adicionei o botão Histórico sem alterar os outros)
+# topo
 top1, top2, top3, top4, top5 = st.columns([2.5, 1, 1, 1, 1])
 with top1:
     if home_name and away_name:
@@ -380,7 +380,7 @@ with top3:
 with top4:
     st.button("📘 Tutorial", use_container_width=True, key="tutorial_btn", on_click=lambda: st.session_state.__setitem__("show_tutorial", True))
 with top5:
-    # Tenta resolver o caminho real do histórico em diferentes nomes/locais
+    # Tenta resolver o caminho real do histórico
     hist_candidates = [
         "pages/02_historico.py",
         "pages/historico.py",
@@ -533,7 +533,7 @@ if st.session_state.get("show_config_team", False):
     st.markdown('</div>', unsafe_allow_html=True)
 
 # =========================
-# Cadastro rápido / NOVO JOGO (sem jogo OU quando clicar “🆕 Jogo”)
+# Cadastro rápido / NOVO JOGO (sem jogo OU quando clicar "🆕 Jogo")
 # =========================
 def _get_or_create_team_id_by_name(frames: dict, name: str) -> int:
     name_norm = str(name).strip()
@@ -593,17 +593,17 @@ if (st.session_state.match_id is None or st.session_state.show_cadastro) and not
         st.subheader("🎯 Registrar Rally (Pré-jogo)")
 
         def on_submit_text_pre():
-            raw = st.session_state.get("line_input_text", "").strip()
+            raw = st.session_state.get("line_input_text_pre", "").strip()
             if not raw: return
             quick_register_line(raw)
-            st.session_state["line_input_text"] = ""
+            st.session_state["line_input_text_pre"] = ""
             st.session_state["q_side"] = "Nós"; st.session_state["q_result"] = "Acerto"; st.session_state["q_action"] = "d"
 
-        _ = st.text_input("Digite código:", key="line_input_text", placeholder="Ex: 1 9 d",
+        _ = st.text_input("Digite código:", key="line_input_text_pre", placeholder="Ex: 1 9 d",
                           label_visibility="collapsed", on_change=on_submit_text_pre)
 
         def _cb_register_pre():
-            register_current(); st.session_state["line_input_text"] = ""
+            register_current(); st.session_state["line_input_text_pre"] = ""
 
         c_reg_pre, c_undo_pre = st.columns([1, 1])
         with c_reg_pre:
@@ -633,7 +633,7 @@ with st.container():
     with bar3:
         sets_match_all = frames["sets"][frames["sets"]["match_id"]==st.session_state.match_id].sort_values("set_number")
         sel_vals = sets_match_all["set_number"].tolist() if not sets_match_all.empty else [1]
-        c31, c32, c33 = st.columns([1, 1, 1])  # combo + reabrir + fechar no MESMO ROW
+        c31, c32, c33 = st.columns([1, 1, 1])
         with c31:
             set_to_reopen = st.selectbox("Set:", sel_vals, label_visibility="collapsed", key="set_select")
         def _close_set():
@@ -698,7 +698,7 @@ with st.container():
 
     frames = st.session_state.frames
 
-    # placar topo — fontes maiores (definidas no CSS)
+    # placar topo
     df_set = current_set_df(frames, st.session_state.match_id, st.session_state.set_number)
     home_pts, away_pts = set_score_from_df(df_set)
     stf = frames["sets"]; sm = stf[stf["match_id"] == st.session_state.match_id]
@@ -721,17 +721,17 @@ with st.container():
         st.markdown("**🎯 Registrar Rally**")
 
         def on_submit_text_main():
-            raw = st.session_state.get("line_input_text", "").strip()
+            raw = st.session_state.get("line_input_text_main", "").strip()
             if not raw: return
             quick_register_line(raw)
-            st.session_state["line_input_text"] = ""
+            st.session_state["line_input_text_main"] = ""
             st.session_state["q_side"] = "Nós"; st.session_state["q_result"] = "Acerto"; st.session_state["q_action"] = "d"
 
-        st.text_input("Digite código:", key="line_input_text",
+        st.text_input("Digite código:", key="line_input_text_main",
                       placeholder="Ex: 1 9 d", label_visibility="collapsed", on_change=on_submit_text_main)
 
         def _cb_register_main():
-            register_current(); st.session_state["line_input_text"] = ""
+            register_current(); st.session_state["line_input_text_main"] = ""
 
         c_reg, c_undo = st.columns([1, 1])
         with c_reg:
@@ -795,7 +795,7 @@ with st.container():
                           on_click=lambda code=code: register_current(action=code), use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-        # Tabelas compactas — alturas 3× (360px)
+        # Tabelas compactas
         tt1, tt2, tt3 = st.columns([1.0, 1.0, 1.2])
         df_cur = df_set
         with tt1:
@@ -855,7 +855,7 @@ with st.container():
         else:
             st.write("_Sem dados._")
 
-        # 2) Erros (por jogadora) — só nossos erros
+        # 2) Erros (por jogadora)
         st.markdown("**Erros (por jogadora)**")
         err = df_set[(df_set["result"]=="ERRO") & (df_set["who_scored"]=="ADV")].copy()
         if not err.empty:
@@ -868,7 +868,7 @@ with st.container():
         else:
             st.write("_Sem erros._")
 
-        # 3) Eficiência por Jogadora (ataque) — último gráfico
+        # 3) Eficiência por Jogadora (ataque)
         st.markdown("**Eficiência por Jogadora (ataque)**")
         def build_attack_rows_for_side(df_base: pd.DataFrame, side_sel: str) -> pd.DataFrame:
             if df_base.empty: 
