@@ -1,0 +1,11 @@
+﻿# 1. Adicionar TODOS os arquivos (incluindo os não rastreados)
+git add --all
+
+# 2. Verificar o status para confirmar
+git status
+
+# 3. Fazer commit das alterações
+git commit -m "Adicionando todos os arquivos do projeto Univolei"
+
+# 4. Fazer push para o GitHub
+git push origin main

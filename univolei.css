@@ -19,6 +19,15 @@ h1, h2, h3 { margin: .1rem 0 .2rem 0; }
 .stNumberInput input { padding-top: .12rem; padding-bottom: .12rem; }
 .stButton button { white-space: nowrap; font-size: .9rem; padding: .28rem .6rem; }
 
+/* Versão ultra-compacta para botões específicos */
+.btn-xxs .stButton button {
+  padding: .12rem .26rem !important;
+  font-size: .74rem !important;
+  line-height: 1 !important;
+  min-height: auto !important;
+  min-width: auto !important;
+}
+
 /* Radios */
 div[role="radiogroup"] > label { margin-right: .45rem; font-size: .9rem; }
 
@@ -37,7 +46,7 @@ div[role="radiogroup"] > label { margin-right: .45rem; font-size: .9rem; }
 .jogadoras-container button {
   padding: .18rem .35rem !important;
   min-width: 2.0rem;
-  width: auto !important;   /* não ocupar 100% da coluna */
+  width: auto !important;
   line-height: 1.1;
   border-radius: 10px;
 }
@@ -69,6 +78,7 @@ div[role="radiogroup"] > label { margin-right: .45rem; font-size: .9rem; }
   .badge { font-size: .85rem; padding: 3px 6px; }
   .custom-table { font-size: .78rem; }
   .stButton button { padding: .22rem .46rem; font-size: .85rem; }
+  .btn-xxs .stButton button { padding: .1rem .22rem !important; font-size: .7rem !important; }
   .score-team { font-size: 11px; }
   .score-points { font-size: 36px; }
   .score-x { font-size: 22px; padding-top: 8px; }

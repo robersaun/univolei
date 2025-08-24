@@ -1,0 +1,132 @@
+﻿streamlit run index.py
+
+
+
+
+
+
+
+1. procurar melhores ias do próprio chatgpt para codificação
+
+2. procurar scouts já realizados e prontos para indicação de boas praticas e apoio do que já existe prnto
+*********************************************************************
+Com os dados registrados dos sets, já crie uma segunda pagina com um dash dos principais infirmacoes destas que vou lhe enviar, ok? pode ser 70% disso, dos mais importantes
+
+
+Ataque
+Eficiência de ataque (EFF) = (Pontos de ataque − Erros de ataque − Bloqueios sofridos) / Tentativas de ataque
+%Ponto de ataque = Pontos de ataque / Tentativas de ataque
+Distribuição do levantador = tentativas por posição / tentativas totais
+
+Recepção
+%Recepção perfeita = Recepções perfeitas / Total de recepções
+
+Saque
+Ace% = Aces / Saques
+Erro% = Erros de saque / Saques
+Pressão de saque = Aces + recepções ruins (C) forçadas / Saques
+
+Bloqueio/Defesa
+Bloqueios ponto/set
+Toques de bloqueio que geram transição% = Rallies com toque de bloco → ataque nosso / toques de bloco
+Defesas efetivas% = Defesas que permitem contra-ataque / Defesas
+
+Erro
+Erros não forçados por set
+Taxa de erro por rotação = Erros cometidos quando na rotação r / rallies na rotação r
+Contexto
+Eficiência por rotação = (Pontos − Erros) / Rallies na rotação
+Clutch: saldo de pontos em faixas [20–25] ou diferença ≤2 pts
+
+6. Alertas inteligentes (em tempo real)
+Regra: Erro de saque ≥ X% em janela de 10 saques → alerta “mudar alvo/risco”.
+Regra: Side-out% por rotação < meta (ex.: 60%) em janela de 8 rallies → sugerir substituição/variação.
+Regra: Levantador com distribuição >50% em um atacante → sugerir diversificar.
+Regra: Recepção C > Y% em um recebedor → “proteger com dupla recepção”.
+
+7. Metas/benchmarks (referências práticas)
+Side-out%: 60–70% bom; >70% excelente (contexto adulto).
+Ace%: 5–10% bom; Erro de saque: 10–15% aceitável dependendo da estratégia.
+Recepção perfeita%: 30–45% bom.
+EFF ataque: >0,25 ponta/oposto; meios podem passar disso.
+Dashboard com 5 visuais principais: Momentum, Pareto de erros, Side-out por rotação, Mapa de recepção, Distribuição do levantador.
+************************************************************************
+
+
+3. KPIs essenciais (com fórmulas)
+Use por time, set, rotação e jogador.
+
+Ataque
+Eficiência de ataque (EFF) = (Pontos de ataque − Erros de ataque − Bloqueios sofridos) / Tentativas de ataque
+%Ponto de ataque = Pontos de ataque / Tentativas de ataque
+Distribuição do levantador = tentativas por posição / tentativas totais
+
+Recepção
+%Recepção perfeita = Recepções perfeitas / Total de recepções
+
+Saque
+Ace% = Aces / Saques
+Erro% = Erros de saque / Saques
+Pressão de saque = Aces + recepções ruins (C) forçadas / Saques
+
+Bloqueio/Defesa
+Bloqueios ponto/set
+Toques de bloqueio que geram transição% = Rallies com toque de bloco → ataque nosso / toques de bloco
+Defesas efetivas% = Defesas que permitem contra-ataque / Defesas
+
+Erro
+Erros não forçados por set
+Taxa de erro por rotação = Erros cometidos quando na rotação r / rallies na rotação r
+Contexto
+Eficiência por rotação = (Pontos − Erros) / Rallies na rotação
+Clutch: saldo de pontos em faixas [20–25] ou diferença ≤2 pts
+
+6. Alertas inteligentes (em tempo real)
+Regra: Erro de saque ≥ X% em janela de 10 saques → alerta “mudar alvo/risco”.
+Regra: Side-out% por rotação < meta (ex.: 60%) em janela de 8 rallies → sugerir substituição/variação.
+Regra: Levantador com distribuição >50% em um atacante → sugerir diversificar.
+Regra: Recepção C > Y% em um recebedor → “proteger com dupla recepção”.
+
+7. Metas/benchmarks (referências práticas)
+Side-out%: 60–70% bom; >70% excelente (contexto adulto).
+Ace%: 5–10% bom; Erro de saque: 10–15% aceitável dependendo da estratégia.
+Recepção perfeita%: 30–45% bom.
+EFF ataque: >0,25 ponta/oposto; meios podem passar disso.
+Dashboard com 5 visuais principais: Momentum, Pareto de erros, Side-out por rotação, Mapa de recepção, Distribuição do levantador.
+
+
+Índice de recepção (0–3) = (Σ notas) / Total
+Side-out% = Pontos ganhos quando recebemos o saque / Rallies em que recebemos
+
+4. Visuais e gráficos (prontos para implementar)
+Tempo real (match dashboard)
+Score & Momentum: linha cumulativa do saldo de pontos (nós − eles) por rally; marcações de tempos/pedidos.
+Controle estatístico de erro (p-chart) por janela móvel (ex.: últimos 10 rallies) com limites (média ± 2σ) → alerta de “deriva de erro”.
+Side-out vs Break-point por rotação (grid 1–6), com barras lado a lado.
+Mapa de calor de recepção (6 zonas) com intensidade de qualidade (0–3).
+Sankey do rally: recepção→levantamento→zona de ataque→resultado (ótimo para leitura do fluxo).
+Radar por jogador: EFF ataque, Ace%, Erro%, Recepção perfeita%, Participação em transição.
+Matriz de distribuição do levantador (linhas = rotação, colunas = atacante) com % de bolas.
+Shot chart de ataque: origem (zona 4/3/2/pipe/6) → destino (1–6 adversário) e resultado (ponto/defendido/bloqueado).
+Gantt de rotações: períodos em que cada rotação ficou em quadra e saldo por rotação.
+Pareto de erros (por tipo: saque, ataque, recepção, técnica).
+Pós-jogo / evolução
+Trend semanal/mensal de EFF, Side-out%, Ace% e Erro% com média móvel.
+Boxplots por jogador (variação set a set de EFF, recepção, etc.).
+Comparativo por adversário (histórico vs oponentes).
+Mapa de calor de “alvos de saque” (quem recebeu e com que qualidade).
+Clutch chart: eficiência em pontos 20–25 e tie-break.
+
+5. Tabelas/relatórios úteis
+Tabela de rotação (por set):
+Rotação | Rallies | Side-out% | Break-point% | EFF | Erros | Aces | Bloqueios ponto | Saldo
+
+Tabela por jogador:
+Jogador | Ataques (P/B/ER/DEF) | EFF | Saques (ACE/ER) | Recepção (A/B/C) | Bloqueios ponto | Defesa efetiva% | PPS (pontos por set)
+
+Tabela de distribuição do levantador:
+Rotação | Oposto% | Ponta1% | Ponta2% | Meio1% | Meio2% | Pipe% | Altura média (se tiver)
+
+Tabela de alvos de saque:
+Recebedor | Saques recebidos | A/B/C | %Perfeita | Side-out% após recepção
+
