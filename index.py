@@ -1,3 +1,4 @@
+# UniVolei Live Scout (Heatmap, Modo Jogo, debug detalhado e prints reais)
 from __future__ import annotations
 
 from pathlib import Path
@@ -9,8 +10,10 @@ import matplotlib as mpl
 import streamlit.components.v1 as components
 import html
 import numpy as np
-import time  # diagnóstico leve
+import time
 from datetime import date
+import json
+from math import ceil
 
 from db_excel import (
     init_or_load, save_all, add_match, add_set,
@@ -18,10 +21,15 @@ from db_excel import (
 )
 from parser_free import parse_line
 
+DEBUG_PRINTS = True
+def debug_print(*args, **kwargs):
+    if DEBUG_PRINTS:
+        print("[UV-DEBUG]", *args, **kwargs, flush=True)
+
 # =========================
 # Config + Estilos
 # =========================
-st.set_page_config(page_title="", layout="wide")
+st.set_page_config(page_title="", layout="wide", initial_sidebar_state="collapsed")
 
 # anti-scroll-jump: preserva posição
 components.html("""
@@ -33,25 +41,7 @@ window.addEventListener('beforeunload', ()=>{sessionStorage.setItem(KEY, window.
 """, height=0)
 
 # =========================
-# NOVO: Função para detectar mobile
-# =========================
-def is_mobile():
-    """Detecta se o usuário está em dispositivo mobile"""
-    try:
-        # Tenta detectar mobile via user agent
-        user_agent = st.get_user_agent()
-        if user_agent:
-            ua_string = str(user_agent).lower()
-            mobile_keywords = ['mobile', 'android', 'iphone', 'ipad', 'webos', 'blackberry', 'windows phone']
-            if any(keyword in ua_string for keyword in mobile_keywords):
-                return True
-    except:
-        # Se falhar, assume que não é mobile
-        pass
-    return False
-
-# =========================
-# Função para carregar CSS externo (univolei.css)
+# CSS externo
 # =========================
 BASE_DIR = Path(__file__).parent.resolve()
 def load_css(filename: str = "univolei.css"):
@@ -60,10 +50,9 @@ def load_css(filename: str = "univolei.css"):
         st.markdown(f"<style>{css_path.read_text(encoding='utf-8')}</style>", unsafe_allow_html=True)
     else:
         st.warning(f"Arquivo CSS não encontrado: {filename}")
-
 load_css("univolei.css")
 
-# Título avec SVG da bola (robusto mesmo sem emoji)
+# Título com SVG
 st.markdown(
     '''
     <div class="header-title">
@@ -81,7 +70,7 @@ st.markdown(
 )
 
 # =========================
-# Figuras ultra-compactas (helper)
+# Figuras ultra-compactas
 # =========================
 SMALL_RC = {
     "figure.dpi": 110,
@@ -112,15 +101,15 @@ def trim_ax(ax, xlabel="", ylabel="", legend=False, max_xticks=6, max_yticks=5):
     return ax.get_figure()
 
 # =========================
-# DataFrame HTML (sem PyArrow)
+# DataFrame HTML
 # =========================
 def display_dataframe(df, height=None, use_container_width=False, extra_class: str = ""):
-    if df.empty:
+    if df is None or len(df) == 0:
         st.write("_Sem dados._"); return
     classes = ('custom-table ' + extra_class).strip()
     html_table = df.to_html(classes=classes, index=False, escape=False)
     styled_html = f"""
-    <div style='overflow:auto; height:{height}px; width: {"100%" if use_container_width else "auto"};'>
+    <div style='overflow:auto; height:{height if height else "auto"}px; width: {"100%" if use_container_width else "auto"};'>
         {html_table}
     </div>
     """
@@ -143,17 +132,63 @@ st.session_state.setdefault("data_rev", 0)
 st.session_state.setdefault("q_side", "Nós")
 st.session_state.setdefault("q_result", "Acerto")
 st.session_state.setdefault("q_action", "d")
+st.session_state.setdefault("q_position", "Frente")  # NOVO
 st.session_state.setdefault("last_selected_player", None)
 st.session_state.setdefault("show_cadastro", False)
 st.session_state.setdefault("show_tutorial", False)
 st.session_state.setdefault("show_config_team", False)
-st.session_state.setdefault("line_input_text_pre", "")
-st.session_state.setdefault("line_input_text_main", "")
+st.session_state.setdefault("line_input_text", "")
 st.session_state.setdefault("perf_logs", [])
 
-# ===== Diagnóstico opcional de performance =====
-PERF_DEBUG = False  # ative/desative aqui
+# Heatmap / clique
+st.session_state.setdefault("last_court_click", None)   # {"x":float,"y":float,"ts":int}
+st.session_state.setdefault("heatmap_debug", True)
 
+# Estado do Modo Jogo
+st.session_state.setdefault("game_mode", False)
+
+# Rótulo botões (Número | Nome)
+st.session_state.setdefault("btn_label_mode", "Número")
+st.session_state.setdefault("player_label_mode", "Número")
+
+# Mostrar números nas bolinhas
+st.session_state.setdefault("show_heat_numbers", False)
+
+# =========== Debug/prints ===========
+st.session_state.setdefault("dbg_prints", [])
+def dbg_print(msg: str):
+    ts = time.strftime("%H:%M:%S")
+    line = f"[{ts}] {msg}"
+    st.session_state["dbg_prints"] = (st.session_state["dbg_prints"] + [line])[-200:]
+    print(line)
+
+# Captura de clique via query param
+def _uv_handle_court_click():
+    try:
+        payload = st.query_params.get("uv_click", None)
+    except Exception:
+        payload = None
+    if not payload:
+        return
+    try:
+        xs, ys = payload.split(",")[:2]
+        x = float(xs); y = float(ys)  # normalizado [0..1]
+        st.session_state["last_court_click"] = {"x": x, "y": y, "ts": int(time.time())}
+        dbg_print(f"Clique capturado: x={x:.4f}, y={y:.4f} (0..1).")
+        try:
+            del st.query_params["uv_click"]
+        except Exception:
+            pass
+    except Exception as e:
+        dbg_print(f"Falha lendo uv_click: {e}")
+        try:
+            del st.query_params["uv_click"]
+        except Exception:
+            pass
+_uv_handle_court_click()
+
+# Perf logs
+PERF_DEBUG = False
 def _add_perf_log(msg: str):
     logs = st.session_state.get("perf_logs", [])
     logs.append(f"{time.strftime('%H:%M:%S')} {msg}")
@@ -194,9 +229,31 @@ if "jogadoras" in frames:
 # Helpers DB/lógica
 # =========================
 OUR_TEAM_ID = 1
-ATTACK_ACTIONS = ["DIAGONAL","LINHA","PIPE","SEGUNDA","LOB","MEIO"]
-ACT_MAP = {"d": "Diagonal","l": "Paralela","m": "Meio","lob": "Largada","seg": "Segunda","pi": "Pipe","re": "Recepção","b": "Bloqueio","sa": "Saque"}
+
+# >>> AÇÃO "rede" incluída <<<
+ACT_MAP = {
+    "d": "Diagonal","l": "Paralela","m": "Meio","lob": "Largada","seg": "Segunda",
+    "pi": "Pipe","re": "Recepção","b": "Bloqueio","sa": "Saque","rede": "Rede"
+}
 REVERSE_ACT_MAP = {v: k for k, v in ACT_MAP.items()}
+
+ACTION_CODE_TO_NAME = {
+    "d": "DIAGONAL","l": "LINHA","m": "MEIO","lob": "LOB","seg": "SEGUNDA",
+    "pi": "PIPE","re": "RECEPÇÃO","b": "BLOQUEIO","sa": "SAQUE","rede": "REDE"
+}
+ACTION_SYNONYM_TO_NAME = {
+    "diagonal":"DIAGONAL","diag":"DIAGONAL",
+    "linha":"LINHA","paralela":"LINHA",
+    "meio":"MEIO",
+    "largada":"LOB","lob":"LOB",
+    "segunda":"SEGUNDA","seg":"SEGUNDA",
+    "pipe":"PIPE","pi":"PIPE",
+    "recepcao":"RECEPÇÃO","recepção":"RECEPÇÃO","re":"RECEPÇÃO",
+    "bloqueio":"BLOQUEIO","bloq":"BLOQUEIO","b":"BLOQUEIO",
+    "saque":"SAQUE","sa":"SAQUE",
+    "rede":"REDE"
+}
+ATTACK_ACTIONS = ["DIAGONAL","LINHA","PIPE","SEGUNDA","LOB","MEIO"]
 
 def team_name_by_id(fr: dict, team_id: int | None) -> str:
     eq = fr.get("equipes", pd.DataFrame())
@@ -276,20 +333,33 @@ def recompute_set_score_fields(fr: dict, match_id: int, set_number: int):
     fr["sets"] = stf
 
 def undo_last_rally_current_set():
+    """Rápido: remove só o último evento e restaura o placar para o penúltimo."""
     fr = st.session_state.frames
     match_id = st.session_state.match_id
     set_number = st.session_state.set_number
-    rl = fr["rallies"]; sub = rl[(rl["match_id"]==match_id) & (rl["set_number"]==set_number)]
+    rl = fr["rallies"]
+    sub = rl[(rl["match_id"]==match_id) & (rl["set_number"]==set_number)].copy().sort_values("rally_no")
     if sub.empty:
         st.warning("Não há rallies para desfazer neste set."); return
-    last_rally_id = sub.iloc[-1]["rally_id"]
-    rl = rl[rl["rally_id"] != last_rally_id]; fr["rallies"] = rl
-    recompute_set_score_fields(fr, match_id, set_number)
+    last_row = sub.iloc[-1]
+    last_rally_id = last_row["rally_id"]
+    rl = rl[rl["rally_id"] != last_rally_id]
+    fr["rallies"] = rl
+    if len(sub) >= 2:
+        prev = sub.iloc[-2]
+        hp, ap = int(prev["score_home"]), int(prev["score_away"])
+    else:
+        hp, ap = 0, 0
+    stf = fr["sets"]
+    mask = (stf["match_id"]==match_id) & (stf["set_number"]==set_number)
+    stf.loc[mask, "home_points"] = hp; stf.loc[mask, "away_points"] = ap
+    fr["sets"] = stf
     save_all(Path(st.session_state.db_path), fr)
     st.session_state.data_rev += 1
-    st.success("Último rally desfeito e placar recalculado.")
+    dbg_print(f"Desfeito rally_id={last_rally_id}. Placar {hp}-{ap} (sem recomputar tudo).")
+    st.success("Último rally desfeito.")
 
-# ===== GARANTIA de quem pontuou (who_scored) conforme lado + erro/ponto =====
+# ===== who_scored e ação =====
 def _fix_who_scored_from_raw_and_row(raw_line: str, row: dict) -> dict:
     try:
         tokens = raw_line.strip().split()
@@ -305,8 +375,28 @@ def _fix_who_scored_from_raw_and_row(raw_line: str, row: dict) -> dict:
         pass
     return row
 
+def _normalize_action_in_row(row: dict) -> dict:
+    a = str(row.get("action", "") or "").strip().lower()
+    if not a:
+        raw = str(row.get("raw_text", "")).strip()
+        toks = raw.split()
+        if toks:
+            last = toks[-1].lower()
+            if last == "e" and len(toks) >= 2:
+                a = toks[-2].lower()
+            else:
+                a = last
+    if a in ACTION_CODE_TO_NAME:
+        name = ACTION_CODE_TO_NAME[a]
+    elif a in ACTION_SYNONYM_TO_NAME:
+        name = ACTION_SYNONYM_TO_NAME[a]
+    else:
+        name = str(row.get("action", "") or "").strip().upper()
+        if name in ("", "NA", "NONE"): name = ""
+    row["action"] = name
+    return row
+
 def _fast_apply_scores_to_row(row: dict):
-    """Atualiza score_home/score_away apenas para o novo rally (O(1))."""
     frames_local = st.session_state.frames
     mid, sn = st.session_state.match_id, st.session_state.set_number
     df_cur = current_set_df(frames_local, mid, sn)
@@ -315,20 +405,47 @@ def _fast_apply_scores_to_row(row: dict):
     else:
         last = df_cur.iloc[-1]
         home, away = int(last["score_home"]), int(last["score_away"])
-    if row.get("who_scored") == "NOS":
-        home += 1
-    elif row.get("who_scored") == "ADV":
-        away += 1
-    row["score_home"] = home
-    row["score_away"] = away
+    if row.get("who_scored") == "NOS": home += 1
+    elif row.get("who_scored") == "ADV": away += 1
+    row["score_home"] = home; row["score_away"] = away
     return row
 
+# ==== CLICK MAPA (compat) ====
+def _capture_court_click_from_query():
+    try:
+        params = dict(st.query_params)
+        if "uvx" in params and "uvy" in params:
+            x = float(params.get("uvx")); y = float(params.get("uvy"))
+            ts = int(params.get("uvt", "0") or 0)
+            st.session_state["last_court_click"] = {"x": x, "y": y, "ts": ts}
+            dbg_print(f"Clique (uvx/uvy) recebido: x={x:.4f}, y={y:.4f}")
+            newp = {k: v for k, v in dict(st.query_params).items() if not k.startswith("uv")}
+            st.query_params.from_dict(newp)
+    except Exception as e:
+        dbg_print(f"Falha ao ler uvx/uvy: {e}")
+_capture_court_click_from_query()
+
 def quick_register_line(raw_line: str):
-    if not raw_line.strip(): return
+    if not raw_line.strip():
+        dbg_print("Linha vazia ignorada."); return
     t0 = time.perf_counter()
     row = parse_line(raw_line)
+    row_before = row.copy()
     row = _fix_who_scored_from_raw_and_row(raw_line, row)
+    row = _normalize_action_in_row(row)
+    # Posição Frente/Fundo
+    row["position_zone"] = str(st.session_state.get("q_position","Frente")).strip().upper()
     row = _fast_apply_scores_to_row(row)
+
+    # clique pendente
+    last_click = st.session_state.get("last_court_click")
+    used_xy = None
+    if last_click and isinstance(last_click, dict):
+        row["court_x"] = float(last_click.get("x", 0.0))
+        row["court_y"] = float(last_click.get("y", 0.0))
+        used_xy = ("clique", row["court_x"], row["court_y"])
+        st.session_state["last_court_click"] = None
+
     t1 = time.perf_counter()
     append_rally(st.session_state.frames, match_id=st.session_state.match_id, set_number=st.session_state.set_number, row=row)
     save_all(Path(st.session_state.db_path), st.session_state.frames)
@@ -338,12 +455,17 @@ def quick_register_line(raw_line: str):
         t2 = time.perf_counter()
         _add_perf_log(f"parse+fix+score: {(t1-t0)*1000:.1f} ms | append+save+auto: {(t2-t1)*1000:.1f} ms")
 
+    dbg_print(
+        f"REGISTRO: raw='{raw_line}' -> action='{row.get('action')}', result='{row.get('result')}', "
+        f"who_scored='{row.get('who_scored')}', player={row.get('player_number')}, "
+        f"pos={row.get('position_zone')}, placar={row.get('score_home')}-{row.get('score_away')}, "
+        f"xy={'%s %.3f %.3f' % used_xy if used_xy else '—'} | row_before={row_before}"
+    )
+
 def quick_register_click(side: str, number: int | None, action: str, is_error: bool):
     prefix = "1" if side == "NOS" else "0"
-    if is_error:
-        line = f"{prefix} {number if number is not None else ''} e".strip()
-    else:
-        line = f"{prefix} {number if number is not None else ''} {action}".strip()
+    num = f"{number}" if number is not None else ""
+    line = f"{prefix} {num} {action}{' e' if is_error else ''}".strip()
     quick_register_line(line)
 
 def resolve_our_roster_numbers(frames: dict) -> list[int]:
@@ -354,17 +476,354 @@ def resolve_our_roster_numbers(frames: dict) -> list[int]:
     ours = jg[jg["team_id"] == OUR_TEAM_ID].dropna(subset=["player_number"]).sort_values("player_number")
     return ours["player_number"].astype(int).unique().tolist()
 
-# central de registro (usada por: botão Registrar, atalhos e mudança de ação)
+def roster_for_ui(frames: dict) -> list[dict]:
+    jg = frames.get("jogadoras", pd.DataFrame()).copy()
+    if jg.empty: return []
+    for col in ["team_id","player_number"]:
+        if col in jg.columns: jg[col] = pd.to_numeric(jg[col], errors="coerce")
+    ours = jg[(jg["team_id"] == OUR_TEAM_ID) & (~jg["player_number"].isna())].copy()
+    if ours.empty: return []
+    ours["player_number"] = ours["player_number"].astype(int)
+    ours["player_name"] = ours["player_name"].astype(str)
+    ours = ours.sort_values("player_number")
+    return ours[["player_number","player_name"]].rename(
+        columns={"player_number":"number","player_name":"name"}
+    ).to_dict("records")
+
+def player_name_by_number(frames: dict, number: int | None) -> str:
+    if number is None: return ""
+    jg = frames.get("jogadoras", pd.DataFrame())
+    if jg is None or jg.empty: return ""
+    row = jg[(pd.to_numeric(jg["team_id"], errors="coerce")==OUR_TEAM_ID) &
+             (pd.to_numeric(jg["player_number"], errors="coerce")==int(number))]
+    return (str(row.iloc[0]["player_name"]) if not row.empty else "")
+
+# central de registro
 def register_current(number: int | None = None, action: str | None = None):
     side_code = "NOS" if st.session_state.get("q_side", "Nós") == "Nós" else "ADV"
     is_err = (st.session_state.get("q_result", "Acerto") == "Erro")
     act = action if action is not None else st.session_state.get("q_action", "d")
     num_val = number if number is not None else st.session_state.get("last_selected_player", None)
     if num_val is None:
-        raw = st.session_state.get("line_input_text_main", "")
+        raw = st.session_state.get("line_input_text", "")
         m = re.findall(r"\b(\d{1,2})\b", raw)
         num_val = int(m[-1]) if m else None
+
+    # ação 'rede' => sempre erro nosso (bolinha vermelha colada à rede)
+    if str(act).lower() == "rede":
+        side_code = "ADV"
+        is_err = True
+
+    dbg_print(f"register_current: side={side_code}, num={num_val}, action={act}, is_err={is_err}, pos={st.session_state.get('q_position')}")
     quick_register_click(side_code, num_val, act, is_err)
+
+# ========= HEATMAP =========
+def _y_for_half(half: str, fb: str | None) -> float:
+    """
+    Metade superior ('opp') ≈ adversário; metade inferior ('our') ≈ nós.
+    Frente = antes dos 3m (perto da rede); Fundo = perto da linha de fundo.
+    """
+    if fb == "FRENTE":
+        return 41.0 if half == "opp" else 59.0   # antes dos 3m
+    if fb == "FUNDO":
+        return 14.0 if half == "opp" else 86.0   # perto da linha de fundo
+    return 28.0 if half == "opp" else 72.0       # neutro
+
+def _y_net_touch(half: str) -> float:
+    return 49.0 if half == "opp" else 51.0
+
+def _x_for_action(act: str) -> float:
+    if act in ("MEIO","PIPE","SEGUNDA","SAQUE","REDE","BLOQUEIO","LOB"):
+        return 50.0
+    if act == "DIAGONAL": return 28.0
+    if act == "LINHA":    return 82.0
+    return 50.0
+
+def build_heat_points(df: pd.DataFrame,
+                      selected_players: list[int] | None,
+                      include_success: bool,
+                      include_errors: bool,
+                      include_adv_points: bool,
+                      include_adv_errors: bool,
+                      return_debug: bool = False):
+    """
+    Correções:
+    - “Segunda”, “Pipe” e “Saque” passam a plotar normalmente (acerto/erro).
+    - Frente/Fundo aplicado em TODAS as ações (inclusive Diagonal e Paralela).
+    - “Rede” e “Bloqueio” colados à rede (espalhando no eixo X).
+    """
+    if df is None or df.empty:
+        empty_dbg = pd.DataFrame(columns=["rally_no","player_number","action_u","res_u","who_u","used_x","used_y","origem","cor"])
+        return ([], [], [], [], empty_dbg) if return_debug else ([], [], [], [])
+
+    def _norm_action(a: str) -> str:
+        a = (a or "").strip().upper()
+        if a in ("M",): return "MEIO"
+        if a in ("D",): return "DIAGONAL"
+        if a in ("L","PARALELA"): return "LINHA"
+        if a in ("LOB","LARGADA"): return "LOB"
+        if a in ("PI","PIPE"): return "PIPE"
+        if a in ("SEG","SEGUNDA"): return "SEGUNDA"
+        if a in ("RE","RECEPCAO","RECEPÇÃO"): return "RECEPÇÃO"
+        if a in ("SA","SAQUE"): return "SAQUE"
+        if a in ("B","BLOQ","BLOQUEIO"): return "BLOQUEIO"
+        if a in ("REDE",): return "REDE"
+        return a
+
+    # inclui 'position_zone' e outras colunas como fonte de Frente/Fundo
+    FB_COLS = ["position_zone","pos_fb","posicao_fb","posicao","pos",
+               "frente_fundo","frente_fundo_sel","zona_fb","zona"]
+    def _row_fb(r) -> str | None:
+        for c in FB_COLS:
+            if c in r and pd.notna(r[c]):
+                v = str(r[c]).strip().upper()  # <<< correção: .upper() (sem .str)
+                if v in ("FRENTE","F","FR","FRONTAL","ATAQUE"):
+                    return "FRENTE"
+                if v in ("FUNDO","B","U","BACK","TRAS","TRÁS","DEFESA"):
+                    return "FUNDO"
+        return None
+
+    df0 = df.copy()
+    df0["action_u"] = df0.get("action", "").astype(str).str.strip().str.upper()
+    df0["who_u"]    = df0.get("who_scored", "").astype(str).str.strip().str.upper()
+    df0["res_u"]    = df0.get("result", "").astype(str).str.strip().str.upper()
+    if "player_number" in df0.columns:
+        df0["player_number"] = pd.to_numeric(df0["player_number"], errors="coerce")
+
+    # filtro por jogadoras (mantendo NaN)
+    df_nos = df0.copy()
+    if selected_players is not None and "player_number" in df_nos.columns:
+        df_nos["player_number"] = df_nos["player_number"].astype("Int64")
+        if len(selected_players) == 0:
+            empty_dbg = pd.DataFrame(columns=["rally_no","player_number","action_u","res_u","who_u","used_x","used_y","origem","cor"])
+            return ([], [], [], [], empty_dbg) if return_debug else ([], [], [], [])
+        sel = pd.Series(selected_players, dtype="Int64")
+        df_nos = df_nos[df_nos["player_number"].isin(sel) | df_nos["player_number"].isna()]
+
+    # aceitamos estes nomes/códigos
+    actions_ok = {
+        "MEIO","M",
+        "DIAGONAL","D",
+        "LINHA","PARALELA","L",
+        "LOB","LARGADA",
+        "PIPE","PI",
+        "SEGUNDA","SEG",
+        "RECEPÇÃO","RECEPCAO","RE",
+        "BLOQUEIO","B","BLOQ",
+        "SAQUE","SA",
+        "REDE"
+    }
+
+    succ_pts: list[dict] = []
+    err_pts:  list[dict] = []
+    adv_pts:  list[dict] = []
+    adv_err_pts: list[dict] = []
+    dbg_rows = []
+    cluster_counters = {}
+
+    group_bias = {
+        "azul": (-0.8, -0.8),
+        "vermelho": (0.8, -0.8),
+        "laranja": (-0.8, 0.8),
+        "laranja_escuro": (0.8, 0.8),
+    }
+
+    def _offset_for_index(idx: int, step_pct: float = 2.2) -> tuple[float, float]:
+        if idx <= 0: return (0.0, 0.0)
+        order = [
+            (1,0), (-1,0), (0,1), (0,-1),
+            (1,1), (-1,1), (1,-1), (-1,-1),
+            (2,0), (-2,0), (0,2), (0,-2),
+            (2,1), (2,-1), (-2,1), (-2,-1),
+            (1,2), (-1,2), (1,-2), (-1,-2),
+            (3,0), (-3,0), (0,3), (0,-3),
+        ]
+        base = order[(idx-1) % len(order)]
+        mult = 1 + ((idx-1) // len(order))
+        return (base[0]*step_pct*mult, base[1]*step_pct*mult)
+
+    def _add_point(lst: list, x: float, y: float, color_tag: str, cluster_key: str, label: str | None, dbg_row: list):
+        idx = cluster_counters.get(cluster_key, 0)
+        dx, dy = _offset_for_index(idx)
+        cluster_counters[cluster_key] = idx + 1
+        gx, gy = group_bias.get(color_tag, (0.0, 0.0))
+        xx = min(100.0, max(0.0, x + dx + gx))
+        yy = min(100.0, max(0.0, y + dy + gy))
+        lst.append({"x": xx, "y": yy, "label": label, "cluster": cluster_key})
+        if return_debug:
+            dbg_row = dbg_row.copy()
+            dbg_row[5] = xx; dbg_row[6] = yy
+            dbg_row[8] = color_tag
+            dbg_rows.append(dbg_row)
+
+    def _who_performed_is_nos(r) -> bool:
+        """Deduza quem executou: NOS se (NOS,PONTO) ou (ADV,ERRO); senão ADV."""
+        w = r.get("who_u","")
+        res = r.get("res_u","")
+        return (w == "NOS" and res == "PONTO") or (w == "ADV" and res == "ERRO")
+
+    def _infer_point(r, color_tag: str, bucket: list, label: str | None):
+        act = _norm_action(r.get("action_u",""))
+        fb = _row_fb(r)
+
+        # clique do usuário tem prioridade
+        cx, cy = r.get("court_x"), r.get("court_y")
+        if pd.notna(cx) and pd.notna(cy):
+            x_use = float(cx)*100 if 0<=cx<=1 else float(cx)
+            y_use = float(cy)*100 if 0<=cy<=1 else float(cy)
+            _add_point(bucket, x_use, y_use, color_tag, f"{color_tag}:{act}", label,
+                       [r.get("rally_no"), r.get("player_number"), act, r.get("res_u"), r.get("who_u"),
+                        x_use, y_use, "clique", color_tag])
+            return
+
+        # metade para posicionar o Y: de quem EXECUTOU
+        perf_is_nos = _who_performed_is_nos(r)
+        eff_half = "our" if perf_is_nos else "opp"
+
+        # recepção sempre na nossa metade
+        if act == "RECEPÇÃO":
+            eff_half = "our"
+
+        # BLOQUEIO/REDE -> colado na rede + espalha no X
+        if act in ("BLOQUEIO","REDE"):
+            y0 = _y_net_touch(eff_half) if fb in (None, "FRENTE") else _y_for_half(eff_half, "FUNDO")
+            idx = cluster_counters.get(f"{color_tag}:{act}", 0)
+            x0 = 10.0 + (idx % 16) * (80.0/15.0)  # distribui ao longo da rede
+        else:
+            x0 = _x_for_action(act)
+            y0 = _y_for_half(eff_half, fb)
+
+        _add_point(bucket, x0, y0, color_tag, f"{color_tag}:{act}", label,
+                   [r.get("rally_no"), r.get("player_number"), act, r.get("res_u"), r.get("who_u"),
+                    x0, y0, "inferência", color_tag])
+
+    # --------- listas ----------
+    if include_success:
+        srows = df_nos[(df_nos["who_u"] == "NOS") & (df_nos["res_u"] == "PONTO") & (df_nos["action_u"].isin(actions_ok))]
+        for _, r in srows.iterrows():
+            lbl = str(int(r["player_number"])) if pd.notna(r.get("player_number")) else None
+            _infer_point(r, color_tag="azul", bucket=succ_pts, label=lbl)
+
+    if include_errors:
+        erows = df_nos[(df_nos["who_u"] == "ADV") & (df_nos["res_u"] == "ERRO") & (df_nos["action_u"].isin(actions_ok))]
+        for _, r in erows.iterrows():
+            lbl = str(int(r["player_number"])) if pd.notna(r.get("player_number")) else None
+            _infer_point(r, color_tag="vermelho", bucket=err_pts, label=lbl)
+
+    if include_adv_points:
+        arows = df0[(df0["who_u"] == "ADV") & (df0["res_u"] == "PONTO") & (df0["action_u"].isin(actions_ok))]
+        for _, r in arows.iterrows():
+            _infer_point(r, color_tag="laranja", bucket=adv_pts, label=None)
+
+    if include_adv_errors:
+        aerr = df0[(df0["who_u"] == "NOS") & (df0["res_u"] == "ERRO") & (df0["action_u"].isin(actions_ok))]
+        for _, r in aerr.iterrows():
+            _infer_point(r, color_tag="laranja_escuro", bucket=adv_err_pts, label=None)
+
+    if return_debug:
+        dbg = pd.DataFrame(dbg_rows, columns=["rally_no","player_number","action_u","res_u","who_u","used_x","used_y","origem","cor"])
+        return succ_pts, err_pts, adv_pts, adv_err_pts, dbg
+    else:
+        return succ_pts, err_pts, adv_pts, adv_err_pts
+
+# =========================
+# QUADRA HTML
+# =========================
+def render_court_html(pts_success, pts_errors, pts_adv=None, pts_adv_err=None, enable_click=False, key="set", show_numbers=False):
+    """
+    Desenha quadra com labels externos “ADV” (topo) e “NÓS” (baixo).
+    """
+    def _norm(points):
+        out = []
+        for it in points or []:
+            if isinstance(it, dict):
+                x = float(it.get("x", 0)); y = float(it.get("y", 0)); lab = it.get("label")
+            elif isinstance(it, (list, tuple)) and len(it) >= 2:
+                x = float(it[0]); y = float(it[1]); lab = None
+            else:
+                continue
+            if 0.0 <= x <= 1.0 and 0.0 <= y <= 1.0:
+                x *= 100.0; y *= 100.0
+            out.append((max(0.0, min(100.0, x)), max(0.0, min(100.0, y)), lab))
+        return out
+
+    S = _norm(pts_success)
+    E = _norm(pts_errors)
+    A = _norm(pts_adv or [])
+    AE = _norm(pts_adv_err or [])
+    container_id = f"uv-court-{key}"
+
+    def _dot_html(x, y, bg, border, text=None):
+        label_html = ""
+        if show_numbers and text:
+            label_html = (
+                "<div style='position:absolute; inset:0; display:flex; align-items:center; justify-content:center; "
+                "font-size:9px; color:#fff; font-weight:700;'>"
+                f"{html.escape(str(text))}</div>"
+            )
+        return (
+            f"<div style='left:{x}%; top:{y}%; width:12px; height:12px; position:absolute;"
+            f"background:{bg}; border:1px solid {border}; border-radius:50%;"
+            f"transform:translate(-50%,-50%); z-index:4;'>{label_html}</div>"
+        )
+
+    dots_html = []
+    for x,y,lab in S:
+        dots_html.append(_dot_html(x, y, "rgba(30,144,255,0.92)", "rgba(20,90,200,0.95)", lab))
+    for x,y,lab in E:
+        dots_html.append(_dot_html(x, y, "rgba(220,50,50,0.92)", "rgba(160,20,20,0.95)", lab))
+    for x,y,lab in A:
+        dots_html.append(_dot_html(x, y, "rgba(255,140,0,0.92)", "rgba(180,90,0,0.95)", lab or "ADV"))
+    for x,y,lab in AE:
+        dots_html.append(_dot_html(x, y, "rgba(210,100,0,0.92)", "rgba(150,70,0,0.95)", lab or "ADV"))
+
+    click_js = ""
+    if enable_click:
+        click_js = f"""
+        (function(){{
+          const containerId = {json.dumps(container_id)};
+          const root = document.getElementById(containerId);
+          if (!root) return;
+          root.addEventListener('click', function(e){{
+            const rect = root.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / rect.width;
+            const y = (e.clientY - rect.top) / rect.height;
+            try {{
+              const params = new URLSearchParams(window.parent.location.search || "");
+              params.set('uv_click', x.toFixed(4) + ',' + y.toFixed(4));
+              const newUrl = window.parent.location.pathname + '?' + params.toString() + window.parent.location.hash;
+              window.parent.history.replaceState({{}}, '', newUrl);
+              window.parent.location.reload();
+            }} catch(err) {{
+              const params = new URLSearchParams(window.location.search || "");
+              params.set('uv_click', x.toFixed(4) + ',' + y.toFixed(4));
+              const newUrl = window.location.pathname + '?' + params.toString() + window.location.hash;
+              window.history.replaceState({{}}, '', newUrl);
+              window.location.reload();
+            }}
+          }});
+        }})();
+        """
+
+    html_block = f"""
+    <div style="width:100%; text-align:center; font-weight:700; margin-bottom:6px;">ADV</div>
+    <div id="{container_id}" style="background:#FFA94D; border:2px solid #333; position:relative; width:100%; height:380px; border-radius:6px;">
+      <!-- REDE -->
+      <div style="
+           position:absolute; left:0; top:calc(50% - 8px); width:100%; height:16px;
+           background:repeating-linear-gradient(90deg, rgba(255,255,255,0.95) 0 12px, rgba(0,0,0,0.12) 12px 14px);
+           border-top:2px solid #111; border-bottom:2px solid #111; z-index:2; opacity:.95;"></div>
+      <div style="position:absolute; left:0; top:50%; width:100%; height:2px; background:#111; z-index:3;"></div>
+      <!-- Linhas de ataque (3m) -->
+      <div style="position:absolute; left:0; top:33.333%; width:100%; height:1px; background:rgba(0,0,0,.30); z-index:1;"></div>
+      <div style="position:absolute; left:0; top:66.666%; width:100%; height:1px; background:rgba(0,0,0,.30); z-index:1;"></div>
+
+      {''.join(dots_html)}
+    </div>
+    <div style="width:100%; text-align:center; font-weight:700; margin-top:12px; margin-bottom:22px;">NÓS</div>
+    <script>{click_js}</script>
+    """
+    components.html(html_block, height=468, scrolling=False)
 
 # =========================
 # Abertura de partida
@@ -398,7 +857,6 @@ with top3:
 with top4:
     st.button("📘 Tutorial", use_container_width=True, key="tutorial_btn", on_click=lambda: st.session_state.__setitem__("show_tutorial", True))
 with top5:
-    # Tenta resolver o caminho real do histórico
     hist_candidates = [
         "pages/02_historico.py",
         "pages/historico.py",
@@ -410,86 +868,15 @@ with top5:
         if (BASE_DIR / p).exists():
             found_hist = p
             break
-
-    if found_hist:
+    def _go_hist(p=found_hist):
         try:
-            st.page_link(found_hist, label="🗂️ Histórico")
+            st.switch_page(p)
         except Exception:
-            def _go_hist(p=found_hist):
-                try:
-                    st.switch_page(p)
-                except Exception:
-                    st.warning("Não consegui abrir a página. Atualize seu Streamlit.")
-            st.button("🗂️ Histórico", use_container_width=True, on_click=_go_hist)
-    else:
-        st.button("🗂️ Histórico", use_container_width=True,
-                  on_click=lambda: st.warning("Página de histórico não encontrada."))
+            st.warning("Não consegui abrir a página. Atualize seu Streamlit.")
+    st.button("🗂️ Histórico", use_container_width=True, on_click=_go_hist)
 
 # =========================
-# Modal do Tutorial (corrigido)
-# =========================
-if st.session_state.get("show_tutorial", False):
-    try:
-        html_path = BASE_DIR / "tutorial_scout.html"
-        if html_path.exists():
-            html_content = html_path.read_text(encoding="utf-8")
-            components.html(
-                f"""
-                <div id='uv-tutorial' style='position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); 
-                width: 90vw; height: 85vh; background-color: white; z-index: 9999; 
-                border: 2px solid #ccc; border-radius: 10px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,.25);'>
-                    <div style='position: absolute; top: 10px; right: 10px; z-index: 10000;'>
-                        <button id='uv-close'
-                            style='background: #ff4b4b; color: white; border: none; border-radius: 50%; 
-                                   width: 30px; height: 30px; cursor: pointer; font-weight: bold;'>X</button>
-                    </div>
-                    <iframe srcdoc='{html.escape(html_content)}' 
-                            style='width: 100%; height: 100%; border: none; margin-top: 40px;'></iframe>
-                </div>
-
-                <script>
-                (function(){{
-                  var btn = document.getElementById('uv-close');
-                  var box = document.getElementById('uv-tutorial');
-
-                  function closeTutorial() {{
-                    if (box) box.style.display = 'none';
-                    var fr = window.frameElement;
-                    if (fr) {{
-                      fr.style.height = '0px';
-                      fr.style.width = '0px';
-                      fr.style.display = 'none';
-                      fr.style.border = '0';
-                    }}
-                    try {{
-                      var pdoc = window.parent.document;
-                      var btns = pdoc.querySelectorAll('button');
-                      for (var i=0; i<btns.length; i++) {{
-                        var t = (btns[i].innerText || '').trim();
-                        if (t.indexOf('Fechar Tutorial') !== -1) {{
-                          btns[i].click();
-                          break;
-                        }}
-                      }}
-                    }} catch (e) {{}}
-                  }}
-
-                  if (btn) btn.addEventListener('click', closeTutorial);
-                }})();
-                </script>
-                """,
-                height=900, scrolling=True
-            )
-        else:
-            st.error("Arquivo de tutorial não encontrado.")
-    except Exception as e:
-        st.error(f"Não consegui abrir o tutorial: {e}")
-
-    st.button("❌ Fechar Tutorial", key="close_tutorial_btn",
-              on_click=lambda: st.session_state.__setitem__("show_tutorial", False))
-
-# =========================
-# Modais resumidos (Config/Tutorial) — mantidos (Config do Time)
+# Modais (Config/Tutorial)
 # =========================
 if st.session_state.get("show_config_team", False):
     st.markdown('<div class="sectionCard">', unsafe_allow_html=True)
@@ -510,6 +897,7 @@ if st.session_state.get("show_config_team", False):
                 equipes = pd.concat([equipes, new_team], ignore_index=True)
             frames["equipes"] = equipes; save_all(Path(st.session_state.db_path), frames)
             st.session_state.show_config_team = False
+            dbg_print(f"Nome do time atualizado para '{new_team_name}'.")
     st.button("💾 Salvar Nome do Time", key="save_team_name_btn", on_click=_save_team_name)
 
     st.markdown("---"); st.subheader("👥 Jogadoras")
@@ -528,6 +916,7 @@ if st.session_state.get("show_config_team", False):
                 jog_df = frames["jogadoras"]
                 jog_df = jog_df[~((jog_df["team_id"] == OUR_TEAM_ID) & (jog_df["player_number"] == player_num))]
                 frames["jogadoras"] = jog_df; save_all(Path(st.session_state.db_path), frames)
+                dbg_print(f"Jogadora #{player_num} removida.")
         st.button("🗑️ Excluir", key="delete_player_btn", on_click=_delete_player)
     st.markdown("---"); st.subheader("➕ Adicionar")
     c1, c2, c3 = st.columns(3)
@@ -545,13 +934,57 @@ if st.session_state.get("show_config_team", False):
             else:
                 frames["jogadoras"] = new_player
             save_all(Path(st.session_state.db_path), frames)
+            dbg_print(f"Jogadora adicionada: #{new_number} {new_name} ({new_position}).")
         else:
             st.warning("Digite um nome.")
     st.button("➕ Adicionar Jogadora", key="add_player_btn", on_click=_add_player)
     st.markdown('</div>', unsafe_allow_html=True)
 
+if st.session_state.get("show_tutorial", False):
+    try:
+        html_path = BASE_DIR / "tutorial_scout.html"
+        if html_path.exists():
+            html_content = html_path.read_text(encoding="utf-8")
+            components.html(
+                f"""
+                <div id='uv-modal' style='position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+                 width: 90vw; height: 85vh; background-color: white; z-index: 1000;
+                 border: 2px solid #ccc; border-radius: 10px; overflow: hidden;'>
+                    <button id='uv-close'
+                         style='position:absolute; top:10px; right:10px; z-index:1001; background:#ff4b4b; color:white;
+                                border:none; border-radius:50%; width:30px; height:30px; cursor:pointer; font-weight:bold;'>X</button>
+                    <iframe srcdoc='{html.escape(html_content)}'
+                             style='width:100%; height:100%; border:none; margin-top:40px;'></iframe>
+                </div>
+                <script>
+                  (function(){{
+                    const btn = document.getElementById('uv-close');
+                    btn.addEventListener('click', function(){{
+                      try {{
+                        const url = new URL(window.parent.location.href);
+                        url.searchParams.set('uv_tutorial_close','1');
+                        window.parent.history.replaceState({{}}, '', url);
+                        document.getElementById('uv-modal').style.display='none';
+                      }} catch(e) {{}}
+                    }});
+                  }})();
+                </script>
+                """,
+                height=900, scrolling=True
+            )
+            params = dict(st.query_params)
+            if params.get("uv_tutorial_close") == "1":
+                st.session_state.show_tutorial = False
+                newp = {k: v for k, v in dict(st.query_params).items() if k != "uv_tutorial_close"}
+                st.query_params.from_dict(newp)
+        else:
+            st.error("Arquivo de tutorial não encontrado.")
+    except Exception as e:
+        st.error(f"Não consegui abrir o tutorial: {e}")
+    st.button("❌ Fechar Tutorial", key="close_tutorial_btn", on_click=lambda: st.session_state.__setitem__("show_tutorial", False))
+
 # =========================
-# Cadastro rápido / NOVO JOGO (sem jogo OU quando clicar "🆕 Jogo")
+# Cadastro rápido / NOVO JOGO
 # =========================
 def _get_or_create_team_id_by_name(frames: dict, name: str) -> int:
     name_norm = str(name).strip()
@@ -590,7 +1023,7 @@ def _create_new_match(opp_name: str, dt: date):
     st.session_state.set_number = 1
     st.session_state.show_cadastro = False
     st.success(f"Novo jogo criado: {team_name_by_id(frames_local, OUR_TEAM_ID)} x {opp_name or team_name_by_id(frames_local, away_id)}")
-
+    dbg_print(f"Novo jogo criado (match_id={next_mid}) contra '{opp_name}' na data {dt}.")
 if (st.session_state.match_id is None or st.session_state.show_cadastro) and not st.session_state.show_config_team:
     with st.container():
         st.markdown('<div class="sectionCard">', unsafe_allow_html=True)
@@ -611,17 +1044,17 @@ if (st.session_state.match_id is None or st.session_state.show_cadastro) and not
         st.subheader("🎯 Registrar Rally (Pré-jogo)")
 
         def on_submit_text_pre():
-            raw = st.session_state.get("line_input_text_pre", "").strip()
+            raw = st.session_state.get("line_input_text", "").strip()
             if not raw: return
             quick_register_line(raw)
-            st.session_state["line_input_text_pre"] = ""
-            st.session_state["q_side"] = "Nós"; st.session_state["q_result"] = "Acerto"; st.session_state["q_action"] = "d"
+            st.session_state["line_input_text"] = ""
+            st.session_state["q_side"] = "Nós"; st.session_state["q_result"] = "Acerto"; st.session_state["q_action"] = "d"; st.session_state["q_position"] = "Frente"
 
-        _ = st.text_input("Digite código:", key="line_input_text_pre", placeholder="Ex: 1 9 d",
+        _ = st.text_input("Digite código:", key="line_input_text", placeholder="Ex: 1 9 d",
                           label_visibility="collapsed", on_change=on_submit_text_pre)
 
         def _cb_register_pre():
-            register_current(); st.session_state["line_input_text_pre"] = ""
+            register_current(); st.session_state["line_input_text"] = ""
 
         c_reg_pre, c_undo_pre = st.columns([1, 1])
         with c_reg_pre:
@@ -634,9 +1067,6 @@ if (st.session_state.match_id is None or st.session_state.show_cadastro) and not
             st.markdown('</div>', unsafe_allow_html=True)
 
         st.markdown('</div>', unsafe_allow_html=True)
-
-# Se ainda não há partida, encerra após área de cadastro
-if st.session_state.match_id is None or st.session_state.show_config_team:
     st.stop()
 
 # =========================
@@ -644,12 +1074,13 @@ if st.session_state.match_id is None or st.session_state.show_config_team:
 # =========================
 with st.container():
     st.markdown('<div class="sectionCard">', unsafe_allow_html=True)
-    if home_name and away_name: st.markdown(f"**Jogo:** {home_name} x {away_name} — {date_str}")
-    bar1, bar3, bar4, bar5 = st.columns([1, 3.2, 1.2, 1.4])
+
+    bar1, bar3, bar4, bar5 = st.columns([1.4, 3.2, 1.2, 1.4])
     with bar1:
         st.session_state.auto_close = st.toggle("Auto 25/15+2", value=st.session_state.auto_close, key="auto_close_toggle")
+        st.session_state.game_mode = st.toggle("🎮 Modo Jogo", value=st.session_state.game_mode, key="game_mode_toggle")
     with bar3:
-        sets_match_all = frames["sets"][frames["sets"]["match_id"]==st.session_state.match_id].sort_values("set_number")
+        sets_match_all = frames["sets"].loc[frames["sets"]["match_id"] == st.session_state.match_id].sort_values("set_number")
         sel_vals = sets_match_all["set_number"].tolist() if not sets_match_all.empty else [1]
         c31, c32, c33 = st.columns([1, 1, 1])
         with c31:
@@ -667,7 +1098,7 @@ with st.container():
         with c32:
             st.markdown('<div class="btn-xxs">', unsafe_allow_html=True)
             st.button("🔓 Reabrir Set", use_container_width=True, key="reopen_btn",
-                      on_click=lambda: dict() if reopen_set(st.session_state.match_id, int(set_to_reopen)) else None)
+                      on_click=lambda: dict() if 'reopen_set' in globals() and callable(globals()['reopen_set']) and globals()['reopen_set'](st.session_state.match_id, int(set_to_reopen)) else None)
             st.markdown('</div>', unsafe_allow_html=True)
         with c33:
             st.markdown('<div class="btn-xxs">', unsafe_allow_html=True)
@@ -696,27 +1127,14 @@ with st.container():
             horizontal=True, index=["Nós","Adversário","Ambos"].index(st.session_state.graph_filter), key="graph_filter_radio")
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ============ Painel de DEBUG (aparece só se PERF_DEBUG=True) ============
-if PERF_DEBUG:
-    with st.container():
-        st.markdown('<div class="sectionCard">', unsafe_allow_html=True)
-        st.markdown("**Debug de performance**")
-        logs = st.session_state.get("perf_logs", [])
-        if logs:
-            st.text("\n".join(logs[-12:]))
-        else:
-            st.caption("Sem logs ainda.")
-        st.markdown('</div>', unsafe_allow_html=True)
-
 # =========================
-# Painel principal: Esquerda (inputs) | Direita (gráficos)
+# PLACAR
 # =========================
 with st.container():
     st.markdown('<div class="sectionCard">', unsafe_allow_html=True)
 
     frames = st.session_state.frames
 
-    # placar topo
     df_set = current_set_df(frames, st.session_state.match_id, st.session_state.set_number)
     home_pts, away_pts = set_score_from_df(df_set)
     stf = frames["sets"]; sm = stf[stf["match_id"] == st.session_state.match_id]
@@ -731,24 +1149,136 @@ with st.container():
         st.markdown(f"<div class='score-box'><div class='score-team'>{away_name}</div><div class='score-points'>{away_pts}</div></div>", unsafe_allow_html=True)
     with pc4:
         st.markdown(f"<div class='set-summary'>Sets: <b>{home_sets_w}</b> × <b>{away_sets_w}</b> &nbsp;|&nbsp; Set atual: <b>{st.session_state.set_number}</b></div>", unsafe_allow_html=True)
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# =========================
+# MODO JOGO
+# =========================
+if st.session_state.game_mode:
+    with st.container():
+        st.markdown('<div class="sectionCard game-mode-container">', unsafe_allow_html=True)
+        st.subheader("🎮 Modo Jogo")
+
+        st.caption("Jogadoras (toque rápido define lado = Nós):")
+        label_mode_col, _ = st.columns([1.0, 3.0])
+        with label_mode_col:
+            st.session_state.player_label_mode = st.radio(
+                "Mostrar botões por:", options=["Número","Nome"], horizontal=True,
+                index=["Número","Nome"].index(st.session_state.player_label_mode),
+                key="player_label_mode_gm"
+            )
+        nums = resolve_our_roster_numbers(st.session_state.frames)
+        name_map = {r["number"]: r["name"] for r in roster_for_ui(st.session_state.frames)}
+
+        if nums:
+            num_cols = 12 if st.session_state.player_label_mode == "Número" else 4
+            jcols = st.columns(num_cols)
+            for i, n in enumerate(nums):
+                label_txt = str(n) if st.session_state.player_label_mode == "Número" else (name_map.get(n) or str(n))
+                with jcols[i % num_cols]:
+                    st.button(
+                        f"{label_txt}",
+                        key=f"gm_pill_{n}",
+                        on_click=lambda n=n: (st.session_state.__setitem__("last_selected_player", n),
+                                              st.session_state.__setitem__("q_side", "Nós")),
+                        use_container_width=True
+                    )
+            with jcols[(len(nums)) % num_cols]:
+                st.button("ADV", key="gm_adv_btn",
+                          on_click=lambda: st.session_state.__setitem__("q_side", "Adv"),
+                          use_container_width=True)
+        else:
+            st.caption("Sem jogadoras")
+
+        st.caption("Resultado / Posição:")
+        rc1, rc2 = st.columns([1.2, 1.0])
+        with rc1:
+            st.session_state.q_result = st.radio("Resultado", options=["Acerto","Erro"], horizontal=True, index=0,
+                                                 key="gm_q_result", label_visibility="collapsed")
+        with rc2:
+            st.session_state.q_position = st.radio("Posição", options=["Frente","Fundo"], horizontal=True,
+                                                   index=["Frente","Fundo"].index(st.session_state.q_position),
+                                                   key="gm_q_position", label_visibility="collapsed")
+
+        st.caption("Atalhos de Ação:")
+        acols = st.columns(12)
+        for i, code in enumerate(["d","l","m","lob","seg","pi","re","b","sa","rede"]):
+            with acols[i % len(acols)]:
+                label = ACT_MAP.get(code, code)[:3]
+                st.button(label, key=f"gm_quick_{code}",
+                          on_click=lambda code=code: register_current(action=code), use_container_width=True)
+
+        st.button("↩️ Desfazer Rally", use_container_width=True, key="gm_undo_btn", on_click=undo_last_rally_current_set)
+
+        st.markdown("---")
+        st.markdown("**🗺️ Mapa de Calor (clique para marcar o local do ataque)**")
+
+        st.session_state.show_heat_numbers = st.checkbox(
+            "Mostrar número/ADV nas bolinhas (nossos + adversário)",
+            value=st.session_state.show_heat_numbers, key="gm_show_numbers_chk"
+        )
+
+        df_hm = current_set_df(st.session_state.frames, st.session_state.match_id, st.session_state.set_number)
+        pts_succ, pts_errs, pts_adv, pts_adv_err, dbg_gm = build_heat_points(
+            df_hm,
+            selected_players=None,
+            include_success=True,
+            include_errors=True,
+            include_adv_points=True,
+            include_adv_errors=True,
+            return_debug=True
+        )
+
+        dbg_print(f"[Modo Jogo] Heatmap: succ={len(pts_succ)} err={len(pts_errs)} adv={len(pts_adv)} advErr={len(pts_adv_err)} (set={st.session_state.set_number})")
+
+        render_court_html(pts_succ, pts_errs, pts_adv, pts_adv_err, enable_click=True, key="gm", show_numbers=st.session_state.show_heat_numbers)
+
+        with st.expander("🔎 Debug Heatmap (Modo Jogo)"):
+            st.write(f"Acertos (azul): **{len(pts_succ)}**  |  Erros (vermelho): **{len(pts_errs)}**  |  ADV (laranja): **{len(pts_adv)}**  |  ADV erros: **{len(pts_adv_err)}**")
+            if not dbg_gm.empty:
+                view = dbg_gm[["rally_no","player_number","action_u","res_u","who_u","used_x","used_y","origem","cor"]].tail(20)
+                display_dataframe(view, height=180, use_container_width=True)
+            else:
+                st.write("_Sem registros elegíveis._")
+
+        lc = st.session_state.get("last_court_click")
+        if lc:
+            st.caption(f"🧪 Último clique capturado: x={lc['x']:.2f}  y={lc['y']:.2f}  (será anexado ao próximo registro)")
+        else:
+            st.caption("🧪 Nenhum clique pendente. Clique na quadra para capturar x/y.")
+
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    st.stop()
+
+# =========================
+# Painel principal
+# =========================
+with st.container():
+    st.markdown('<div class="sectionCard">', unsafe_allow_html=True)
+
+    frames = st.session_state.frames
+    df_set = current_set_df(frames, st.session_state.match_id, st.session_state.set_number)
+
     left, right = st.columns([1.25, 1.0])
 
-    # -------- ESQUERDA: INPUTS --------
+    # -------- ESQUERDA --------
     with left:
         st.markdown("**🎯 Registrar Rally**")
 
         def on_submit_text_main():
-            raw = st.session_state.get("line_input_text_main", "").strip()
+            raw = st.session_state.get("line_input_text", "").strip()
             if not raw: return
             quick_register_line(raw)
-            st.session_state["line_input_text_main"] = ""
-            st.session_state["q_side"] = "Nós"; st.session_state["q_result"] = "Acerto"; st.session_state["q_action"] = "d"
+            st.session_state["line_input_text"] = ""
+            st.session_state["q_side"] = "Nós"; st.session_state["q_result"] = "Acerto"; st.session_state["q_action"] = "d"; st.session_state["q_position"] = "Frente"
 
-        st.text_input("Digite código:", key="line_input_text_main",
+        st.text_input("Digite código:", key="line_input_text",
                       placeholder="Ex: 1 9 d", label_visibility="collapsed", on_change=on_submit_text_main)
 
         def _cb_register_main():
-            register_current(); st.session_state["line_input_text_main"] = ""
+            register_current(); st.session_state["line_input_text"] = ""
 
         c_reg, c_undo = st.columns([1, 1])
         with c_reg:
@@ -760,556 +1290,348 @@ with st.container():
             st.button("↩️ Desfazer Rally", use_container_width=True, key="undo_btn_main", on_click=undo_last_rally_current_set)
             st.markdown('</div>', unsafe_allow_html=True)
 
+        # Jogadoras (Número/Nome)
         st.caption("Jogadoras (selecione):")
+        label_mode_col, _ = st.columns([1.0, 3.0])
+        with label_mode_col:
+            st.session_state.player_label_mode = st.radio(
+                "Mostrar botões por:", options=["Número","Nome"], horizontal=True,
+                index=["Número","Nome"].index(st.session_state.player_label_mode),
+                key="player_label_mode_main"
+            )
+
         nums = resolve_our_roster_numbers(frames)
-        
-        # NOVO: Layout adaptativo para mobile/desktop
-        if is_mobile():
-            # LAYOUT MOBILE - tudo compacto
-            mobile_col1, mobile_col2 = st.columns([1, 1])
-            
-            with mobile_col1:
-                st.caption("Equipe:")
-                st.session_state.q_side = st.radio("Equipe", options=["Nós","Adv"], horizontal=True, index=0,
-                                                   key="q_side_radio_mobile", label_visibility="collapsed")
-            
-            with mobile_col2:
-                st.caption("Resultado:")
-                st.session_state.q_result = st.radio("Resultado", options=["Acerto","Erro"], horizontal=True, index=0,
-                                                     key="q_result_radio_mobile", label_visibility="collapsed")
-            
-            # Jogadoras em grid compacto
-            if nums:
-                st.caption("Jogadoras:")
-                st.markdown('<div class="jogadoras-container">', unsafe_allow_html=True)
-                # Mais colunas para mobile (6 colunas)
-                jcols = st.columns(6)
-                for i, n in enumerate(nums):
-                    with jcols[i % 6]:
-                        st.button(f"{n}", key=f"pill_mobile_{n}", 
-                                 on_click=lambda n=n: st.session_state.__setitem__("last_selected_player", n), 
-                                 use_container_width=True)
-                st.markdown('</div>', unsafe_allow_html=True)
-                sel = st.session_state.get("last_selected_player")
-                if sel is not None:
-                    st.caption(f"Selecionada: **#{sel}**")
-            
-            # Ação e atalhos
-            action_col1, action_col2 = st.columns([1.5, 2])
-            
-            with action_col1:
-                st.caption("Ação:")
-                action_options = list(ACT_MAP.values())
-                current_action = ACT_MAP.get(st.session_state.q_action, "Diagonal")
-                st.selectbox("Ação", action_options, index=action_options.index(current_action),
-                             label_visibility="collapsed", key="q_action_select_mobile", 
-                             on_change=on_action_change)
-            
-            with action_col2:
-                st.caption("Atalhos:")
-                st.markdown('<div class="atalhos-container small-btn">', unsafe_allow_html=True)
-                acols = st.columns(5)  # 5 colunas para atalhos no mobile
-                codes = ["d","l","m","lob","seg","pi","re","b","sa"]
-                for i, code in enumerate(codes):
-                    with acols[i % 5]:
-                        label = ACT_MAP.get(code, code)[:3]
-                        st.button(label, key=f"quick_mobile_{code}",
-                                  on_click=lambda code=code: register_current(action=code), 
-                                  use_container_width=True)
-                st.markdown('</div>', unsafe_allow_html=True)
-        
-        else:
-            # LAYOUT DESKTOP (mantém o original)
-            if nums:
-                st.markdown('<div class="jogadoras-container">', unsafe_allow_html=True)
-                jcols = st.columns(min(12, max(1, len(nums))))
-                for i, n in enumerate(nums):
-                    with jcols[i % len(jcols)]:
-                        st.button(f"{n}", key=f"pill_main_{n}", on_click=lambda n=n: st.session_state.__setitem__("last_selected_player", n), use_container_width=True)
-                st.markdown('</div>', unsafe_allow_html=True)
-                sel = st.session_state.get("last_selected_player")
-                if sel is not None:
-                    st.caption(f"Selecionada: **#{sel}**")
+        name_map = {r["number"]: r["name"] for r in roster_for_ui(frames)}
+
+        if nums:
+            num_cols = 12 if st.session_state.player_label_mode == "Número" else 4
+            jcols = st.columns(num_cols)
+            for i, n in enumerate(nums):
+                label_txt = str(n) if st.session_state.player_label_mode == "Número" else (name_map.get(n) or str(n))
+                with jcols[i % num_cols]:
+                    st.button(
+                        f"{label_txt}",
+                        key=f"pill_main_{n}",
+                        on_click=lambda n=n: (st.session_state.__setitem__("last_selected_player", n),
+                                              st.session_state.__setitem__("q_side", "Nós")),
+                        use_container_width=True
+                    )
+            with jcols[(len(nums)) % num_cols]:
+                st.button("ADV", key="pill_main_adv",
+                          on_click=lambda: st.session_state.__setitem__("q_side", "Adv"),
+                          use_container_width=True)
+            sel = st.session_state.get("last_selected_player")
+            if sel is not None:
+                st.caption(f"Selecionada: **#{sel}**")
             else:
                 st.caption("Sem jogadoras")
 
-            row2 = st.columns([1.0, 1.0, 0.6])
+            # Resultado + Posição
+            row2 = st.columns([1.0, 1.0])
             with row2[0]:
-                st.caption("Equipe:")
-                st.session_state.q_side = st.radio("Equipe", options=["Nós","Adv"], horizontal=True, index=0,
-                                                   key="q_side_radio_main", label_visibility="collapsed")
-            with row2[1]:
                 st.caption("Resultado:")
-                st.session_state.q_result = st.radio("Resultado", options=["Acerto","Erro"], horizontal=True, index=0,
-                                                     key="q_result_radio_main", label_visibility="collapsed")
+                st.session_state.q_result = st.radio(
+                    "Resultado", options=["Acerto","Erro"], horizontal=True, index=0,
+                    key="q_result_radio_main", label_visibility="collapsed"
+                )
+            with row2[1]:
+                st.caption("Posição:")
+                st.session_state.q_position = st.radio(
+                    "Posição", options=["Frente","Fundo"], horizontal=True,
+                    index=["Frente","Fundo"].index(st.session_state.q_position),
+                    key="q_position_radio_main", label_visibility="collapsed"
+                )
 
+            # Ação (select que também registra)
             def on_action_change():
                 selected_label = st.session_state.get("q_action_select_main", None)
-                if not selected_label: return
+                if not selected_label:
+                    return
                 code = REVERSE_ACT_MAP.get(selected_label, "d")
                 st.session_state["q_action"] = code
                 if st.session_state.get("last_selected_player") is None:
-                    st.warning("Selecione uma jogadora antes de escolher a ação."); return
+                    st.warning("Selecione uma jogadora antes de escolher a ação.")
+                    return
                 register_current(action=code)
 
-            with row2[2]:
-                st.caption("Ação:")
-                action_options = list(ACT_MAP.values())
-                current_action = ACT_MAP.get(st.session_state.q_action, "Diagonal")
-                st.selectbox("Ação", action_options, index=action_options.index(current_action),
-                             label_visibility="collapsed", key="q_action_select_main", on_change=on_action_change)
+            st.caption("Ação:")
+            action_options = list(ACT_MAP.values())
+            current_action = ACT_MAP.get(st.session_state.q_action, "Diagonal")
+            st.selectbox(
+                "Ação", action_options, index=action_options.index(current_action),
+                label_visibility="collapsed", key="q_action_select_main",
+                on_change=on_action_change
+            )
 
+            # Atalhos (inclui 'rede')
             st.caption("Atalhos:")
             st.markdown('<div class="atalhos-container small-btn">', unsafe_allow_html=True)
             acols = st.columns(12)
-            codes = ["d","l","m","lob","seg","pi","re","b","sa"]
+            codes = ["d","l","m","lob","seg","pi","re","b","sa","rede"]
             for i, code in enumerate(codes):
                 with acols[i % len(acols)]:
                     label = ACT_MAP.get(code, code)[:3]
-                    st.button(label, key=f"quick_main_{code}",
-                              on_click=lambda code=code: register_current(action=code), use_container_width=True)
+                    st.button(
+                        label, key=f"quick_main_{code}",
+                        on_click=lambda code=code: register_current(action=code),
+                        use_container_width=True
+                    )
             st.markdown('</div>', unsafe_allow_html=True)
 
-        # Tabelas compactas
-        tt1, tt2, tt3 = st.columns([1.0, 1.0, 1.2])
-        df_cur = df_set
-        with tt1:
-            st.markdown("**Pontuadoras**")
-            if not df_cur.empty:
-                atq = df_cur[(df_cur["who_scored"]=="NOS") & (df_cur["action"].isin(ATTACK_ACTIONS))].copy()
-                if not atq.empty:
-                    tbl = atq.groupby(["player_number"]).size().reset_index(name="pontos").sort_values("pontos", ascending=False)
-                    display_dataframe(tbl, height=360, use_container_width=True)
-                else: st.write("_Sem dados_")
-            else: st.write("_Sem dados_")
-        with tt2:
-            st.markdown("**Erros (Nossos)**")
-            if not df_cur.empty:
-                er = df_cur[(df_cur["result"]=="ERRO") & (df_cur["who_scored"]=="ADV")].copy()
-                if not er.empty:
-                    er["player_number"] = er["player_number"].fillna("—").astype(str)
-                    tbl = er.groupby(["player_number"]).size().reset_index(name="erros").sort_values("erros", ascending=False)
-                    display_dataframe(tbl, height=360, use_container_width=True)
-                else: st.write("_Sem erros_")
-            else: st.write("_Sem dados_")
-        with tt3:
-            st.markdown("**Histórico**")
-            if not df_cur.empty:
-                seq = ["N" if w == "NOS" else "A" for w in df_cur["who_scored"]]
-                histo = pd.DataFrame({"Rally": range(1, len(seq)+1), "Ponto": seq})
-                display_dataframe(histo, height=360, use_container_width=True)
+            # Tabelas rápidas (pontuadoras / erros / histórico)
+            tt1, tt2, tt3 = st.columns([1.0, 1.0, 1.2])
+            df_cur = df_set
+            with tt1:
+                st.markdown("**Pontuadoras**")
+                if not df_cur.empty:
+                    atq = df_cur[
+                        (df_cur["who_scored"]=="NOS") &
+                        (df_cur["action"].isin(ATTACK_ACTIONS))
+                    ].copy()
+                    if not atq.empty:
+                        tbl = atq.groupby(["player_number"]).size().reset_index(name="pontos").sort_values("pontos", ascending=False)
+                        display_dataframe(tbl, height=360, use_container_width=True)
+                    else:
+                        st.write("_Sem dados_")
+                else:
+                    st.write("_Sem dados._")
+            with tt2:
+                st.markdown("**Erros (Nossos)**")
+                if not df_cur.empty:
+                    er = df_cur[(df_cur["result"]=="ERRO") & (df_cur["who_scored"]=="ADV")].copy()
+                    if not er.empty:
+                        er["player_number"] = er["player_number"].fillna("—").astype(str)
+                        tbl = er.groupby(["player_number"]).size().reset_index(name="erros").sort_values("erros", ascending=False)
+                        display_dataframe(tbl, height=360, use_container_width=True)
+                    else:
+                        st.write("_Sem erros_")
+                else:
+                    st.write("_Sem dados._")
+            with tt3:
+                st.markdown("**Histórico**")
+                if not df_cur.empty:
+                    seq = ["Nós" if str(w).upper() == "NOS" else "Adv" for w in df_cur["who_scored"]]
+                    histo = pd.DataFrame({"Rally": range(1, len(seq)+1), "Quem pontuou": seq})
+                    display_dataframe(histo, height=360, use_container_width=True)
+                else:
+                    st.info("Sem rallies")
+
+        # -------- DIREITA: GRÁFICOS / KPIs --------
+        with right:
+            def filter_df_for_graphs(df: pd.DataFrame, who: str) -> pd.DataFrame:
+                if df.empty: return df
+                if who == "Nós": return df[df["who_scored"] == "NOS"]
+                if who == "Adversário": return df[df["who_scored"] == "ADV"]
+                return df
+
+            df_viz = filter_df_for_graphs(df_set, st.session_state.graph_filter)
+
+            # Placar (evolução no set)
+            st.markdown("**Placar**")
+            if not df_set.empty:
+                fig3, ax3 = small_fig()
+                from matplotlib.ticker import MaxNLocator
+                ax3.xaxis.set_major_locator(MaxNLocator(integer=True))
+                ax3.yaxis.set_major_locator(MaxNLocator(integer=True))
+                ax3.plot(df_set["rally_no"], df_set["score_home"], marker="o", markersize=2.4, linewidth=0.9, label=home_name or "Nós")
+                ax3.plot(df_set["rally_no"], df_set["score_away"], marker="o", markersize=2.4, linewidth=0.9, label=away_name or "Adv")
+                if not df_set.empty:
+                    last_rally = int(df_set["rally_no"].iloc[-1])
+                    ax3.scatter([last_rally], [df_set["score_home"].iloc[-1]], s=28, zorder=5)
+                    ax3.scatter([last_rally], [df_set["score_away"].iloc[-1]], s=28, zorder=5)
+                    ax3.annotate(str(df_set["score_home"].iloc[-1]), (last_rally, df_set["score_home"].iloc[-1]),
+                                textcoords="offset points", xytext=(4, 4), fontsize=7, ha='center')
+                    ax3.annotate(str(df_set["score_away"].iloc[-1]), (last_rally, df_set["score_away"].iloc[-1]),
+                                textcoords="offset points", xytext=(4, -10), fontsize=7, ha='center')
+                fig3 = trim_ax(ax3, xlabel="Rally", ylabel="Pts", legend=True, max_xticks=10, max_yticks=6)
+                ax3.legend(loc="upper left", frameon=False, handlelength=1.0, borderaxespad=0.1)
+                st.pyplot(fig3)
             else:
-                st.info("Sem rallies")
+                st.write("_Sem dados._")
 
-    # -------- DIREITA: GRÁFICOS EMPILHADOS --------
-    with right:
-        def filter_df_for_graphs(df: pd.DataFrame, who: str) -> pd.DataFrame:
-            if df.empty: return df
-            if who == "Nós": return df[df["who_scored"] == "NOS"]
-            if who == "Adversário": return df[df["who_scored"] == "ADV"]
-            return df
-        df_viz = filter_df_for_graphs(df_set, st.session_state.graph_filter)
-
-        # 1) Placar
-        st.markdown("**Placar**")
-        if not df_set.empty:
-            fig3, ax3 = small_fig()
-            from matplotlib.ticker import MaxNLocator
-            ax3.xaxis.set_major_locator(MaxNLocator(integer=True))
-            ax3.yaxis.set_major_locator(MaxNLocator(integer=True))
-            ax3.plot(df_set["rally_no"], df_set["score_home"], marker="o", markersize=2.4, linewidth=0.9, label=home_name or "Nós")
-            ax3.plot(df_set["rally_no"], df_set["score_away"], marker="o", markersize=2.4, linewidth=0.9, label=away_name or "Adv")
-            last_rally = int(df_set["rally_no"].iloc[-1])
-            ax3.scatter([last_rally], [home_pts], s=28, zorder=5)
-            ax3.scatter([last_rally], [away_pts], s=28, zorder=5)
-            ax3.annotate(str(home_pts), (last_rally, home_pts), textcoords="offset points", xytext=(4, 4), fontsize=7, ha='center')
-            ax3.annotate(str(away_pts), (last_rally, away_pts), textcoords="offset points", xytext=(4, -10), fontsize=7, ha='center')
-            fig3 = trim_ax(ax3, xlabel="Rally", ylabel="Pts", legend=True, max_xticks=10, max_yticks=6)
-            ax3.legend(loc="upper left", frameon=False, handlelength=1.0, borderaxespad=0.1)
-            st.pyplot(fig3)
-        else:
-            st.write("_Sem dados._")
-
-        # 2) Erros (por jogadora)
-        st.markdown("**Erros (por jogadora)**")
-        err = df_set[(df_set["result"]=="ERRO") & (df_set["who_scored"]=="ADV")].copy()
-        if not err.empty:
-            err["player_number"] = err["player_number"].fillna("—").astype(str)
-            tbl = err.groupby(["player_number"]).size().reset_index(name="erros").sort_values("erros", ascending=False)
-            fig2, ax2 = small_fig()
-            ax2.bar(tbl["player_number"], tbl["erros"])
-            fig2 = trim_ax(ax2, xlabel="Jog.", ylabel="Erros", legend=False, max_xticks=10, max_yticks=5)
-            st.pyplot(fig2)
-        else:
-            st.write("_Sem erros._")
-
-        # 3) Eficiência por Jogadora (ataque)
-        st.markdown("**Eficiência por Jogadora (ataque)**")
-        def build_attack_rows_for_side(df_base: pd.DataFrame, side_sel: str) -> pd.DataFrame:
-            if df_base.empty: 
-                return df_base
-            mask_action = df_base["action"].isin(ATTACK_ACTIONS)
-            if side_sel == "Nós":
-                pts  = df_base[mask_action & (df_base["who_scored"]=="NOS")]
-                errs = df_base[mask_action & (df_base["who_scored"]=="ADV") & (df_base["result"]=="ERRO")]
-            elif side_sel == "Adversário":
-                pts  = df_base[mask_action & (df_base["who_scored"]=="ADV")]
-                errs = df_base[mask_action & (df_base["who_scored"]=="NOS") & (df_base["result"]=="ERRO")]
+            # Erros por jogadora
+            st.markdown("**Erros (por jogadora)**")
+            err = df_set[(df_set["result"]=="ERRO") & (df_set["who_scored"]=="ADV")].copy()
+            if not err.empty:
+                err["player_number"] = err["player_number"].fillna("—").astype(str)
+                tbl = err.groupby(["player_number"]).size().reset_index(name="erros").sort_values("erros", ascending=False)
+                fig2, ax2 = small_fig()
+                ax2.bar(tbl["player_number"], tbl["erros"])
+                fig2 = trim_ax(ax2, xlabel="Jog.", ylabel="Erros", legend=False, max_xticks=10, max_yticks=5)
+                st.pyplot(fig2)
             else:
-                return df_base[mask_action]
-            return pd.concat([pts, errs], ignore_index=True) if not pts.empty or not errs.empty else pd.DataFrame(columns=df_base.columns)
+                st.write("_Sem erros._")
 
-        att = build_attack_rows_for_side(df_set, st.session_state.graph_filter)
-        if not att.empty:
-            att = att.copy()
-            if st.session_state.graph_filter == "Nós":
-                att["is_ponto"] = ((att["who_scored"]=="NOS") & (att["result"]=="PONTO")).astype(int)
-                att["is_erro"]  = ((att["who_scored"]=="ADV") & (att["result"]=="ERRO")).ast(int)
-            elif st.session_state.graph_filter == "Adversário":
-                att["is_ponto"] = ((att["who_scored"]=="ADV") & (att["result"]=="PONTO")).astype(int)
-                att["is_erro"]  = ((att["who_scored"]=="NOS") & (att["result"]=="ERRO")).astype(int)
+            # Eficiência por jogadora (ataque)
+            st.markdown("**Eficiência por Jogadora (ataque)**")
+            def build_attack_rows_for_side(df_base: pd.DataFrame, side_sel: str) -> pd.DataFrame:
+                if df_base.empty:
+                    return df_base
+                mask_action = df_base["action"].isin(ATTACK_ACTIONS)
+                if side_sel == "Nós":
+                    pts  = df_base[mask_action & (df_base["who_scored"]=="NOS")]
+                    errs = df_base[mask_action & (df_base["who_scored"]=="ADV") & (df_base["result"]=="ERRO")]
+                elif side_sel == "Adversário":
+                    pts  = df_base[mask_action & (df_base["who_scored"]=="ADV")]
+                    errs = df_base[mask_action & (df_base["who_scored"]=="NOS") & (df_base["result"]=="ERRO")]
+                else:
+                    return df_base[mask_action]
+                return pd.concat([pts, errs], ignore_index=True) if not pts.empty or not errs.empty else pd.DataFrame(columns=df_base.columns)
+
+            att = build_attack_rows_for_side(df_set, st.session_state.graph_filter)
+            if not att.empty:
+                att = att.copy()
+                if st.session_state.graph_filter == "Nós":
+                    att["is_ponto"] = ((att["who_scored"]=="NOS") & (att["result"]=="PONTO")).astype(int)
+                    att["is_erro"]  = ((att["who_scored"]=="ADV") & (att["result"]=="ERRO")).astype(int)
+                elif st.session_state.graph_filter == "Adversário":
+                    att["is_ponto"] = ((att["who_scored"]=="ADV") & (att["result"]=="PONTO")).astype(int)
+                    att["is_erro"]  = ((att["who_scored"]=="NOS") & (att["result"]=="ERRO")).astype(int)
+                else:
+                    att["is_ponto"] = (att["result"]=="PONTO").astype(int)
+                    att["is_erro"]  = (att["result"]=="ERRO").astype(int)
+
+                eff = att.groupby(["player_number"]).agg(
+                    tentativas=("result","count"),
+                    pontos=("is_ponto","sum"),
+                    erros=("is_erro","sum")
+                ).reset_index()
+                eff["eficiencia"] = (eff["pontos"] - eff["erros"]) / eff["tentativas"].replace(0, 1)
+                eff["player_number"] = eff["player_number"].fillna("—").astype(str)
+                fig1, ax1 = small_fig()
+                ax1.bar(eff["player_number"], eff["eficiencia"])
+                fig1 = trim_ax(ax1, xlabel="Jog.", ylabel="Ef.", legend=False, max_xticks=10, max_yticks=5)
+                st.pyplot(fig1)
             else:
-                att["is_ponto"] = (att["result"]=="PONTO").astype(int)
-                att["is_erro"]  = (att["result"]=="ERRO").astype(int)
+                st.write("_Sem dados._")
 
-            eff = att.groupby(["player_number"]).agg(
-                tentativas=("result","count"),
-                pontos=("is_ponto","sum"),
-                erros=("is_erro","sum")
-            ).reset_index()
-            eff["eficiencia"] = (eff["pontos"] - eff["erros"]) / eff["tentativas"].replace(0, 1)
-            eff["player_number"] = eff["player_number"].fillna("—").astype(str)
-            fig1, ax1 = small_fig()
-            ax1.bar(eff["player_number"], eff["eficiencia"])
-            fig1 = trim_ax(ax1, xlabel="Jog.", ylabel="Ef.", legend=False, max_xticks=10, max_yticks=5)
-            st.pyplot(fig1)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+# =========================
+# Mapa de Calor (Quadra) — Set atual
+# =========================
+with st.container():
+    st.markdown('<div class="sectionCard">', unsafe_allow_html=True)
+    st.subheader("🗺️ Mapa de Calor (Quadra) — Set atual")
+
+    colf1, colf2, colf3, colf4, colf5 = st.columns([1.2, .8, .9, .9, 1.2])
+    with colf1:
+        nums = resolve_our_roster_numbers(st.session_state.frames)
+        selected_players = st.multiselect("Jogadoras:", options=nums, default=nums, placeholder="Todas")
+    with colf2:
+        show_success = st.checkbox("Acertos (azul)", value=True)
+    with colf3:
+        show_errors = st.checkbox("Erros (vermelho)", value=True)
+    with colf4:
+        show_adv_pts = st.checkbox("ADV pontos (laranja)", value=True)
+    with colf5:
+        show_adv_errs = st.checkbox("ADV erros (laranja escuro)", value=True)
+
+    st.session_state.show_heat_numbers = st.checkbox(
+        "Mostrar número/ADV nas bolinhas (nossos + adversário)",
+        value=st.session_state.show_heat_numbers, key="set_show_numbers_chk"
+    )
+
+    df_hm = current_set_df(st.session_state.frames, st.session_state.match_id, st.session_state.set_number)
+    pts_succ, pts_errs, pts_adv, pts_adv_err, dbg = build_heat_points(
+        df_hm,
+        selected_players=selected_players,
+        include_success=show_success,
+        include_errors=show_errors,
+        include_adv_points=show_adv_pts,
+        include_adv_errors=show_adv_errs,
+        return_debug=True
+    )
+    dbg_print(f"[Heatmap Set] succ={len(pts_succ)} err={len(pts_errs)} advPts={len(pts_adv)} advErr={len(pts_adv_err)} | filtros: players={selected_players}")
+
+    render_court_html(
+        pts_succ,
+        pts_errs,
+        pts_adv if show_adv_pts else [],
+        pts_adv_err if show_adv_errs else [],
+        enable_click=True,
+        key="set",
+        show_numbers=st.session_state.show_heat_numbers
+    )
+
+    with st.expander("🔎 Debug Heatmap (Set atual)"):
+        st.write(
+            f"Acertos (azul): **{len(pts_succ)}** | Erros (vermelho): **{len(pts_errs)}** | "
+            f"ADV pontos (laranja): **{len(pts_adv)}** | ADV erros (laranja escuro): **{len(pts_adv_err)}**"
+        )
+        if not dbg.empty:
+            view = dbg[["rally_no","player_number","action_u","res_u","who_u","used_x","used_y","origem","cor"]].tail(30)
+            display_dataframe(view, height=180, use_container_width=True)
         else:
-            st.write("_Sem dados._")
+            st.write("_Sem dados elegíveis._")
 
     st.markdown('</div>', unsafe_allow_html=True)
 
 # =========================
-# KPIs — Set atual e Partida, para NÓS e ADV (com colunas de ataque)
-# =========================
-def compute_kpis_scope(frames, match_id, set_number, scope="set") -> pd.DataFrame:
-    rl = frames["rallies"]
-    if scope == "set":
-        df = current_set_df(frames, match_id, set_number)
-    else:
-        df = rl[rl["match_id"] == match_id].copy().sort_values(["set_number","rally_no"])
-    if df.empty:
-        return pd.DataFrame(columns=["Lado","Aces","Bloqueios ponto","Erros","Paralela","Diagonal","Meio","Clutch saldo"])
-
-    aces_nos = len(df[(df["who_scored"]=="NOS") & (df["action"]=="SAQUE")])
-    aces_adv = len(df[(df["who_scored"]=="ADV") & (df["action"]=="SAQUE")])
-
-    blq_nos = len(df[(df["who_scored"]=="NOS") & (df["action"]=="BLOQUEIO")])
-    blq_adv = len(df[(df["who_scored"]=="ADV") & (df["action"]=="BLOQUEIO")])
-
-    err_nos = len(df[(df["result"]=="ERRO") & (df["who_scored"]=="ADV")])
-    err_adv = len(df[(df["result"]=="ERRO") & (df["who_scored"]=="NOS")])
-
-    par_nos = len(df[(df["who_scored"]=="NOS") & (df["action"]=="LINHA")])
-    par_adv = len(df[(df["who_scored"]=="ADV") & (df["action"]=="LINHA")])
-
-    diag_nos = len(df[(df["who_scored"]=="NOS") & (df["action"]=="DIAGONAL")])
-    diag_adv = len(df[(df["who_scored"]=="ADV") & (df["action"]=="DIAGONAL")])
-
-    meio_nos = len(df[(df["who_scored"]=="NOS") & (df["action"]=="MEIO")])
-    meio_adv = len(df[(df["who_scored"]=="ADV") & (df["action"]=="MEIO")])
-
-    diff = (df["score_home"] - df["score_away"]).abs()
-    in_clutch = (df["score_home"].between(20,25)) | (df["score_away"].between(20,25)) | (diff <= 2)
-    clutch = df[in_clutch]
-    clutch_nos = int((clutch["who_scored"]=="NOS").sum() - (clutch["who_scored"]=="ADV").sum()) if not clutch.empty else 0
-    clutch_adv = -clutch_nos
-
-    out = pd.DataFrame([
-        {"Lado":"Nós","Aces":aces_nos,"Bloqueios ponto":blq_nos,"Erros":err_nos,
-         "Paralela":par_nos,"Diagonal":diag_nos,"Meio":meio_nos,"Clutch saldo":clutch_nos},
-        {"Lado":"Adversário","Aces":aces_adv,"Bloqueios ponto":blq_adv,"Erros":err_adv,
-         "Paralela":par_adv,"Diagonal":diag_adv,"Meio":meio_adv,"Clutch saldo":clutch_adv},
-    ])
-    return out
-
-with st.container():
-    st.markdown('<div class="sectionCard">', unsafe_allow_html=True)
-    st.subheader("📈 KPIs")
-
-    frames = st.session_state.frames
-    k_set = compute_kpis_scope(frames, st.session_state.match_id, st.session_state.set_number, scope="set")
-    k_match = compute_kpis_scope(frames, st.session_state.match_id, st.session_state.set_number, scope="match")
-
-    c1, c2 = st.columns(2)
-    with c1:
-        st.markdown(f"**Set atual (Set {st.session_state.set_number})**")
-        display_dataframe(k_set, height=110, use_container_width=True)
-    with c2:
-        st.markdown("**Partida (até agora)**")
-        display_dataframe(k_match, height=110, use_container_width=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-# =========================
-# KPI por Jogadora — Erros gerais (vermelho) e Ataques ponto por tipo (verde)
+# Tabelas complementares / Debug
 # =========================
 with st.container():
     st.markdown('<div class="sectionCard">', unsafe_allow_html=True)
-    st.subheader("📌 KPI por Jogadora (Set atual)")
+    st.subheader("🧾 Tabelas rápidas do Set")
 
     df_cur = current_set_df(st.session_state.frames, st.session_state.match_id, st.session_state.set_number)
 
-    cA, cB = st.columns(2)
+    cta, ctb = st.columns(2)
 
-    # ---- Erros gerais (nossos) ----
-    with cA:
-        st.markdown("**Erros gerais (nossos)**")
+    with cta:
+        st.markdown("**Rallies (últimos 50)**")
         if not df_cur.empty:
-            er = df_cur[(df_cur["result"]=="ERRO") & (df_cur["who_scored"]=="ADV")].copy()
-            if not er.empty:
-                er["player_number"] = er["player_number"].fillna("—")
-                # Total por jogadora
-                tot = er.groupby("player_number").size().reset_index(name="Erros")
-                # Quebra por tipo (action)
-                piv_err = er.groupby(["player_number","action"]).size().unstack(fill_value=0)
-
-                # Ações relevantes (inclui ataques e fundamentos onde erro ocorre)
-                desired_cols = [
-                    "DIAGONAL","LINHA","MEIO","PIPE","SEGUNDA","LOB",
-                    "SAQUE","BLOQUEIO","RECEPÇÃO","RECEPCAO"
-                ]
-                for c in desired_cols:
-                    if c not in piv_err.columns:
-                        piv_err[c] = 0
-
-                # combinar RECEPÇÃO/RECEPCAO numa coluna única "Recepção"
-                piv_err["RECEPÇÃO"] = piv_err.get("RECEPÇÃO", 0) + piv_err.get("RECEPCAO", 0)
-                order_cols = ["DIAGONAL","LINHA","MEIO","PIPE","SEGUNDA","LOB","SAQUE","BLOQUEIO","RECEPÇÃO"]
-                piv_err = piv_err[order_cols].rename(columns={
-                    "DIAGONAL":"Diagonal",
-                    "LINHA":"Paralela",
-                    "MEIO":"Meio",
-                    "PIPE":"Pipe",
-                    "SEGUNDA":"Segunda",
-                    "LOB":"Largada",
-                    "SAQUE":"Saque",
-                    "BLOQUEIO":"Bloqueio",
-                    "RECEPÇÃO":"Recepção",
-                }).reset_index()
-
-                # Mesclar total + tipos
-                tbl_err = pd.merge(tot, piv_err, on="player_number", how="left")
-                tbl_err = tbl_err.rename(columns={"player_number":"Jog."}).sort_values("Erros", ascending=False)
-
-                display_dataframe(tbl_err, height=200, use_container_width=True, extra_class="header-red")
-            else:
-                st.write("_Sem erros._")
+            cols_show = ["rally_no","player_number","action","result","who_scored","score_home","score_away"]
+            cols_show = [c for c in cols_show if c in df_cur.columns]
+            view = df_cur[cols_show].tail(50).copy()
+            view = view.rename(columns={
+                "rally_no":"Rally",
+                "player_number":"Jog",
+                "action":"Ação",
+                "result":"Res",
+                "who_scored":"Quem",
+                "score_home":"Nós",
+                "score_away":"Adv"
+            })
+            display_dataframe(view, height=260, use_container_width=True)
         else:
             st.write("_Sem dados._")
 
-    # ---- Ataques ponto por tipo (nossos) ----
-    with cB:
-        st.markdown("**Ataques ponto por tipo (nossos)**")
+    with ctb:
+        st.markdown("**Ataques (nossos) – últimos 30**")
         if not df_cur.empty:
-            atp = df_cur[(df_cur["result"]=="PONTO") & (df_cur["who_scored"]=="NOS")].copy()
-            if not atp.empty:
-                atp["player_number"] = atp["player_number"].fillna("—")
-                piv = atp.groupby(["player_number","action"]).size().unstack(fill_value=0)
-                col_map = {
-                    "DIAGONAL":"Diagonal",
-                    "LINHA":"Paralela",
-                    "MEIO":"Meio",
-                    "PIPE":"Pipe",
-                    "SEGUNDA":"Segunda",
-                    "LOB":"Largada",
-                    "SAQUE":"Saque",
-                }
-                for k in col_map.keys():
-                    if k not in piv.columns: piv[k] = 0
-                piv = piv[list(col_map.keys())].rename(columns=col_map).reset_index()
-                piv = piv.rename(columns={"player_number":"Jog."})
-                display_dataframe(piv, height=200, use_container_width=True, extra_class="header-green")
+            atq = df_cur[(df_cur["who_scored"]=="NOS") & (df_cur["action"].isin(ATTACK_ACTIONS))].copy()
+            if not atq.empty:
+                cols_show2 = ["rally_no","player_number","result"]
+                cols_show2 = [c for c in cols_show2 if c in atq.columns]
+                v2 = atq[cols_show2].tail(30).rename(columns={
+                    "rally_no":"Rally","player_number":"Jog","result":"Res"
+                })
+                display_dataframe(v2, height=260, use_container_width=True)
             else:
-                st.write("_Sem pontos de ataque._")
+                st.write("_Sem dados._")
         else:
             st.write("_Sem dados._")
 
     st.markdown('</div>', unsafe_allow_html=True)
 
 # =========================
-# NOVA SEÇÃO — Análises Visuais (técnico)
+# Rodapé
 # =========================
-def _attack_rows_us(df):
-    if df.empty: return df
-    mask = df["action"].isin(ATTACK_ACTIONS)
-    pts  = df[mask & (df["who_scored"]=="NOS")].copy()
-    errs = df[mask & (df["who_scored"]=="ADV") & (df["result"]=="ERRO")].copy()
-    return pd.concat([pts, errs], ignore_index=True) if (not pts.empty or not errs.empty) else pd.DataFrame(columns=df.columns)
-
-def _player_efficiency_attacks(df):
-    if df.empty: 
-        return pd.DataFrame(columns=["player_number","tentativas","pontos","erros","eficiencia"])
-    df = df.copy()
-    df["is_ponto"] = ((df["who_scored"]=="NOS") & (df["result"]=="PONTO")).astype(int)
-    df["is_erro"]  = ((df["who_scored"]=="ADV") & (df["result"]=="ERRO")).astype(int)
-    g = df.groupby("player_number").agg(
-        tentativas=("result","count"),
-        pontos=("is_ponto","sum"),
-        erros=("is_erro","sum")
-    ).reset_index()
-    g["eficidade"] = (g["pontos"] - g["erros"]) / g["tentativas"].replace(0, 1)
-    return g
-
-def _team_eff_by_set(frames, match_id):
-    sets_df = frames["sets"]
-    if sets_df.empty: return pd.DataFrame(columns=["set_number","ef_ataque","erro_rate"])
-    set_list = sets_df[sets_df["match_id"]==match_id]["set_number"].sort_values().unique().tolist()
-    rows = []
-    rl = frames["rallies"]
-    for s in set_list:
-        d = current_set_df(frames, match_id, int(s))
-        if d.empty:
-            rows.append({"set_number":s, "ef_ataque":0.0, "erro_rate":0.0}); continue
-        att = _attack_rows_us(d)
-        eff = _player_efficiency_attacks(att)
-        ef_team = float((eff["pontos"].sum() - eff["erros"].sum()) / eff["tentativas"].sum()) if not eff.empty else 0.0
-        erros_gerais = len(d[(d["result"]=="ERRO") & (d["who_scored"]=="ADV")])
-        total_rallies = len(d)
-        erro_rate = float(erros_gerais / total_rallies) if total_rallies else 0.0
-        rows.append({"set_number":s, "ef_ataque":ef_team, "erro_rate":erro_rate})
-    return pd.DataFrame(rows)
-
-with st.container():
-    st.markdown('<div class="sectionCard">', unsafe_allow_html=True)
-    st.subheader("🎛️ Análises Visuais de Desempenho")
-
-    frames = st.session_state.frames
-    match_id = st.session_state.match_id
-    set_atual = st.session_state.set_number
-
-    # Seletor do set em foco (default: atual)
-    all_sets = frames["sets"][frames["sets"]["match_id"]==match_id]["set_number"].sort_values().unique().tolist()
-    col_sel, _ = st.columns([1.2, 2])
-    with col_sel:
-        set_foco = st.selectbox("Set em foco", options=all_sets if all_sets else [set_atual],
-                                index=(all_sets.index(set_atual) if set_atual in all_sets else 0))
-
-    df_foco = current_set_df(frames, match_id, int(set_foco))
-
-    # ---- Heatmap de erros por tipo x jogadora (set foco) ----
-    st.markdown("**Heatmap de Erros por Tipo × Jogadora (set em foco)**")
-    if not df_foco.empty:
-        er = df_foco[(df_foco["result"]=="ERRO") & (df_foco["who_scored"]=="ADV")].copy()
-        if not er.empty:
-            er["player_number"] = er["player_number"].fillna("—")
-            piv = er.groupby(["player_number","action"]).size().unstack(fill_value=0)
-            tipos = ["DIAGONAL","LINHA","MEIO","PIPE","SEGUNDA","LOB","SAQUE","BLOQUEIO","RECEPÇÃO","RECEPCAO"]
-            for t in tipos:
-                if t not in piv.columns: piv[t] = 0
-            # Junta recepção
-            piv["RECEPÇÃO"] = piv.get("RECEPÇÃO", 0) + piv.get("RECEPCAO", 0)
-            ordem = ["DIAGONAL","LINHA","MEIO","PIPE","SEGUNDA","LOB","SAQUE","BLOQUEIO","RECEPÇÃO"]
-            piv = piv[ordem]
-            mat = piv.values
-            labels_x = [ {"DIAGONAL":"Diag","LINHA":"Par","MEIO":"Meio","PIPE":"Pipe","SEGUNDA":"Seg","LOB":"Larg","SAQUE":"Saq","BLOQUEIO":"Bloq","RECEPÇÃO":"Rec"}[c] for c in ordem ]
-            labels_y = [str(x) for x in piv.index]
-
-            fig_hm, ax_hm = plt.subplots(figsize=(4.8, 2.6), dpi=110)
-            im = ax_hm.imshow(mat, aspect="auto")
-            ax_hm.set_xticks(np.arange(len(labels_x)))
-            ax_hm.set_yticks(np.arange(len(labels_y)))
-            ax_hm.set_xticklabels(labels_x, fontsize=7, rotation=0)
-            ax_hm.set_yticklabels(labels_y, fontsize=7)
-            for i in range(mat.shape[0]):
-                for j in range(mat.shape[1]):
-                    val = int(mat[i, j])
-                    if val:
-                        ax_hm.text(j, i, str(val), ha="center", va="center", fontsize=7)
-            ax_hm.set_xlabel("Tipo de erro", fontsize=7)
-            ax_hm.set_ylabel("Jog.", fontsize=7)
-            fig_hm.tight_layout(pad=0.2)
-            st.pyplot(fig_hm)
-        else:
-            st.caption("_Sem erros no set em foco._")
-    else:
-        st.caption("_Sem dados no set em foco._")
-
-    # ---- Delta de eficiência por jogadora (set foco vs média anteriores) ----
-    st.markdown("**Delta de Eficiência de Ataque por Jogadora** (set em foco × média dos sets anteriores)")
-    if not df_foco.empty and len(all_sets) > 1:
-        anteriores = [s for s in all_sets if s < set_foco]
-        df_prev = pd.concat([current_set_df(frames, match_id, int(s)) for s in anteriores], ignore_index=True) if anteriores else pd.DataFrame()
-        att_cur = _attack_rows_us(df_foco)
-        eff_cur = _player_efficiency_attacks(att_cur)
-        att_prev = _attack_rows_us(df_prev) if not df_prev.empty else pd.DataFrame(columns=df_foco.columns)
-        eff_prev = _player_efficiency_attacks(att_prev)
-        eff_prev = eff_prev.rename(columns={"eficiencia":"ef_prev"})[["player_number","ef_prev"]]
-        comp = pd.merge(eff_cur[["player_number","eficiencia"]], eff_prev, on="player_number", how="left")
-        comp["ef_prev"] = comp["ef_prev"].fillna(0.0)
-        comp["delta"] = comp["eficiencia"] - comp["ef_prev"]
-        comp["player_number"] = comp["player_number"].fillna("—").astype(str)
-        comp = comp.sort_values("delta", ascending=True)
-
-        figd, axd = small_fig(w=3.4, h=1.6)
-        axd.bar(comp["player_number"], comp["delta"])
-        axd.axhline(0, linewidth=0.8)
-        for i, v in enumerate(comp["delta"].values):
-            axd.annotate(f"{v:+.2f}", (i, v), textcoords="offset points", xytext=(0, -7 if v<0 else 3), ha="center", fontsize=6)
-        figd = trim_ax(axd, xlabel="Jog.", ylabel="Δ Ef.", legend=False, max_xticks=12, max_yticks=5)
-        st.pyplot(figd)
-        st.caption("Acima de 0: evoluiu no set em foco vs. sua média anterior. Abaixo de 0: piorou.")
-    else:
-        st.caption("_Sem sets anteriores para comparação._")
-
-    # ---- Tendência por set da equipe (eficiência de ataque e taxa de erros) ----
-    st.markdown("**Tendência da Equipe por Set** (eficiência de ataque e taxa de erros)")
-    trend = _team_eff_by_set(frames, match_id)
-    if not trend.empty:
-        figt, axt = plt.subplots(figsize=(4.2, 2.2), dpi=110)
-        axt.plot(trend["set_number"], trend["ef_ataque"], marker="o", linewidth=0.9, label="Ef. ataque (time)")
-        axt.plot(trend["set_number"], trend["erro_rate"], marker="o", linewidth=0.9, label="Taxa de erros (time)")
-        axt.set_xlabel("Set", fontsize=7); axt.set_ylabel("Valor", fontsize=7)
-        axt.grid(True, alpha=0.15)
-        axt.legend(loc="best", fontsize=7, frameon=False, handlelength=1.0)
-        figt.tight_layout(pad=0.2)
-        st.pyplot(figt)
-        st.caption("Objetivo: subir a eficiência de ataque e reduzir a taxa de erros ao longo dos sets.")
-    else:
-        st.caption("_Sem dados para tendência._")
-
-    st.markdown('</div>', unsafe_allow_html=True)
+st.markdown(
+    "<div style='text-align:center; opacity:.6; font-size:.78rem; margin:8px 0;'>"
+    "UniVolei • Live Scout</div>",
+    unsafe_allow_html=True
+)
 
 # =========================
-# Histórico de Sets (mantido)
-# =========================
-with st.container():
-    st.markdown('<div class="sectionCard">', unsafe_allow_html=True)
-    st.subheader("📊 Histórico de Sets")
-    stf_all = st.session_state.frames["sets"]
-    sm_consulta = stf_all[stf_all["match_id"] == st.session_state.match_id].copy()
-    if not sm_consulta.empty:
-        home_name_cons = home_name; away_name_cons = away_name
-        sets_list = sm_consulta.sort_values("set_number")[["set_number","home_points","away_points","winner_team_id"]].copy()
-        sets_list["Vencedor"] = sets_list["winner_team_id"].apply(lambda x: home_name_cons if x == 1 else away_name_cons if x == 2 else "")
-        view_tbl = sets_list.rename(columns={
-            "set_number":"Set", "home_points":f"Pts {home_name_cons}", "away_points":f"Pts {away_name_cons}"
-        })[["Set", f"Pts {home_name_cons}", f"Pts {away_name_cons}", "Vencedor"]]
-        display_dataframe(view_tbl, height=120, use_container_width=True)
-    else:
-        st.info("Sem sets registrados")
-    st.markdown('</div>', unsafe_allow_html=True)
-
-# =========================
-# Configuração para deploy no Render
+# Configuração para deploy (Render)
 # =========================
 if __name__ == "__main__":
     import os
     import streamlit as st
-    
-    # Configurações específicas para deploy
+
     port = int(os.environ.get("PORT", 10000))
-    
-    # Executa o app Streamlit com as configurações do Render
-    # Evita loop infinito de reruns
     if not st.session_state.get("_boot_rerun_done", False):
         st.session_state["_boot_rerun_done"] = True
-        st.rerun()  # Ou qualquer lógica de inicialização do seu app
+        st.rerun()
