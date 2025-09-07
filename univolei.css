@@ -1,226 +1,277 @@
-/* PARTE 3/3 — univolei.css (com todos os ajustes pedidos) */
+/* =========================
+   BASE / DESKTOP (padrão)
+   ========================= */
 
 /* Container e títulos */
-.block-container { padding-top: .15rem; padding-bottom: .15rem; max-width: 1600px; }
-h1, h2, h3 { margin: .05rem 0 .1rem 0; }
+.block-container { padding: .15rem 0; max-width: 1600px; }
+h1, h2, h3 { margin: .05rem 0 .1rem; }
 
-.header-title { 
-  font-size: 1.6rem; font-weight: 900; display:flex; align-items:center; gap:6px; 
-  margin: 0.05rem 0 .1rem 0;
+.header-title{
+  font-size: 1.6rem; font-weight: 900; display:flex; align-items:center; gap:6px;
+  margin:.05rem 0 .1rem;
 }
 
 /* Cartão de seção */
-.sectionCard { 
-  border:1px solid #e1e6ef; background:#fff; border-radius:8px; padding:4px 6px; margin:4px 0; overflow: hidden;
+.sectionCard{
+  border:1px solid #e1e6ef; background:#fff; border-radius:8px;
+  padding:4px 6px; margin:4px 0; overflow:hidden;
 }
 
 /* Controles gerais */
-.stButton button, .stTextInput input, .stSelectbox, .stNumberInput input, .stRadio, .stDataFrame { font-size: .85rem; }
-.stTextInput > div > div > input { padding-top: .12rem; padding-bottom: .12rem; }
-.stSelectbox > div > div { padding-top: .10rem; padding-bottom: .10rem; }
-.stNumberInput input { padding-top: .10rem; padding-bottom: .10rem; }
+.stButton button,
+.stTextInput input,
+.stSelectbox,
+.stNumberInput input,
+.stRadio,
+.stDataFrame{ font-size:.85rem; }
 
-/* Botões — padroniza borda/visual (corrige “Histórico”) */
-.stButton button {
-  /* importante: deixar quebrar linha para nomes longos e evitar corte */
-  white-space: normal !important;
-  overflow-wrap: anywhere;
-  padding: .22rem .5rem;
-  font-size: .85rem;
-  border:1px solid #e1e6ef;
-  border-radius:6px;
-  background:#fff;
-  min-width: auto;
-  max-width: 100%;
+.stTextInput > div > div > input{ padding:.12rem 0; }
+.stSelectbox > div > div{ padding:.10rem 0; }
+.stNumberInput input{ padding:.10rem 0; }
+
+/* Botões padrão */
+.stButton button{
+  white-space:normal !important; overflow-wrap:anywhere;
+  padding:.22rem .5rem; font-size:.85rem;
+  border:1px solid #e1e6ef; border-radius:6px; background:#fff;
+  max-width:100%;
 }
 
-/* Links de página (st.page_link) com cara de botão */
-.btn-linklike a, .btn-linklike button {
-  display:inline-block;
-  padding:.22rem .5rem;
-  font-size:.85rem;
-  border:1px solid #e1e6ef;
-  border-radius:6px;
-  background:#fff;
-  text-decoration:none !important;
-  color:inherit !important;
+/* Botões super compactos (aplique .btn-xxs no contêiner) */
+.btn-xxs .stButton button{
+  padding:.08rem .20rem !important; font-size:.70rem !important;
+  line-height:1 !important; min-height:auto !important;
 }
 
-/* Versão ultra-compacta para botões específicos */
-.btn-xxs .stButton button {
-  padding: .08rem .20rem !important;
-  font-size: .70rem !important;
-  line-height: 1 !important;
-  min-height: auto !important;
-  min-width: auto !important;
+/* Botões pequenos (aplique .small-btn no contêiner) */
+.small-btn .stButton button{
+  padding:.12rem .25rem !important; font-size:.72rem !important;
 }
 
-/* Atalhos (mini) — aumentar largura mínima para "MEIO" caber confortável */
-.small-btn .stButton button { 
-  padding:.12rem .25rem !important; 
-  font-size:.72rem !important; 
-  min-width: 3.5rem !important;  /* garante largura do "MEIO" */
+/* Links de página com cara de botão */
+.btn-linklike a, .btn-linklike button{
+  display:inline-block; padding:.22rem .5rem; font-size:.85rem;
+  border:1px solid #e1e6ef; border-radius:6px; background:#fff;
+  text-decoration:none !important; color:inherit !important;
 }
 
 /* Radios */
-div[role="radiogroup"] > label { margin-right: .35rem; font-size: .85rem; }
+div[role="radiogroup"] > label{ margin-right:.35rem; font-size:.85rem; }
 
 /* Badges */
-.badge { background:#f5f7fb; border:1px solid #e1e6ef; border-radius:999px; padding:3px 6px; font-size:.90rem; white-space:nowrap; }
-.badge b { font-weight:800; }
+.badge{
+  background:#f5f7fb; border:1px solid #e1e6ef; border-radius:999px;
+  padding:3px 6px; font-size:.90rem; white-space:nowrap;
+}
+.badge b{ font-weight:800; }
 
-/* Tabelas */
-.custom-table { width: 100%; border-collapse: collapse; margin: 3px 0; font-size: .78rem; }
-.custom-table th { background:#f0f2f6; padding: 4px; text-align: left; border: 1px solid #ddd; }
-.custom-table td { padding: 4px; border: 1px solid #ddd; }
-.custom-table tr:nth-child(even) { background:#f9f9f9; }
+/* Tabelas comuns */
+.custom-table{ width:100%; border-collapse:collapse; margin:3px 0; font-size:.78rem; }
+.custom-table th{ background:#f0f2f6; padding:4px; text-align:left; border:1px solid #ddd; }
+.custom-table td{ padding:4px; border:1px solid #ddd; }
+.custom-table tr:nth-child(even){ background:#f9f9f9; }
 
-/* Tabelas KPI com melhor visual */
-.kpi-table { width: 100%; border-collapse: collapse; margin: 3px 0; font-size: .78rem; }
-.kpi-table th { background:#4a6fa5; color: white; padding: 4px; text-align: left; border: 1px solid #ddd; }
-.kpi-table td { padding: 4px; border: 1px solid #ddd; }
-.kpi-table tr:nth-child(even) { background:#f0f7ff; }
-.kpi-table tr:nth-child(odd) { background:#e6f2ff; }
+/* Tabelas KPI */
+.kpi-table{ width:100%; border-collapse:collapse; margin:3px 0; font-size:.78rem; }
+.kpi-table th{ background:#4a6fa5; color:#fff; padding:4px; text-align:left; border:1px solid #ddd; }
+.kpi-table td{ padding:4px; border:1px solid #ddd; }
+.kpi-table tr:nth-child(even){ background:#f0f7ff; }
+.kpi-table tr:nth-child(odd){ background:#e6f2ff; }
 
-/* Lista de jogadoras (botões numéricos super compactos) */
-.jogadoras-container { display:flex; flex-wrap:wrap; gap:2px; margin:1px 0 2px 0; }
-.jogadoras-container button {
-  padding: .12rem .25rem !important;
-  min-width: 1.6rem !important;
-  width: auto !important;         /* deixa o botão “do tamanho do nome” */
-  max-width: 100% !important;
-  line-height: 1 !important;
-  border-radius: 6px;
-  font-size: .75rem !important;
-  white-space: normal !important; /* permite quebrar se precisar */
-  overflow-wrap: anywhere;
+/* Lista de jogadoras (se usada) */
+.jogadoras-container{ display:flex; flex-wrap:wrap; gap:2px; margin:1px 0 2px; }
+.jogadoras-container button{
+  padding:.12rem .25rem !important; width:auto !important; max-width:100% !important;
+  line-height:1 !important; border-radius:6px; font-size:.75rem !important;
+  white-space:normal !important; overflow-wrap:anywhere;
 }
 
-/* Botão ADV (equipe adversária) no final da lista de jogadoras */
-.pill-adv .stButton button {
-  background:#263238 !important;   /* cinza-escuro */
-  color:#ffffff !important;
-  border:1px solid #000 !important;
+/* Botão ADV (aplique .pill-adv no contêiner) */
+.pill-adv .stButton button{
+  background:#263238 !important; color:#fff !important; border:1px solid #000 !important;
 }
 
-/* Placar — aumentei tamanhos conforme pedido */
-.score-box { text-align:center; }
-.score-team { font-size: 16px; font-weight: 800; }
-.score-points { font-size: 52px; font-weight: 900; line-height: 1; }
-.score-x { font-size: 34px; font-weight: 900; padding-top: 10px; }
-
-/* Texto “Sets: … | Set atual …” um pouco maior */
-.set-summary { font-size: 1.12rem; font-weight: 800; }
+/* Placar */
+.score-box{ text-align:center; }
+.score-team{ font-size:16px; font-weight:800; }
+.score-points{ font-size:52px; font-weight:900; line-height:1; }
+.score-x{ font-size:34px; font-weight:900; padding-top:10px; }
+.set-summary{ font-size:1.12rem; font-weight:800; }
 
 /* KPIs */
-.kpi { display:flex; flex-direction:column; gap:1px; border:1px solid #e1e6ef; border-radius:6px; padding:4px 6px; }
-.kpi .v { font-size:1.1rem; font-weight:900; }
-.kpi .t { font-size:.75rem; opacity:.85; }
+.kpi{ display:flex; flex-direction:column; gap:1px; border:1px solid #e1e6ef; border-radius:6px; padding:4px 6px; }
+.kpi .v{ font-size:1.1rem; font-weight:900; }
+.kpi .t{ font-size:.75rem; opacity:.85; }
 
 /* Colunas com menos espaçamento lateral */
-.stColumn { padding-left: 2px; padding-right: 2px; }
+.stColumn{ padding-left:2px; padding-right:2px; }
 
-/* Ajustes gerais de espaçamentos entre elementos */
-.block-container div[data-testid="stVerticalBlock"] > div:has(> div.element-container) { margin: 0; }
+/* Remove espaçamentos verticais extras */
+.block-container div[data-testid="stVerticalBlock"] > div:has(> div.element-container){ margin:0; }
 
-/* Quadra de vôlei (versão CSS) — fundo laranja e rede no centro */
-.volleyball-court {
-  position: relative;
-  width: 100%;
-  height: 300px;
-  background-color: #FFCC80; /* laranja claro */
-  border: 2px solid #5d4037; /* marrom, combina com madeira */
-  margin: 10px 0;
+/* Compactação pontual */
+.tight-block div[data-testid="stVerticalBlock"] > div:has(> div.element-container){ margin:0 !important; }
+.tight-block [data-testid="stHorizontalBlock"]{ margin:2px 0 !important; }
+.tight-block .stButton button{ margin:2px 0 !important; }
+
+/* =========================
+   FIXES GERAIS (desktop e mobile)
+   ========================= */
+
+/* Tira qualquer “respiro” em volta de components.html (iframes) */
+.element-container:has(> iframe){ margin:0 !important; padding:0 !important; }
+/* Garante iframe sem borda/fundo e 100% */
+iframe[title^="streamlit-component"]{
+  display:block !important; width:100% !important; border:0 !important; background:transparent !important;
 }
 
-.court-line { position: absolute; background-color: #5d4037; }
-.court-attack-line { position: absolute; width: 80%; height: 2px; background-color: #5d4037; top: 33.33%; }
+/* Desarma min-width chato das colunas (funciona em todas as larguras) */
+.stColumn{ min-width:0 !important; width:auto !important; flex:1 1 0 !important; }
 
-/* LINHA DA REDE no centro */
-.court-center-line {
-  position: absolute;
-  width: 100%;
-  height: 3px;             /* mais grossa para destacar */
-  background-color: #000;  /* preta */
-  top: 50%;
-}
+/* “Mobile-only” (conteúdos HTML auxiliares) */
+.mobile-only{ display:none !important; }
 
-.court-zone {
-  position: absolute;
-  border: 1px dashed #bcae9e;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 10px;
-  color: #4e342e;
-}
+/* =========================
+   MOBILE (<= 480px / 640px)
+   ========================= */
 
-.heatmap-point {
-  position: absolute;
-  border-radius: 50%;
-  opacity: 0.7;
-  transform: translate(-50%, -50%);
-}
+@media (max-width:480px){
+  /* Textos menores */
+  .header-title{ font-size:1.05rem !important; gap:4px !important; }
+  .badge{ font-size:.78rem; padding:2px 4px; }
 
-.heatmap-success { background-color: rgba(0, 150, 0, 0.6); border: 1px solid rgba(0, 120, 0, 0.85); }
-.heatmap-error { background-color: rgba(211, 47, 47, 0.6); border: 1px solid rgba(183, 28, 28, 0.85); }
+  /* Tabelas mais compactas */
+  .custom-table, .kpi-table{ font-size:12px !important; }
+  .custom-table th, .custom-table td,
+  .kpi-table th, .kpi-table td{ padding:3px !important; }
 
-/* Modo jogo */
-.game-mode-container {
-  background-color: #f8f9fa;
-  border: 2px solid #4a6fa5;
-  border-radius: 8px;
-  padding: 10px;
-  margin-bottom: 15px;
-}
+  /* Container com margens laterais curtas */
+  .block-container{ padding:.08rem 6px !important; }
+  .stColumn{ padding-left:1px; padding-right:1px; }
 
-/* ===== Responsivo para celular ===== */
-@media (max-width: 480px) {
-  .header-title { font-size: 1.1rem; gap:4px; }
-  .badge { font-size: .78rem; padding: 2px 4px; }
-  .custom-table, .kpi-table { font-size: .72rem; margin: 2px 0; }
-  .custom-table th, .custom-table td, .kpi-table th, .kpi-table td { padding: 3px; }
+  /* Inputs e radios menores */
+  .stTextInput > div > div > input,
+  .stNumberInput input{ padding:4px 0 !important; font-size:12px !important; }
+  div[role="radiogroup"] > label{ margin-right:6px !important; font-size:12px !important; padding:1px 3px !important; }
 
-  .stButton button { padding: .18rem .40rem; font-size: .78rem; }
-  .btn-xxs .stButton button { padding: .06rem .16rem !important; font-size: .65rem !important; }
-  .small-btn .stButton button { min-width: 2.8rem !important; }
+  /* Cards/KPI mais compactos */
+  .sectionCard{ padding:6px !important; border-radius:6px !important; }
+  .kpi{ padding:3px 4px !important; border-radius:5px !important; }
+  .kpi .v{ font-size:1rem !important; }
+  .kpi .t{ font-size:.70rem !important; }
 
-  /* Placar (mobile) um pouco maior também */
-  .score-team { font-size: 13px; }
-  .score-points { font-size: 38px; }
-  .score-x { font-size: 26px; padding-top: 6px; }
-  .set-summary { font-size: .94rem; }
+  /* Placar mais compacto */
+  .score-team{ font-size:13px !important; }
+  .score-points{ font-size:38px !important; }
+  .score-x{ font-size:26px !important; padding-top:6px !important; }
+  .set-summary{ font-size:.94rem !important; }
 
-  .jogadoras-container { gap: 2px; }
-  .jogadoras-container button { 
-    min-width: 1.4rem !important; 
-    padding: .10rem .20rem !important; 
-    font-size: .68rem !important;
+  /* Quadra mais baixa */
+  #uv-court-main, #uv-court-gm{ height:260px !important; }
+
+  /* Conteúdo “mobile-only” visível só aqui */
+  .mobile-only{ display:block !important; }
+
+  /* Botões HTML auxiliares (linhas mobile) */
+  #gm-mob-players, #gm-mob-quick{ margin:2px 0 !important; }
+  .uv-row{ display:flex; flex-wrap:wrap; gap:6px; }
+  .uv-btn{
+    padding:6px 8px; font-size:13px; line-height:1; border-radius:8px;
+    border:1px solid #ccd3e0; background:#f7f9ff;
+    width:auto; min-width:36px; min-height:26px;
   }
-
-  .sectionCard { padding: 3px 4px; border-radius:6px; }
-  .kpi { padding: 3px 4px; border-radius:5px; }
-  .kpi .v { font-size: 1rem; }
-  .kpi .t { font-size: .70rem; }
-
-  /* Reduzir ainda mais o espaçamento entre elementos no mobile */
-  .block-container { padding-top: .10rem; padding-bottom: .10rem; }
-  .stColumn { padding-left: 1px; padding-right: 1px; }
-
-  /* Ajustes específicos para a área de registro */
-  .stTextInput > div > div > input { 
-    padding-top: .08rem !important; 
-    padding-bottom: .08rem !important; 
-    font-size: .80rem !important;
-  }
-
-  /* Reduzir margens dos rádios */
-  div[role="radiogroup"] > label { 
-    margin-right: .25rem; 
-    font-size: .78rem; 
-    padding: 2px 4px !important;
-  }
-
-  /* Ajustes para quadra no mobile */
-  .volleyball-court { height: 200px; }
+  .uv-btn.adv{ background:#263238; color:#fff; border-color:#000; opacity:.95; }
+  .uv-btn.rede{ background:#ffe5e5; border-color:#ffb0b0; }
 }
+
+/* Regras contra min-width do Streamlit em layout estreito */
+@media (max-width:640px){
+  [data-testid="stColumn"]{
+    min-width:0 !important; width:auto !important; flex:0 0 auto !important;
+  }
+  [data-testid="stColumn"] > div{
+    min-width:0 !important; width:auto !important;
+  }
+  [class*="st-emotion-cache"][data-testid="stColumn"]{
+    min-width:0 !important; width:auto !important; flex:0 0 auto !important;
+  }
+  [data-testid="stColumn"] .stButton > button,
+  [data-testid="stColumn"] button{
+    width:auto !important; min-width:0 !important; display:inline-block !important;
+  }
+  [data-testid="stHorizontalBlock"]{ align-items:flex-start !important; gap:6px !important; }
+}
+/* Tira altura mínima herdada quando há iframes vazios (desktop) */
+.element-container:has(> iframe) > div { min-height: 0 !important; }
+
+/* Evita gap em blocos horizontais padrão do Streamlit */
+[data-testid="stHorizontalBlock"] { margin-top: 2px !important; margin-bottom: 2px !important; }
+
+/* Parágrafos e títulos de seção mais "colados" */
+.block-container p { margin: 2px 0 !important; }
+.block-container hr { margin: 4px 0 !important; }
+
+/* Radios/inputs com margem inferior mínima */
+.stRadio, .stSelectbox, .stTextInput, .stNumberInput { margin-bottom: 4px !important; }
+
+/* =========================
+   DENSIDADE MÁXIMA (desktop ≥ 992px)
+   ========================= */
+   @media (min-width: 992px){
+    .block-container{ padding:.05rem 0 !important; }
+    .sectionCard{ padding:2px 4px !important; margin:2px 0 !important; }
+  
+    /* Menos ar entre blocos e colunas */
+    [data-testid="stVerticalBlock"] > div{ margin:2px 0 !important; }
+    [data-testid="stHorizontalBlock"]{ margin:2px 0 !important; gap:4px !important; }
+    .stColumn{ padding-left:1px !important; padding-right:1px !important; }
+  
+    /* Inputs e selects mais finos */
+    .stTextInput > div > div > input,
+    .stNumberInput input{ padding:.08rem 0 !important; }
+    .stSelectbox > div > div{ padding:.06rem 0 !important; }
+  
+    /* Radios mais colados */
+    div[role="radiogroup"] > label{ margin-right:.25rem !important; }
+  
+    /* Botões menores */
+    .stButton button{
+      padding:.14rem .35rem !important;
+      font-size:.78rem !important;
+      line-height:1.1 !important;
+    }
+  
+    /* Tabelas mais densas */
+    .custom-table, .kpi-table{ font-size:.72rem !important; }
+    .custom-table th, .custom-table td,
+    .kpi-table th, .kpi-table td{ padding:2px 3px !important; }
+  
+    /* Placar mais enxuto */
+    .score-team{ font-size:14px !important; }
+    .score-points{ font-size:44px !important; }
+    .score-x{ font-size:26px !important; padding-top:4px !important; }
+    .set-summary{ font-size:1rem !important; }
+  
+    /* Quadra menor no desktop */
+    #uv-court-main, #uv-court-gm{ height:320px !important; }
+  }
+  
+
+/* === Fix: evitar duplicação no mobile (Modo Jogo) ===
+   Oculta os blocos HTML auxiliares (.uv-mobile-only) quando estamos no Modo Jogo.
+   Isso remove a duplicidade de "Jogadoras" e "Atalhos" em telas <=480px. */
+@media (max-width: 480px){
+  .gm-tight .uv-mobile-only { display: none !important; }
+}
+
+
+/* === Game Mode mobile: use only HTML buttons (avoid duplication) === */
+@media (max-width: 480px){
+  .gm-tight .gm-desktop-only { display: none !important; }
+}
+/* === Extra compaction for game mode (both desktop & mobile) === */
+.gm-tight .block-container{ padding:.02rem 4px !important; }
+.gm-tight [data-testid="stVerticalBlock"] > div{ margin:1px 0 !important; }
+.gm-tight [data-testid="stHorizontalBlock"]{ margin:2px 0 !important; gap:4px !important; }
+.gm-tight .stButton button{ padding:.12rem .28rem !important; }
+.gm-tight div[role="radiogroup"] > label{ margin-right:.25rem !important; }
