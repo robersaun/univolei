@@ -129,32 +129,11 @@ def load_css(filename: str = "univolei.css"):
     if css_path.exists():
         st.markdown(f"<style>{css_path.read_text(encoding='utf-8')}</style>", unsafe_allow_html=True)
 load_css("univolei.css")
-
-components.html("""
-<script>
-(function(){
-  try{
-    var doc = window.parent && window.parent.document ? window.parent.document : document;
-    // No-op here: class is managed elsewhere if needed
-    doc.body.classList.add('gm-tight');
-  }catch(e){}
-})();
-</script>
-""", height=0, scrolling=False)
-
-# === When in game mode, mark <body> with .gm-tight to compact spacing only there
-try:
-    if st.session_state.get("game_mode", False):
-        components.html("""<script>(function(){try{(window.parent?.document||document).body.classList.add('gm-tight');}catch(e){}})();</script>""", height=0, scrolling=False)
-except Exception:
-    pass
-
 # === CSS anti-gap para QUALQUER iframe de components.html ===
 st.markdown("""
 <style>
   /* Enxuga espaçamento geral */
-
-  [data-testid="stVerticalBlock"] > div { margin-top: 2px !important; margin-bottom: 2px !important; }
+  [data-testid="stVerticalBlock"] > div { margin-bottom: .35rem !important; }
   div[data-testid="stMarkdownContainer"] > p:empty { margin:0 !important; padding:0 !important; }
 
   /* ===== Anti-gap agressivo para iframes de components.html ===== */
@@ -204,23 +183,6 @@ st.markdown("""
   .uv-btn.rede { background:rgba(220,50,50,0.18); border-color:rgba(160,20,20,0.55); color:#fff; }
 </style>
 """, unsafe_allow_html=True)
-
-st.markdown("""
-<style>
-/* === Ultra-compact spacing inside MODO JOGO only (scoped) === */
-.gm-tight [data-testid="stVerticalBlock"] > div { margin-top: 2px !important; margin-bottom: 2px !important; }
-.gm-tight .element-container { margin-top: 2px !important; margin-bottom: 2px !important; }
-.gm-tight [data-testid="stHorizontalBlock"] { gap: 6px !important; }
-.gm-tight [data-testid="stCaptionContainer"] { margin: 0 !important; padding: 0 !important; }
-.gm-tight .stButton button { margin-top: 0 !important; margin-bottom: 0 !important; }
-.gm-tight div[data-testid="stMarkdownContainer"] p { margin: 2px 0 !important; }
-.gm-tight .stRadio > label, .gm-tight .stRadio legend { margin-bottom: 2px !important; }
-.gm-tight [data-baseweb="select"] { margin-top: 0 !important; margin-bottom: 0 !important; }
-.gm-tight .stCheckbox { margin-top: 0 !important; margin-bottom: 0 !important; }
-.gm-tight .stSlider { margin-top: 0 !important; margin-bottom: 0 !important; }
-</style>
-""", unsafe_allow_html=True)
-
 
 
 # =========================
@@ -307,7 +269,6 @@ st.session_state.setdefault("_do_rerun_after", False)
 
 # =========== Debug/prints (em memória) ===========
 st.session_state.setdefault("dbg_prints", [])
-st.session_state.setdefault('_gm_mobile_html_enabled', False)
 def dbg_print(msg: str):
     ts = time.strftime("%H:%M:%S")
     line = f"[{ts}] {msg}"
@@ -1040,9 +1001,8 @@ def _go_hist():
         except Exception:
             pass
     # Fallback: oferece link clicável
-    _hp_link = str(hp).replace("\\", "/")
     st.markdown(
-        f"**Abra o histórico aqui:** [Abrir Histórico]({_hp_link})  \n"
+        f"**Abra o histórico aqui:** [Abrir Histórico]({str(hp).replace('\\', '/')})  \n"
         "Se o clique não abrir, use a barra lateral do Streamlit para entrar na página de histórico."
     )
 
@@ -1064,8 +1024,11 @@ with top4:
     st.button("📘 Tutorial", use_container_width=True, key="top_tutorial_btn",
               on_click=lambda: st.session_state.__setitem__("show_tutorial", True))
 with top5:
-    st.button("🗂️ Histórico", use_container_width=True, key="top_history_btn", on_click=_go_hist)
-
+    # Abrir Histórico (link direto — evita issues com switch_page)
+    st.markdown(
+        '<a href="/historico" target="_self" style="display:block;text-align:center;padding:.4rem .6rem;border:1px solid rgba(49,51,63,.2);border-radius:.5rem;font-weight:600;">🗂️ Histórico</a>',
+        unsafe_allow_html=True
+    )
 # Finalizar partida direto
 def _finalizar_partida():
     if st.session_state.match_id is None: return
@@ -1363,34 +1326,32 @@ if st.session_state._do_rerun_after:
 # =========================
 # PLACAR (top)
 # =========================
-if not st.session_state.game_mode:
-    with st.container():
-        st.markdown('<div class="sectionCard">', unsafe_allow_html=True)
+with st.container():
+    st.markdown('<div class="sectionCard">', unsafe_allow_html=True)
 
-        frames = st.session_state.frames
-        df_set = current_set_df(frames, st.session_state.match_id, st.session_state.set_number)
-        home_pts, away_pts = set_score_from_df(df_set)
-        stf = frames["sets"]; sm = stf[stf["match_id"] == st.session_state.match_id]
-        home_sets_w = int((sm["winner_team_id"] == 1).sum()); away_sets_w = int((sm["winner_team_id"] == 2).sum())
+    frames = st.session_state.frames
+    df_set = current_set_df(frames, st.session_state.match_id, st.session_state.set_number)
+    home_pts, away_pts = set_score_from_df(df_set)
+    stf = frames["sets"]; sm = stf[stf["match_id"] == st.session_state.match_id]
+    home_sets_w = int((sm["winner_team_id"] == 1).sum()); away_sets_w = int((sm["winner_team_id"] == 2).sum())
 
-        pc1, pc2, pc3, pc4 = st.columns([1.1, .8, 1.1, 2.2])
-        with pc1:
-            st.markdown(f"<div class='score-box'><div class='score-team'>{home_name}</div><div class='score-points'>{home_pts}</div></div>", unsafe_allow_html=True)
-        with pc2:
-            st.markdown("<div class='score-box'><div class='score-x'>×</div></div>", unsafe_allow_html=True)
-        with pc3:
-            st.markdown(f"<div class='score-box'><div class='score-team'>{away_name}</div><div class='score-points'>{away_pts}</div></div>", unsafe_allow_html=True)
-        with pc4:
-            st.markdown(f"<div class='set-summary'>Sets: <b>{home_sets_w}</b> × <b>{away_sets_w}</b> &nbsp;|&nbsp; Set atual: <b>{st.session_state.set_number}</b></div>", unsafe_allow_html=True)
+    pc1, pc2, pc3, pc4 = st.columns([1.1, .8, 1.1, 2.2])
+    with pc1:
+        st.markdown(f"<div class='score-box'><div class='score-team'>{home_name}</div><div class='score-points'>{home_pts}</div></div>", unsafe_allow_html=True)
+    with pc2:
+        st.markdown("<div class='score-box'><div class='score-x'>×</div></div>", unsafe_allow_html=True)
+    with pc3:
+        st.markdown(f"<div class='score-box'><div class='score-team'>{away_name}</div><div class='score-points'>{away_pts}</div></div>", unsafe_allow_html=True)
+    with pc4:
+        st.markdown(f"<div class='set-summary'>Sets: <b>{home_sets_w}</b> × <b>{away_sets_w}</b> &nbsp;|&nbsp; Set atual: <b>{st.session_state.set_number}</b></div>", unsafe_allow_html=True)
 
-        st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # =========================
 # MODO JOGO
 # =========================
 if st.session_state.game_mode:
     with st.container():
-        st.markdown('<div class=\"gm-tight\">', unsafe_allow_html=True)
         #DEIXEI COMENTADO -> NAO RETIRAR ESTAS LINHAS, HABILITAR SE NECESSÁRIO DEPOIS!
         #st.markdown('<div class="sectionCard game-mode-container">', unsafe_allow_html=True)
         #st.subheader("🎮 Modo Jogo")
@@ -1439,8 +1400,6 @@ if st.session_state.game_mode:
             )
 
         # Linha de botões de jogadoras + ADV
-
-        # ******* INÍCIO BLOCO: JOGADORAS (Modo Jogo) *******
         st.caption("Jogadoras (toque rápido define lado = Nós)")
         nums = resolve_our_roster_numbers(st.session_state.frames)
         name_map = {r["number"]: r["name"] for r in roster_for_ui(st.session_state.frames)}
@@ -1470,51 +1429,49 @@ if st.session_state.game_mode:
             st.caption("Sem jogadoras")
 
         # >>> MOBILE (VISUAL) – Jogadoras + ADV (SEM IFRAME)
-        if st.session_state.get('_gm_mobile_html_enabled', False):
-                try:
-                    _labels_players = []
-                    for _n in nums or []:
-                        _lab = str(_n) if st.session_state.player_label_mode == "Número" else (name_map.get(_n) or str(_n))
-                        _labels_players.append(_lab)
-        
-                    import html as _html
-                    _btns = []
-                    for _lab in _labels_players:
-                        _lab_esc = _html.escape(str(_lab))
-                        _btns.append(f'<button class="uv-btn" onclick="uvMobClick(\'{_lab_esc}\')">{_lab_esc}</button>')
-                    _btns.append('<button class="uv-btn adv" onclick="uvMobClick(\'ADV\')">ADV</button>')
-        
-                    st.markdown("""
-                <div class="uv-mobile-only" style="margin:0;">
-                <div class="uv-row" id="gm-mob-players" style="margin:4px 0 4px 0;">
-                    """ + "".join(_btns) + """
-                </div>
-                </div>
-                <script>
-                (function(){
-                function uvMobClick(txt){
-                    try{
-                    const doc = window.parent?.document || document;
-                    const t = (txt||'').toString().trim();
-                    const btns = Array.from(doc.querySelectorAll('button'));
-                    const target = btns.find(b => (b.textContent||'').trim() === t);
-                    if(target) target.click();
-                    }catch(e){ console.log('uvMobClick error', e); }
-                }
-                // expõe 1x
-                if(typeof window.uvMobClick!=='function'){ window.uvMobClick = uvMobClick; }
-                })();
-                </script>
-                """, unsafe_allow_html=True)
-        
-                except Exception:
-                    pass
+        try:
+            _labels_players = []
+            for _n in nums or []:
+                _lab = str(_n) if st.session_state.player_label_mode == "Número" else (name_map.get(_n) or str(_n))
+                _labels_players.append(_lab)
+
+            import html as _html
+            _btns = []
+            for _lab in _labels_players:
+                _lab_esc = _html.escape(str(_lab))
+                _btns.append(f'<button class="uv-btn" onclick="uvMobClick(\'{_lab_esc}\')">{_lab_esc}</button>')
+            _btns.append('<button class="uv-btn adv" onclick="uvMobClick(\'ADV\')">ADV</button>')
+
+            st.markdown("""
+        <div class="uv-mobile-only" style="margin:0;">
+        <div class="uv-row" id="gm-mob-players" style="margin:4px 0 4px 0;">
+            """ + "".join(_btns) + """
+        </div>
+        </div>
+        <script>
+        (function(){
+        function uvMobClick(txt){
+            try{
+            const doc = window.parent?.document || document;
+            const t = (txt||'').toString().trim();
+            const btns = Array.from(doc.querySelectorAll('button'));
+            const target = btns.find(b => (b.textContent||'').trim() === t);
+            if(target) target.click();
+            }catch(e){ console.log('uvMobClick error', e); }
+        }
+        // expõe 1x
+        if(typeof window.uvMobClick!=='function'){ window.uvMobClick = uvMobClick; }
+        })();
+        </script>
+        """, unsafe_allow_html=True)
+
+        except Exception:
+            pass
         # >>> FIM MOBILE (VISUAL) – Jogadoras + ADV (SEM IFRAME)
 
 
 
         # Atalhos
-        # ******* FIM BLOCO: JOGADORAS (Modo Jogo) *******
         st.markdown("**Atalhos**")
         atalho_specs = [
             ("d",    "Diag"),
@@ -1537,74 +1494,42 @@ if st.session_state.game_mode:
                     use_container_width=True
                 )
 
-        
-
-        # ******* INÍCIO BLOCO: Botão Desfazer Rally (Modo Jogo) *******
-        _next_col_idx = (len(atalho_specs)) % len(acols)
-        with acols[_next_col_idx]:
-            st.button(
-                "Desfazer Rally",
-                key="gm_desfazer_btn",
-                on_click=undo_last_rally_current_set,
-                use_container_width=True
-            )
-        components.html("""
-        <script>
-        (function(){
-          try{
-            const doc = window.parent?.document || document;
-            const btns = Array.from(doc.querySelectorAll('button'));
-            const b = btns.find(x => (x.textContent||'').trim().toLowerCase() === 'desfazer rally');
-            if(b){
-              b.style.background = 'rgba(200,60,60,0.82)';
-              b.style.border = '1px solid rgba(140,30,30,0.90)';
-              b.style.color = '#fff';
-              b.style.fontWeight = '700';
-              b.style.marginLeft = '10px';
-            }
-          }catch(e){}
-        })();
-        </script>
-        """, height=0, scrolling=False)
-        # ******* FIM BLOCO: Botão Desfazer Rally (Modo Jogo) *******
-
         _paint_adv_rede_buttons()
 
         # >>> MOBILE (VISUAL) – Atalhos (SEM IFRAME)
-        if st.session_state.get('_gm_mobile_html_enabled', False):
-                try:
-                    import html as _html
-                    _btns2 = []
-                    for _code, _label in atalho_specs:
-                        _lab_esc = _html.escape(str(_label))
-                        cls = "uv-btn rede" if str(_label).strip().lower()=="rede" else "uv-btn"
-                        _btns2.append(f'<button class="{cls}" onclick="uvMobClick(\'{_lab_esc}\')">{_lab_esc}</button>')
-        
-                    st.markdown("""
-                <div class="uv-mobile-only" style="margin:0;">
-                <div class="uv-row" id="gm-mob-quick" style="margin:4px 0 6px 0;">
-                    """ + "".join(_btns2) + """
-                </div>
-                </div>
-                <script>
-                (function(){
-                if(typeof window.uvMobClick!=='function'){
-                    window.uvMobClick = function(txt){
-                    try{
-                        const doc = window.parent?.document || document;
-                        const t = (txt||'').toString().trim();
-                        const btns = Array.from(doc.querySelectorAll('button'));
-                        const target = btns.find(b => (b.textContent||'').trim() === t);
-                        if(target) target.click();
-                    }catch(e){ console.log('uvMobClick error', e); }
-                    };
-                }
-                })();
-                </script>
-                """, unsafe_allow_html=True)
-        
-                except Exception:
-                    pass
+        try:
+            import html as _html
+            _btns2 = []
+            for _code, _label in atalho_specs:
+                _lab_esc = _html.escape(str(_label))
+                cls = "uv-btn rede" if str(_label).strip().lower()=="rede" else "uv-btn"
+                _btns2.append(f'<button class="{cls}" onclick="uvMobClick(\'{_lab_esc}\')">{_lab_esc}</button>')
+
+            st.markdown("""
+        <div class="uv-mobile-only" style="margin:0;">
+        <div class="uv-row" id="gm-mob-quick" style="margin:4px 0 6px 0;">
+            """ + "".join(_btns2) + """
+        </div>
+        </div>
+        <script>
+        (function(){
+        if(typeof window.uvMobClick!=='function'){
+            window.uvMobClick = function(txt){
+            try{
+                const doc = window.parent?.document || document;
+                const t = (txt||'').toString().trim();
+                const btns = Array.from(doc.querySelectorAll('button'));
+                const target = btns.find(b => (b.textContent||'').trim() === t);
+                if(target) target.click();
+            }catch(e){ console.log('uvMobClick error', e); }
+            };
+        }
+        })();
+        </script>
+        """, unsafe_allow_html=True)
+
+        except Exception:
+            pass
         # >>> FIM MOBILE (VISUAL) – Atalhos (SEM IFRAME)
 
         # ===== Encerramento da UI do Modo Jogo para esconder o restante =====
@@ -1612,6 +1537,17 @@ if st.session_state.game_mode:
         # --- Quadra (Modo Jogo) exibida logo antes do encerramento ---
         try:
             
+        # --- Linha do placar (logo acima da quadra) ---
+            _df_for_score = df_hm if 'df_hm' in locals() else current_set_df(st.session_state.frames, st.session_state.match_id, st.session_state.set_number)
+            _home_pts, _away_pts = set_score_from_df(_df_for_score)
+            _set_raw = st.session_state.get("set_number")
+            _setn = 1
+            if _set_raw is not None:
+                _s = str(_set_raw).strip()
+                if _s.isdigit():
+                    _setn = int(_s)
+            st.markdown(f"**Set {_setn} — Placar: {_home_pts} x {_away_pts}**")
+
             df_hm = current_set_df(st.session_state.frames, st.session_state.match_id, st.session_state.set_number)
         except Exception:
             df_hm = None
@@ -1634,49 +1570,12 @@ if st.session_state.game_mode:
             return_debug=False
         )
 
-
-        # --- Placar completo (Modo Jogo) acima da quadra ---
-
-        _frames_gm = st.session_state.frames
-
-        _df_set_gm = current_set_df(_frames_gm, st.session_state.match_id, st.session_state.set_number)
-
-        _home_pts_gm, _away_pts_gm = set_score_from_df(_df_set_gm)
-
-        _stf_gm = _frames_gm["sets"]; _sm_gm = _stf_gm[_stf_gm["match_id"] == st.session_state.match_id]
-
-        _home_sets_w_gm = int((_sm_gm["winner_team_id"] == 1).sum()); _away_sets_w_gm = int((_sm_gm["winner_team_id"] == 2).sum())
-
-        _pc1, _pc2, _pc3, _pc4 = st.columns([1.1, .8, 1.1, 2.2])
-
-        with _pc1:
-
-            st.markdown(f"<div class='score-box'><div class='score-team'>{home_name}</div><div class='score-points'>{_home_pts_gm}</div></div>", unsafe_allow_html=True)
-
-        with _pc2:
-
-            st.markdown("<div class='score-box'><div class='score-x'>×</div></div>", unsafe_allow_html=True)
-
-        with _pc3:
-
-            st.markdown(f"<div class='score-box'><div class='score-team'>{away_name}</div><div class='score-points'>{_away_pts_gm}</div></div>", unsafe_allow_html=True)
-
-        with _pc4:
-
-            st.markdown(f"<div class='set-summary'>Sets: <b>{_home_sets_w_gm}</b> × <b>{_away_sets_w_gm}</b> &nbsp;|&nbsp; Set atual: <b>{st.session_state.set_number}</b></div>", unsafe_allow_html=True)
-
-
-        # ******* INÍCIO BLOCO: QUADRA + PLACAR (Modo Jogo) *******
         render_court_html(
             pts_succ, pts_errs, pts_adv, pts_adv_err,
             enable_click=True, key="gm", show_numbers=st.session_state.show_heat_numbers
         )
-        # ******* FIM BLOCO: QUADRA + PLACAR (Modo Jogo) *******
-
         
         # --- Filtros (GM) abaixo da quadra ---
-
-        # ******* INÍCIO BLOCO: FILTROS (Modo Jogo) *******
         f1, f2, f3, f4, f5 = st.columns([1.0, 1.0, 1.0, 1.2, 1.4])
         with f1: show_success_gm   = st.checkbox("Nossos acertos", value=True, key="gm_show_succ")
         with f2: show_errors_gm    = st.checkbox("Nossos erros",   value=True, key="gm_show_err")
@@ -1691,11 +1590,8 @@ if st.session_state.game_mode:
         st.session_state.show_heat_numbers = st.checkbox(
             "Mostrar número/ADV nas bolinhas",
             value=st.session_state.show_heat_numbers, key="gm_show_numbers_chk"
-        # ******* FIM BLOCO: FILTROS (Modo Jogo) *******
-
         )
 
-        st.markdown('</div>', unsafe_allow_html=True)
         st.markdown('</div>', unsafe_allow_html=True)
         st.stop()
 
@@ -1759,23 +1655,6 @@ if st.session_state.game_mode:
 # Painel principal
 # =========================
 with st.container():
-
-    # ===== CSS denso aplicado SOMENTE no Modo Jogo =====
-    st.markdown("""
-    <style>
-      /* Compacta margens verticais gerais dentro do Modo Jogo */
-      [data-testid="stVerticalBlock"] > div { margin-top: 2px !important; margin-bottom: 2px !important; }
-      /* Linhas/colunas do Streamlit ficam mais coladas */
-      div[data-testid="stHorizontalBlock"] { margin-top: 0 !important; margin-bottom: 0 !important; }
-      div[data-testid="stHorizontalBlock"] > div { margin-top: 2px !important; margin-bottom: 2px !important; padding-top: 0 !important; padding-bottom: 0 !important; }
-      /* Títulos/markdown/caption mais juntos */
-      div[data-testid="stMarkdownContainer"] > p { margin: 2px 0 !important; }
-      /* Reduz espaço de selects/radios */
-      div[role="radiogroup"] { margin: 0 !important; }
-      div[data-baseweb="select"] { margin-top: 0 !important; margin-bottom: 0 !important; }
-    </style>
-    """, unsafe_allow_html=True)
-    # ===== FIM CSS denso (Modo Jogo) =====
     st.markdown('<div class="sectionCard">', unsafe_allow_html=True)
 
     frames = st.session_state.frames
@@ -1877,9 +1756,6 @@ with st.container():
         else:
             st.caption("Sem jogadoras cadastradas para o nosso time.")
 
-        st.markdown('<div class="gm-desktop-only">', unsafe_allow_html=True)
-
-
         # Atalhos
         st.markdown("**Atalhos**")
         atalho_specs = [
@@ -1905,9 +1781,6 @@ with st.container():
 
         _paint_adv_rede_buttons()
 
-
-
-        st.markdown('</div>', unsafe_allow_html=True)
         st.markdown("---")
         st.markdown("**🗺️ Mapa de Calor (clique para marcar o local do ataque)**")
 

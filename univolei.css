@@ -168,9 +168,13 @@ iframe[title^="streamlit-component"]{
 
   /* Quadra mais baixa */
   #uv-court-main, #uv-court-gm{ height:260px !important; }
+  
 
   /* Conteúdo “mobile-only” visível só aqui */
   .mobile-only{ display:block !important; }
+
+  /* Force-hide uv-mobile-only (avoid duplicate buttons on mobile) */
+.uv-mobile-only { display: none !important; }
 
   /* Botões HTML auxiliares (linhas mobile) */
   #gm-mob-players, #gm-mob-quick{ margin:2px 0 !important; }
