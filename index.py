@@ -95,7 +95,12 @@ def _paint_adv_rede_buttons():
 
       // pinta botões
       function paint(){
-        const doc = window.parent?.document || document;
+        var doc;
+        try{
+          doc = (window.parent && window.parent.document) ? window.parent.document : document;
+        }catch(e){
+          doc = document;
+        }
         const map = [
           {text:'adv',  bg:'rgba(255,0,255,0.20)', border:'rgba(160,0,160,0.55)'},
           {text:'rede', bg:'rgba(220,50,50,0.18)', border:'rgba(160,20,20,0.55)'}
@@ -648,7 +653,7 @@ def register_current(number: int | None = None, action: str | None = None):
     num_val = number if number is not None else st.session_state.get("last_selected_player", None)
     if num_val is None:
         raw = st.session_state.get("line_input_text", "")
-        m = re.findall(r"\b(\d{1,2})\b", raw)
+        m = re.findall(r"\\b(\\d{1,2})\\b", raw)
         num_val = int(m[-1]) if m else None
 
     if str(act).lower() == "rede":
@@ -1003,7 +1008,7 @@ def _go_hist():
         return
 
     # Caminho relativo correto para páginas dentro de /pages (sem usar barra invertida na f-string)
-    rel = ("pages/" + hp.name).replace("\\", "/")
+    rel = ("pages/" + hp.name).replace("\\\\", "/")
 
     st.info("🔎 Abrindo Histórico via switch_page → " + rel)
     print("[HIST-SP] tentando st.switch_page('" + rel + "')", flush=True)
@@ -1487,20 +1492,25 @@ if st.session_state.game_mode:
             _btns = []
             for _lab in _labels_players:
                 _lab_esc = _html.escape(str(_lab))
-                _btns.append(f'<button class="uv-btn" onclick="uvMobClick(\'{_lab_esc}\')">{_lab_esc}</button>')
-            _btns.append('<button class="uv-btn adv" onclick="uvMobClick(\'ADV\')">ADV</button>')
+                _btns.append(f'<button class="uv-btn" onclick="uvMobClick(\\'{_lab_esc}\\')">{_lab_esc}</button>')
+            _btns.append('<button class="uv-btn adv" onclick="uvMobClick(\\'ADV\\')">ADV</button>')
 
-            st.markdown("""
+            st.markdown(\"\"\"
         <div class="uv-mobile-only" style="margin:0;">
         <div class="uv-row" id="gm-mob-players" style="margin:4px 0 4px 0;">
-            """ + "".join(_btns) + """
+            \"\"\" + \"\"\"\"\"\".join(_btns) + \"\"\"
         </div>
         </div>
         <script>
         (function(){
         function uvMobClick(txt){
             try{
-            const doc = window.parent?.document || document;
+            var doc;
+            try{
+              doc = (window.parent && window.parent.document) ? window.parent.document : document;
+            }catch(e){
+              doc = document;
+            }
             const t = (txt||'').toString().trim();
             const btns = Array.from(doc.querySelectorAll('button'));
             const target = btns.find(b => (b.textContent||'').trim() === t);
@@ -1511,7 +1521,7 @@ if st.session_state.game_mode:
         if(typeof window.uvMobClick!=='function'){ window.uvMobClick = uvMobClick; }
         })();
         </script>
-        """, unsafe_allow_html=True)
+        \"\"\", unsafe_allow_html=True)
 
         except Exception:
             pass
@@ -1551,12 +1561,12 @@ if st.session_state.game_mode:
             for _code, _label in atalho_specs:
                 _lab_esc = _html.escape(str(_label))
                 cls = "uv-btn rede" if str(_label).strip().lower()=="rede" else "uv-btn"
-                _btns2.append(f'<button class="{cls}" onclick="uvMobClick(\'{_lab_esc}\')">{_lab_esc}</button>')
+                _btns2.append(f'<button class="{cls}" onclick="uvMobClick(\\'{_lab_esc}\\')">{_lab_esc}</button>')
 
-            st.markdown("""
+            st.markdown(\"\"\"
         <div class="uv-mobile-only" style="margin:0;">
         <div class="uv-row" id="gm-mob-quick" style="margin:4px 0 6px 0;">
-            """ + "".join(_btns2) + """
+            \"\"\" + \"\"\"\"\"\".join(_btns2) + \"\"\"
         </div>
         </div>
         <script>
@@ -1564,7 +1574,12 @@ if st.session_state.game_mode:
         if(typeof window.uvMobClick!=='function'){
             window.uvMobClick = function(txt){
             try{
-                const doc = window.parent?.document || document;
+                var doc;
+                try{
+                  doc = (window.parent && window.parent.document) ? window.parent.document : document;
+                }catch(e){
+                  doc = document;
+                }
                 const t = (txt||'').toString().trim();
                 const btns = Array.from(doc.querySelectorAll('button'));
                 const target = btns.find(b => (b.textContent||'').trim() === t);
@@ -1574,7 +1589,7 @@ if st.session_state.game_mode:
         }
         })();
         </script>
-        """, unsafe_allow_html=True)
+        \"\"\", unsafe_allow_html=True)
 
         except Exception:
             pass
@@ -1983,7 +1998,7 @@ with st.container():
         if show_debug_ui() and st.session_state.get("dbg_prints"):
             st.markdown("---")
             st.markdown("**🧰 Debug (logs recentes)**")
-            st.code("\n".join(st.session_state["dbg_prints"][-40:]), language="text")
+            st.code("\\n".join(st.session_state["dbg_prints"][-40:]), language="text")
 
     st.markdown('</div>', unsafe_allow_html=True)
 
