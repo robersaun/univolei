@@ -989,22 +989,70 @@ def _find_hist_page():
     return None
 
 def _go_hist():
-    hp = _find_hist_page()
+    """Abre a página de Histórico (em /pages) com logs na UI e no console."""
+    try:
+        hp = _find_hist_page()
+    except Exception as e:
+        st.error(f"❌ Erro ao localizar a página de histórico: {e}")
+        print("[HIST-ERR] _find_hist_page falhou:", e, flush=True)
+        return
+
     if hp is None:
         st.warning("Página de histórico não encontrada em /pages.")
+        print("[HIST-NONE] Nenhum arquivo de histórico encontrado em /pages", flush=True)
         return
-    # Streamlit novo (tem switch_page)
-    if hasattr(st, "switch_page"):
-        try:
-            st.switch_page(str(hp))
+
+    # Caminho relativo correto para páginas dentro de /pages (sem usar barra invertida na f-string)
+    rel = ("pages/" + hp.name).replace("\\", "/")
+
+    st.info("🔎 Abrindo Histórico via switch_page → " + rel)
+    print("[HIST-SP] tentando st.switch_page('" + rel + "')", flush=True)
+
+    # 1) switch_page
+    try:
+        if hasattr(st, "switch_page"):
+            st.switch_page(rel)
+            print("[HIST-SP-OK] switch_page executado para " + rel, flush=True)
             return
-        except Exception:
-            pass
-    # Fallback: oferece link clicável
+        else:
+            st.warning("switch_page() não disponível nesta versão do Streamlit.")
+            print("[HIST-SP-MISS] switch_page indisponível", flush=True)
+    except Exception as e:
+        st.warning(f"⚠️ Falha no switch_page('{rel}'): {e}")
+        print("[HIST-SP-FAIL]", e, flush=True)
+
+    # 2) Fallback: rota direta /historico (igual à barra lateral)
+    try:
+        st.info("🔁 Tentando fallback via rota absoluta /historico")
+        components.html(
+            """
+            <script>
+            (function(){
+              try{
+                var loc = (window.parent && window.parent.location) ? window.parent.location : window.location;
+                var target = (loc.origin || "") + "/historico";
+                console.warn("[HIST-JS] Redirecionando para", target);
+                loc.href = target;
+              }catch(e){
+                console.error("[HIST-JS] Falha no redirecionamento:", e);
+                try{ window.location.href = "/historico"; }catch(_){}
+              }
+            })();
+            </script>
+            """,
+            height=0, scrolling=False
+        )
+        return
+    except Exception as e:
+        st.warning("⚠️ Falha no fallback JS para /historico: " + str(e))
+        print("[HIST-FB-FAIL]", e, flush=True)
+
+    # 3) Último fallback: link clicável (relativo)
     st.markdown(
-        f"**Abra o histórico aqui:** [Abrir Histórico]({str(hp).replace('\\', '/')})  \n"
-        "Se o clique não abrir, use a barra lateral do Streamlit para entrar na página de histórico."
+        "**Abra o histórico aqui:** [Abrir Histórico](" + rel + ")  \n"
+        "Se não abrir, use a barra lateral do Streamlit."
     )
+    print("[HIST-LINK] Exibido link para " + rel, flush=True)
 
 # =========================
 # Topo (Time, Jogo, Tutorial, Histórico)
