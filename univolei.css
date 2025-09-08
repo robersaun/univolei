@@ -168,13 +168,9 @@ iframe[title^="streamlit-component"]{
 
   /* Quadra mais baixa */
   #uv-court-main, #uv-court-gm{ height:260px !important; }
-  
 
-  /* Conteúdo “mobile-only” visível só aqui */
+  /* Conteúdo “mobile-only” visível só aqui (por padrão) */
   .mobile-only{ display:block !important; }
-
-  /* Force-hide uv-mobile-only (avoid duplicate buttons on mobile) */
-.uv-mobile-only { display: none !important; }
 
   /* Botões HTML auxiliares (linhas mobile) */
   #gm-mob-players, #gm-mob-quick{ margin:2px 0 !important; }
@@ -186,10 +182,15 @@ iframe[title^="streamlit-component"]{
   }
   .uv-btn.adv{ background:#263238; color:#fff; border-color:#000; opacity:.95; }
   .uv-btn.rede{ background:#ffe5e5; border-color:#ffb0b0; }
+
+  /* Importante: no MODO JOGO, esconder blocos HTML auxiliares
+     para não duplicar “Jogadoras”/“Atalhos” em telas pequenas */
+  .gm-tight .uv-mobile-only { display: none !important; }
 }
 
 /* Regras contra min-width do Streamlit em layout estreito */
 @media (max-width:640px){
+  /* versões antigas */
   [data-testid="stColumn"]{
     min-width:0 !important; width:auto !important; flex:0 0 auto !important;
   }
@@ -199,12 +200,21 @@ iframe[title^="streamlit-component"]{
   [class*="st-emotion-cache"][data-testid="stColumn"]{
     min-width:0 !important; width:auto !important; flex:0 0 auto !important;
   }
+  /* versões novas – seletor mais genérico */
+  [data-testid*="column"],
+  [class*="st-emotion-cache"][data-testid*="column"]{
+    min-width:0 !important; width:auto !important; flex:0 0 auto !important;
+  }
+
+  /* Botões em colunas não devem ocupar 100% no mobile */
   [data-testid="stColumn"] .stButton > button,
   [data-testid="stColumn"] button{
     width:auto !important; min-width:0 !important; display:inline-block !important;
   }
+
   [data-testid="stHorizontalBlock"]{ align-items:flex-start !important; gap:6px !important; }
 }
+
 /* Tira altura mínima herdada quando há iframes vazios (desktop) */
 .element-container:has(> iframe) > div { min-height: 0 !important; }
 
@@ -221,61 +231,68 @@ iframe[title^="streamlit-component"]{
 /* =========================
    DENSIDADE MÁXIMA (desktop ≥ 992px)
    ========================= */
-   @media (min-width: 992px){
-    .block-container{ padding:.05rem 0 !important; }
-    .sectionCard{ padding:2px 4px !important; margin:2px 0 !important; }
-  
-    /* Menos ar entre blocos e colunas */
-    [data-testid="stVerticalBlock"] > div{ margin:2px 0 !important; }
-    [data-testid="stHorizontalBlock"]{ margin:2px 0 !important; gap:4px !important; }
-    .stColumn{ padding-left:1px !important; padding-right:1px !important; }
-  
-    /* Inputs e selects mais finos */
-    .stTextInput > div > div > input,
-    .stNumberInput input{ padding:.08rem 0 !important; }
-    .stSelectbox > div > div{ padding:.06rem 0 !important; }
-  
-    /* Radios mais colados */
-    div[role="radiogroup"] > label{ margin-right:.25rem !important; }
-  
-    /* Botões menores */
-    .stButton button{
-      padding:.14rem .35rem !important;
-      font-size:.78rem !important;
-      line-height:1.1 !important;
-    }
-  
-    /* Tabelas mais densas */
-    .custom-table, .kpi-table{ font-size:.72rem !important; }
-    .custom-table th, .custom-table td,
-    .kpi-table th, .kpi-table td{ padding:2px 3px !important; }
-  
-    /* Placar mais enxuto */
-    .score-team{ font-size:14px !important; }
-    .score-points{ font-size:44px !important; }
-    .score-x{ font-size:26px !important; padding-top:4px !important; }
-    .set-summary{ font-size:1rem !important; }
-  
-    /* Quadra menor no desktop */
-    #uv-court-main, #uv-court-gm{ height:320px !important; }
+@media (min-width: 992px){
+  .block-container{ padding:.05rem 0 !important; }
+  .sectionCard{ padding:2px 4px !important; margin:2px 0 !important; }
+
+  /* Menos ar entre blocos e colunas */
+  [data-testid="stVerticalBlock"] > div{ margin:2px 0 !important; }
+  [data-testid="stHorizontalBlock"]{ margin:2px 0 !important; gap:4px !important; }
+  .stColumn{ padding-left:1px !important; padding-right:1px !important; }
+
+  /* Inputs e selects mais finos */
+  .stTextInput > div > div > input,
+  .stNumberInput input{ padding:.08rem 0 !important; }
+  .stSelectbox > div > div{ padding:.06rem 0 !important; }
+
+  /* Radios mais colados */
+  div[role="radiogroup"] > label{ margin-right:.25rem !important; }
+
+  /* Botões menores */
+  .stButton button{
+    padding:.14rem .35rem !important;
+    font-size:.78rem !important;
+    line-height:1.1 !important;
   }
-  
 
-/* === Fix: evitar duplicação no mobile (Modo Jogo) ===
-   Oculta os blocos HTML auxiliares (.uv-mobile-only) quando estamos no Modo Jogo.
-   Isso remove a duplicidade de "Jogadoras" e "Atalhos" em telas <=480px. */
-@media (max-width: 480px){
-  .gm-tight .uv-mobile-only { display: none !important; }
+  /* Tabelas mais densas */
+  .custom-table, .kpi-table{ font-size:.72rem !important; }
+  .custom-table th, .custom-table td,
+  .kpi-table th, .kpi-table td{ padding:2px 3px !important; }
+
+  /* Placar mais enxuto */
+  .score-team{ font-size:14px !important; }
+  .score-points{ font-size:44px !important; }
+  .score-x{ font-size:26px !important; padding-top:4px !important; }
+  .set-summary{ font-size:1rem !important; }
+
+  /* Quadra menor no desktop */
+  #uv-court-main, #uv-court-gm{ height:320px !important; }
 }
-
 
 /* === Game Mode mobile: use only HTML buttons (avoid duplication) === */
-@media (max-width: 480px){
+@media (max-width: 640px){
   .gm-tight .gm-desktop-only { display: none !important; }
 }
+
 /* === Extra compaction for game mode (both desktop & mobile) === */
 .gm-tight .block-container{ padding:.02rem 4px !important; }
 .gm-tight [data-testid="stVerticalBlock"] > div{ margin:1px 0 !important; }
 .gm-tight [data-testid="stHorizontalBlock"]{ margin:2px 0 !important; gap:4px !important; }
 .gm-tight .stButton button{ padding:.12rem .28rem !important; }
 .gm-tight div[role="radiogroup"] > label{ margin-right:.25rem !important; }
+
+/* === GARANTIA (independente de testIDs): 
+       no Modo Jogo + mobile, botões SEMPRE lado a lado e compactos === */
+@media (max-width:640px){
+  .gm-tight .stButton > button,
+  .gm-tight button,
+  .gm-tight [data-testid^="baseButton-"]{
+    width:auto !important;
+    min-width:0 !important;
+    display:inline-block !important;
+    padding:6px 8px !important;
+    font-size:13px !important;
+    line-height:1 !important;
+  }
+}
