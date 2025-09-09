@@ -269,5 +269,20 @@ iframe[title^="streamlit-component"]{
 }
 /* ====== FIM ANTI-DUPLICAÇÃO ====== */
 
-/* Oculta completamente barras HTML compactas (botões menores) em todas as versões */
+
+
+/* ====== FIX RENDER: impedir que st.button ocupe 100% da largura ====== */
+.stButton > button{
+  width:auto !important;
+  display:inline-flex !important;
+  align-items:center;
+  white-space:nowrap;
+}
+.stButton{ display:inline-block !important; margin:2px 4px !important; }
+/* ====== FIM FIX RENDER ====== */
+
+/* Ocultar definitivamente os botões HTML compactos (em qualquer device) */
 .uv-mobile-only{ display:none !important; }
+
+/* Mostrar blocos desktop sempre; HTML compacto fica oculto */
+.gm-desktop-only{ display: initial !important; }

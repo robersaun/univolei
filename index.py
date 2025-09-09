@@ -1380,25 +1380,25 @@ if st.session_state._do_rerun_after:
 # PLACAR (top)
 # =========================
 with st.container():
-    st.markdown('<div class="sectionCard">', unsafe_allow_html=True)
-
-    frames = st.session_state.frames
-    df_set = current_set_df(frames, st.session_state.match_id, st.session_state.set_number)
-    home_pts, away_pts = set_score_from_df(df_set)
-    stf = frames["sets"]; sm = stf[stf["match_id"] == st.session_state.match_id]
-    home_sets_w = int((sm["winner_team_id"] == 1).sum()); away_sets_w = int((sm["winner_team_id"] == 2).sum())
-
-    pc1, pc2, pc3, pc4 = st.columns([1.1, .8, 1.1, 2.2])
-    with pc1:
-        st.markdown(f"<div class='score-box'><div class='score-team'>{home_name}</div><div class='score-points'>{home_pts}</div></div>", unsafe_allow_html=True)
-    with pc2:
-        st.markdown("<div class='score-box'><div class='score-x'>×</div></div>", unsafe_allow_html=True)
-    with pc3:
-        st.markdown(f"<div class='score-box'><div class='score-team'>{away_name}</div><div class='score-points'>{away_pts}</div></div>", unsafe_allow_html=True)
-    with pc4:
-        st.markdown(f"<div class='set-summary'>Sets: <b>{home_sets_w}</b> × <b>{away_sets_w}</b> &nbsp;|&nbsp; Set atual: <b>{st.session_state.set_number}</b></div>", unsafe_allow_html=True)
-
-    st.markdown('</div>', unsafe_allow_html=True)
+    if not st.session_state.game_mode:
+        st.markdown('<div class="sectionCard">', unsafe_allow_html=True)
+        frames = st.session_state.frames
+        df_set = current_set_df(frames, st.session_state.match_id, st.session_state.set_number)
+        home_pts, away_pts = set_score_from_df(df_set)
+        stf = frames["sets"]; sm = stf[stf["match_id"] == st.session_state.match_id]
+        home_sets_w = int((sm["winner_team_id"] == 1).sum()); away_sets_w = int((sm["winner_team_id"] == 2).sum())
+        
+        pc1, pc2, pc3, pc4 = st.columns([1.1, .8, 1.1, 2.2])
+        with pc1:
+            st.markdown(f"<div class='score-box'><div class='score-team'>{home_name}</div><div class='score-points'>{home_pts}</div></div>", unsafe_allow_html=True)
+        with pc2:
+            st.markdown("<div class='score-box'><div class='score-x'>×</div></div>", unsafe_allow_html=True)
+        with pc3:
+            st.markdown(f"<div class='score-box'><div class='score-team'>{away_name}</div><div class='score-points'>{away_pts}</div></div>", unsafe_allow_html=True)
+        with pc4:
+            st.markdown(f"<div class='set-summary'>Sets: <b>{home_sets_w}</b> × <b>{away_sets_w}</b> &nbsp;|&nbsp; Set atual: <b>{st.session_state.set_number}</b></div>", unsafe_allow_html=True)
+            
+        st.markdown('</div>', unsafe_allow_html=True)
 
 # =========================
 # MODO JOGO
@@ -1530,8 +1530,6 @@ if st.session_state.game_mode:
                 pass
         # >>> FIM MOBILE (VISUAL) – Jogadoras + ADV (SEM IFRAME)
 
-
-
         # Atalhos
         st.markdown("**Atalhos**")
         atalho_specs = [
@@ -1608,16 +1606,24 @@ if st.session_state.game_mode:
         try:
             
         # --- Linha do placar (logo acima da quadra) ---
-            _df_for_score = df_hm if 'df_hm' in locals() else current_set_df(st.session_state.frames, st.session_state.match_id, st.session_state.set_number)
-            _home_pts, _away_pts = set_score_from_df(_df_for_score)
-            _set_raw = st.session_state.get("set_number")
-            _setn = 1
-            if _set_raw is not None:
-                _s = str(_set_raw).strip()
-                if _s.isdigit():
-                    _setn = int(_s)
-            st.markdown(f"**Set {_setn} — Placar: {_home_pts} x {_away_pts}**")
+            # --- Scoreboard (modo jogo) exatamente como no topo, porém acima da quadra ---
+            _frames = st.session_state.frames
+            _df_set = current_set_df(_frames, st.session_state.match_id, st.session_state.set_number)
+            _home_pts, _away_pts = set_score_from_df(_df_set)
+            _stf = _frames["sets"]
+            _sm = _stf[_stf["match_id"] == st.session_state.match_id]
+            _home_sets_w = int((_sm["winner_team_id"] == 1).sum())
+            _away_sets_w = int((_sm["winner_team_id"] == 2).sum())
 
+            pc1, pc2, pc3, pc4 = st.columns([1.1, .8, 1.1, 2.2])
+            with pc1:
+                st.markdown(f"<div class='score-box'><div class='score-team'>Univolei</div><div class='score-points'>{_home_pts}</div></div>", unsafe_allow_html=True)
+            with pc2:
+                st.markdown("<div class='score-box'><div class='score-x'>×</div></div>", unsafe_allow_html=True)
+            with pc3:
+                st.markdown(f"<div class='score-box'><div class='score-team'>Adversário</div><div class='score-points'>{_away_pts}</div></div>", unsafe_allow_html=True)
+            with pc4:
+                st.markdown(f"<div class='set-summary'>Sets: <b>{_home_sets_w} × {_away_sets_w}</b> | Set atual: <b>{st.session_state.set_number}</b></div>", unsafe_allow_html=True)
             df_hm = current_set_df(st.session_state.frames, st.session_state.match_id, st.session_state.set_number)
         except Exception:
             df_hm = None
@@ -2018,3 +2024,10 @@ if __name__ == "__main__":
     if not st.session_state.get("_boot_rerun_done", False):
         st.session_state["_boot_rerun_done"] = True
         st.rerun()
+        
+        
+        
+        
+        
+        
+        
