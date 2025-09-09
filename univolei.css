@@ -268,3 +268,6 @@ iframe[title^="streamlit-component"]{
   body:has(#gm-mob-quick)   .gm-desktop-only{ display:none !important; }
 }
 /* ====== FIM ANTI-DUPLICAÇÃO ====== */
+
+/* Oculta completamente barras HTML compactas (botões menores) em todas as versões */
+.uv-mobile-only{ display:none !important; }

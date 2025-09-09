@@ -1482,49 +1482,52 @@ if st.session_state.game_mode:
             st.caption("Sem jogadoras")
 
         # >>> MOBILE (VISUAL) – Jogadoras + ADV (SEM IFRAME)
-        try:
-            _labels_players = []
-            for _n in nums or []:
-                _lab = str(_n) if st.session_state.player_label_mode == "Número" else (name_map.get(_n) or str(_n))
-                _labels_players.append(_lab)
+        if False:
+            try:
+                _labels_players = []
+                for _n in nums or []:
+                    _lab = str(_n) if st.session_state.player_label_mode == "Número" else (name_map.get(_n) or str(_n))
+                    _labels_players.append(_lab)
 
-            import html as _html
-            _btns = []
-            for _lab in _labels_players:
-                _lab_esc = _html.escape(str(_lab))
-                _btns.append(f'<button class="uv-btn" onclick="uvMobClick(\\'{_lab_esc}\\')">{_lab_esc}</button>')
-            _btns.append('<button class="uv-btn adv" onclick="uvMobClick(\\'ADV\\')">ADV</button>')
+                import html as _html
+                _btns = []
+                for _lab in _labels_players:
+                    _lab_esc = _html.escape(str(_lab))
+                    _btns.append(f"<button class='uv-btn' onclick='uvMobClick(\"{_lab_esc}\")'>{_lab_esc}</button>")
+                _btns.append("<button class='uv-btn adv' onclick='uvMobClick(\"ADV\")'>ADV</button>")
 
-            st.markdown(\"\"\"
-        <div class="uv-mobile-only" style="margin:0;">
-        <div class="uv-row" id="gm-mob-players" style="margin:4px 0 4px 0;">
-            \"\"\" + \"\"\"\"\"\".join(_btns) + \"\"\"
-        </div>
-        </div>
-        <script>
-        (function(){
-        function uvMobClick(txt){
-            try{
-            var doc;
-            try{
-              doc = (window.parent && window.parent.document) ? window.parent.document : document;
-            }catch(e){
-              doc = document;
-            }
-            const t = (txt||'').toString().trim();
-            const btns = Array.from(doc.querySelectorAll('button'));
-            const target = btns.find(b => (b.textContent||'').trim() === t);
-            if(target) target.click();
-            }catch(e){ console.log('uvMobClick error', e); }
-        }
-        // expõe 1x
-        if(typeof window.uvMobClick!=='function'){ window.uvMobClick = uvMobClick; }
-        })();
-        </script>
-        \"\"\", unsafe_allow_html=True)
+                components.html(
+                    """
+                    <div class="uv-mobile-only" style="margin:0;">
+                      <div class="uv-row" id="gm-mob-players" style="margin:4px 0 4px 0;">
+                    """ + "".join(_btns) + """
+                      </div>
+                    </div>
+                    <script>
+                    (function(){
+                      function uvMobClick(txt){
+                        try{
+                          var doc;
+                          try{
+                            doc = (window.parent && window.parent.document) ? window.parent.document : document;
+                          }catch(e){
+                            doc = document;
+                          }
+                          const t = (txt||'').toString().trim();
+                          const btns = Array.from(doc.querySelectorAll('button'));
+                          const target = btns.find(b => (b.textContent||'').trim() === t);
+                          if(target) target.click();
+                        }catch(e){ console.log('uvMobClick error', e); }
+                      }
+                      if(typeof window.uvMobClick!=='function'){ window.uvMobClick = uvMobClick; }
+                    })();
+                    </script>
+                    """,
+                    height=0, scrolling=False
+                )
 
-        except Exception:
-            pass
+            except Exception:
+                pass
         # >>> FIM MOBILE (VISUAL) – Jogadoras + ADV (SEM IFRAME)
 
 
@@ -1555,44 +1558,48 @@ if st.session_state.game_mode:
         _paint_adv_rede_buttons()
 
         # >>> MOBILE (VISUAL) – Atalhos (SEM IFRAME)
-        try:
-            import html as _html
-            _btns2 = []
-            for _code, _label in atalho_specs:
-                _lab_esc = _html.escape(str(_label))
-                cls = "uv-btn rede" if str(_label).strip().lower()=="rede" else "uv-btn"
-                _btns2.append(f'<button class="{cls}" onclick="uvMobClick(\\'{_lab_esc}\\')">{_lab_esc}</button>')
+        if False:
+            try:
+                import html as _html
+                _btns2 = []
+                for _code, _label in atalho_specs:
+                    _lab_esc = _html.escape(str(_label))
+                    cls = "uv-btn rede" if str(_label).strip().lower()=="rede" else "uv-btn"
+                    _btns2.append(f"<button class='{cls}' onclick='uvMobClick(\"{_lab_esc}\")'>{_lab_esc}</button>")
 
-            st.markdown(\"\"\"
-        <div class="uv-mobile-only" style="margin:0;">
-        <div class="uv-row" id="gm-mob-quick" style="margin:4px 0 6px 0;">
-            \"\"\" + \"\"\"\"\"\".join(_btns2) + \"\"\"
-        </div>
-        </div>
-        <script>
-        (function(){
-        if(typeof window.uvMobClick!=='function'){
-            window.uvMobClick = function(txt){
-            try{
-                var doc;
-                try{
-                  doc = (window.parent && window.parent.document) ? window.parent.document : document;
-                }catch(e){
-                  doc = document;
-                }
-                const t = (txt||'').toString().trim();
-                const btns = Array.from(doc.querySelectorAll('button'));
-                const target = btns.find(b => (b.textContent||'').trim() === t);
-                if(target) target.click();
-            }catch(e){ console.log('uvMobClick error', e); }
-            };
-        }
-        })();
-        </script>
-        \"\"\", unsafe_allow_html=True)
+                components.html(
+                    """
+                    <div class="uv-mobile-only" style="margin:0;">
+                      <div class="uv-row" id="gm-mob-quick" style="margin:4px 0 6px 0;">
+                    """ + "".join(_btns2) + """
+                      </div>
+                    </div>
+                    <script>
+                    (function(){
+                      if(typeof window.uvMobClick!=='function'){
+                        window.uvMobClick = function(txt){
+                          try{
+                            var doc;
+                            try{
+                              doc = (window.parent && window.parent.document) ? window.parent.document : document;
+                            }catch(e){
+                              doc = document;
+                            }
+                            const t = (txt||'').toString().trim();
+                            const btns = Array.from(doc.querySelectorAll('button'));
+                            const target = btns.find(b => (b.textContent||'').trim() === t);
+                            if(target) target.click();
+                          }catch(e){ console.log('uvMobClick error', e); }
+                        };
+                      }
+                    })();
+                    </script>
+                    """,
+                    height=0, scrolling=False
+                )
 
-        except Exception:
-            pass
+            except Exception:
+                pass
         # >>> FIM MOBILE (VISUAL) – Atalhos (SEM IFRAME)
 
         # ===== Encerramento da UI do Modo Jogo para esconder o restante =====
