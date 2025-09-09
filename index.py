@@ -103,7 +103,8 @@ def _paint_adv_rede_buttons():
         }
         const map = [
           {text:'adv',  bg:'rgba(255,0,255,0.20)', border:'rgba(160,0,160,0.55)'},
-          {text:'rede', bg:'rgba(220,50,50,0.18)', border:'rgba(160,20,20,0.55)'}
+          {text:'rede', bg:'rgba(220,50,50,0.18)', border:'rgba(160,20,20,0.55)'},
+          {text:'refazer', bg:'rgba(240,60,60,0.25)', border:'rgba(180,30,30,0.70)'}
         ];
         const btns = Array.from(doc.querySelectorAll('button'));
         btns.forEach(b=>{
@@ -1543,6 +1544,7 @@ if st.session_state.game_mode:
             ("b",    "Bloq"),
             ("sa",   "Saque"),
             ("rede", "Rede"),
+            ("redo", "Refazer"),
         ]
         acols = st.columns(12)
         for i, (code, label) in enumerate(atalho_specs):
@@ -1845,6 +1847,7 @@ with st.container():
             ("b",    "Bloq"),
             ("sa",   "Saque"),
             ("rede", "Rede"),
+            ("redo", "Refazer"),
         ]
         acols = st.columns(12)
         for i, (code, label) in enumerate(atalho_specs):

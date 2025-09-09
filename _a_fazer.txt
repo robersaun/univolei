@@ -82,6 +82,14 @@ Nossos acertos", value=True, key="gm_show_succ")
             "Mostrar número/ADV nas bolinhas",
             value
 
+
+-----------------------------
+TEMOS NOSSA PRIMEIRA VERSAO ESTAVEL, mas ainda temos bastante a ajustar.
+1. veja a imagem que enviei, a do lado esquerdo é com zoom normal no celular, preciso que a quadra fique ajustável ao tamanho da largura do celular, que os botoes das jogadoras façam duas linhas (uma embaixo da outra e se necessario os botoes atalho tb. estes botoes, o placar e a quadra sao o foco principal. Pode fazer isso que pedi e se possível aumentar a fonte deles, diminuindo ainda mais os espaços. TOME EXTREMO CUIDADO AO FAZER ESSES AJUSTES E NAO REPITA ERROS, MUITO MENOS OS DE DUPLICACOES DE BOTOES. vou te enviar meus codigos atuais, mas sao os que vc me ajudou a gerar.
+ao lado do botao rede, coloque de novo o refazer rally, em um tom um pouco mais forte, vermelho mesmo
+obs: a imagem separada que vou enviar é do mobile do browser, se ficasse assim acho que já estaria bom, mas sei que vc pode melhorar e usar esta img como base para o que estou pedindo
+consegue ajustar apenas isso, sem erros novos ou velhos de caracteres, mantendo as funcoes mobile fechando aspas certinho e sem errar ou retirar nada, me enviando o codigo final e completo para download?
+
 -----------------------------
 
 melhore visivivelmente essa pagina de historico em anexo com algumas coires e melhor layoyt

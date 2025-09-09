@@ -271,3 +271,25 @@ iframe[title^="streamlit-component"]{
 
 /* Oculta completamente barras HTML compactas (botões menores) em todas as versões */
 .uv-mobile-only{ display:none !important; }
+
+
+/* ===== MOBILE: duas linhas para botões (jogadoras/atalhos) e fontes maiores ===== */
+@media (max-width: 480px){
+  [data-testid="stHorizontalBlock"]{ flex-wrap: wrap !important; }
+  [data-testid="stHorizontalBlock"] > div:has(button){
+    flex: 0 0 calc(100% / 6) !important;
+    max-width: calc(100% / 6) !important;
+    min-width: calc(100% / 6) !important;
+  }
+  [data-testid="stHorizontalBlock"] .stButton > button,
+  [data-testid="stHorizontalBlock"] button{
+    font-size: 14px !important;
+    line-height: 1.15 !important;
+    padding: 6px 8px !important;
+    margin: 2px 0 !important;
+    width: 100% !important;
+  }
+  .score-points{ font-size: 44px !important; }
+  .score-team{ font-size: 14px !important; }
+  .set-summary{ font-size: .98rem !important; }
+}
