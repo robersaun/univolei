@@ -140,18 +140,18 @@ def load_css(filename: str = "univolei.css"):
 _css_path = load_css("univolei.css")
 st.caption(f"CSS carregado: {'SIM' if _css_path else 'NÃO'}  {(_css_path or '')}")
 st.markdown('<span class="uv-css-ok" style="display:none">CSS OK</span>', unsafe_allow_html=True)
-
-# Marca as linhas corretas no DOM (Jogadoras / Atalhos) para aplicar CSS no mobile
 st.markdown("""
 <script>
 (function(){
+  const N = 6; // botões por linha (troque para 5 se quiser 5 por linha)
+
   function addRowClassByTitle(substr, cls){
-    // Procura um Markdown container cujo texto contenha 'substr' (ex: "Jogadoras", "Atalhos")
+    // Encontra o título (ex.: "Jogadoras", "Atalhos")
     const md = [...document.querySelectorAll('div[data-testid="stMarkdownContainer"]')]
       .find(el => (el.innerText || '').toLowerCase().includes(substr.toLowerCase()));
     if(!md) return false;
 
-    // Acha o próximo bloco horizontal (st.columns) após esse título e aplica a classe 'cls'
+    // Pega o bloco de colunas logo após o título e marca com a classe
     let sib = md.parentElement;
     for(let i=0;i<30 && sib;i++){
       sib = sib.nextElementSibling;
@@ -163,28 +163,58 @@ st.markdown("""
     return false;
   }
 
-  function tagOnce(){
-    try{
-      const ok1 = addRowClassByTitle('Jogadoras', 'gm-players-row');
-      const ok2 = addRowClassByTitle('Atalhos',   'gm-quick-row');
-      console.log('[uv] tag rows:', {ok1, ok2});
-    }catch(e){ console.log('[uv] tag error', e); }
+  function forceGrid(){
+    // Seleciona o stHorizontalBlock das duas linhas, mesmo que haja wrappers
+    const rows = document.querySelectorAll(
+      '.gm-players-row[data-testid="stHorizontalBlock"], .gm-players-row div[data-testid="stHorizontalBlock"],' +
+      '.gm-quick-row[data-testid="stHorizontalBlock"],  .gm-quick-row  div[data-testid="stHorizontalBlock"]'
+    );
+
+    rows.forEach(row=>{
+      // Força o container a ser um grid flex com wrap
+      row.style.setProperty('display','flex','important');
+      row.style.setProperty('flex-wrap','wrap','important');
+      row.style.setProperty('gap','6px','important');
+      row.style.setProperty('align-items','stretch','important');
+
+      // Cada coluna ocupa 1/N da largura
+      row.querySelectorAll('div[data-testid="column"]').forEach(col=>{
+        col.style.setProperty('flex', `0 0 calc(100%/${N})`, 'important');
+        col.style.setProperty('width', `calc(100%/${N})`, 'important');
+        col.style.setProperty('max-width', `calc(100%/${N})`, 'important');
+        col.style.setProperty('min-width', '0', 'important');
+        col.style.setProperty('box-sizing', 'border-box', 'important');
+      });
+
+      // Botão preenche a célula (pílula)
+      row.querySelectorAll('.stButton > button').forEach(btn=>{
+        btn.style.setProperty('width','100%','important');
+        btn.style.setProperty('display','inline-flex','important');
+        btn.style.setProperty('align-items','center','important');
+        btn.style.setProperty('justify-content','center','important');
+        btn.style.setProperty('border-radius','9999px','important');
+      });
+    });
   }
 
-  // Debounce para re-render do Streamlit
-  let timer = null;
-  const run = () => { clearTimeout(timer); timer = setTimeout(tagOnce, 80); };
+  function apply(){
+    const ok1 = addRowClassByTitle('Jogadoras', 'gm-players-row');
+    const ok2 = addRowClassByTitle('Atalhos',   'gm-quick-row');
+    forceGrid();
+    console.log('[uv] grid fix', {ok1, ok2});
+  }
+
+  // Debounce para re-renders do Streamlit
+  let t = null;
+  const run = () => { clearTimeout(t); t = setTimeout(apply, 60); };
 
   if (document.readyState !== 'loading') run();
   else document.addEventListener('DOMContentLoaded', run);
 
-  // Observa mudanças no app (Streamlit re-render) e re-aplica
-  const obs = new MutationObserver(run);
-  obs.observe(document.body, {childList:true, subtree:true});
+  new MutationObserver(run).observe(document.body, {childList:true, subtree:true});
 })();
 </script>
 """, unsafe_allow_html=True)
-
 
 # === CSS anti-gap para QUALQUER iframe de components.html ===
 st.markdown("""
