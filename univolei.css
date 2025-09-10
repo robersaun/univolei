@@ -409,3 +409,4 @@ iframe[title^="streamlit-component"]{
   }
 }
 /* ===== END: MOBILE GAME – SET BUTTONS LIKE TOP TOOLBAR (FINAL) ===== */
+.uv-css-ok{ display:inline-block !important; background:#16a34a; color:#fff; padding:2px 8px; border-radius:9999px; font-size:.75rem; }

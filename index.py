@@ -129,18 +129,18 @@ def _paint_adv_rede_buttons():
 # CSS externo
 # =========================
 BASE_DIR = Path(__file__).parent.resolve()
-
 def load_css(filename: str = "univolei.css"):
-    # Tenta no diretório do arquivo e, em seguida, no diretório de trabalho (Render pode variar)
     for css_path in (BASE_DIR / filename, Path.cwd() / filename):
         if css_path.exists():
             st.markdown(f"<style>{css_path.read_text(encoding='utf-8')}</style>", unsafe_allow_html=True)
-            return True
-    # (Opcional) log no console para diagnóstico sem quebrar a execução
+            return str(css_path)  # caminho efetivamente usado
     print(f"[load_css] CSS não encontrado: {filename} | BASE_DIR={BASE_DIR} | CWD={Path.cwd()}")
-    return False
+    return None
 
-load_css("univolei.css")
+_css_path = load_css("univolei.css")
+st.caption(f"CSS carregado: {'SIM' if _css_path else 'NÃO'}  {(_css_path or '')}")
+st.markdown('<span class="uv-css-ok" style="display:none">CSS OK</span>', unsafe_allow_html=True)
+
 
 # === CSS anti-gap para QUALQUER iframe de components.html ===
 st.markdown("""
