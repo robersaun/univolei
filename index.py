@@ -103,8 +103,7 @@ def _paint_adv_rede_buttons():
         }
         const map = [
           {text:'adv',  bg:'rgba(255,0,255,0.20)', border:'rgba(160,0,160,0.55)'},
-          {text:'rede', bg:'rgba(220,50,50,0.18)', border:'rgba(160,20,20,0.55)'},
-          {text:'refazer', bg:'rgba(240,60,60,0.25)', border:'rgba(180,30,30,0.70)'}
+          {text:'rede', bg:'rgba(220,50,50,0.18)', border:'rgba(160,20,20,0.55)'}
         ];
         const btns = Array.from(doc.querySelectorAll('button'));
         btns.forEach(b=>{
@@ -1378,17 +1377,19 @@ if st.session_state._do_rerun_after:
     st.rerun()
 
 # =========================
-# PLACAR (top)
-# =========================
-with st.container():
-    if not st.session_state.game_mode:
+# PLACAR (top) – visível fora do Modo Jogo
+if not st.session_state.game_mode:
+    # =========================
+    with st.container():
         st.markdown('<div class="sectionCard">', unsafe_allow_html=True)
+
         frames = st.session_state.frames
         df_set = current_set_df(frames, st.session_state.match_id, st.session_state.set_number)
         home_pts, away_pts = set_score_from_df(df_set)
         stf = frames["sets"]; sm = stf[stf["match_id"] == st.session_state.match_id]
         home_sets_w = int((sm["winner_team_id"] == 1).sum()); away_sets_w = int((sm["winner_team_id"] == 2).sum())
-        
+
+        st.markdown('<div class="gm-score-row">', unsafe_allow_html=True)
         pc1, pc2, pc3, pc4 = st.columns([1.1, .8, 1.1, 2.2])
         with pc1:
             st.markdown(f"<div class='score-box'><div class='score-team'>{home_name}</div><div class='score-points'>{home_pts}</div></div>", unsafe_allow_html=True)
@@ -1398,8 +1399,9 @@ with st.container():
             st.markdown(f"<div class='score-box'><div class='score-team'>{away_name}</div><div class='score-points'>{away_pts}</div></div>", unsafe_allow_html=True)
         with pc4:
             st.markdown(f"<div class='set-summary'>Sets: <b>{home_sets_w}</b> × <b>{away_sets_w}</b> &nbsp;|&nbsp; Set atual: <b>{st.session_state.set_number}</b></div>", unsafe_allow_html=True)
-            
+
         st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # =========================
 # MODO JOGO
@@ -1454,6 +1456,7 @@ if st.session_state.game_mode:
             )
 
         # Linha de botões de jogadoras + ADV
+        st.markdown('<div class="gm-players-row">', unsafe_allow_html=True)
         st.caption("Jogadoras (toque rápido define lado = Nós)")
         nums = resolve_our_roster_numbers(st.session_state.frames)
         name_map = {r["number"]: r["name"] for r in roster_for_ui(st.session_state.frames)}
@@ -1482,6 +1485,7 @@ if st.session_state.game_mode:
         else:
             st.caption("Sem jogadoras")
 
+        st.markdown('</div>', unsafe_allow_html=True)
         # >>> MOBILE (VISUAL) – Jogadoras + ADV (SEM IFRAME)
         if False:
             try:
@@ -1531,7 +1535,9 @@ if st.session_state.game_mode:
                 pass
         # >>> FIM MOBILE (VISUAL) – Jogadoras + ADV (SEM IFRAME)
 
+
         # Atalhos
+        st.markdown('<div class="gm-quick-row">', unsafe_allow_html=True)
         st.markdown("**Atalhos**")
         atalho_specs = [
             ("d",    "Diag"),
@@ -1544,7 +1550,6 @@ if st.session_state.game_mode:
             ("b",    "Bloq"),
             ("sa",   "Saque"),
             ("rede", "Rede"),
-            ("redo", "Refazer"),
         ]
         acols = st.columns(12)
         for i, (code, label) in enumerate(atalho_specs):
@@ -1557,6 +1562,7 @@ if st.session_state.game_mode:
 
         _paint_adv_rede_buttons()
 
+        st.markdown('</div>', unsafe_allow_html=True)
         # >>> MOBILE (VISUAL) – Atalhos (SEM IFRAME)
         if False:
             try:
@@ -1608,24 +1614,16 @@ if st.session_state.game_mode:
         try:
             
         # --- Linha do placar (logo acima da quadra) ---
-            # --- Scoreboard (modo jogo) exatamente como no topo, porém acima da quadra ---
-            _frames = st.session_state.frames
-            _df_set = current_set_df(_frames, st.session_state.match_id, st.session_state.set_number)
-            _home_pts, _away_pts = set_score_from_df(_df_set)
-            _stf = _frames["sets"]
-            _sm = _stf[_stf["match_id"] == st.session_state.match_id]
-            _home_sets_w = int((_sm["winner_team_id"] == 1).sum())
-            _away_sets_w = int((_sm["winner_team_id"] == 2).sum())
+            _df_for_score = df_hm if 'df_hm' in locals() else current_set_df(st.session_state.frames, st.session_state.match_id, st.session_state.set_number)
+            _home_pts, _away_pts = set_score_from_df(_df_for_score)
+            _set_raw = st.session_state.get("set_number")
+            _setn = 1
+            if _set_raw is not None:
+                _s = str(_set_raw).strip()
+                if _s.isdigit():
+                    _setn = int(_s)
+            st.markdown(f"**Set {_setn} — Placar: {_home_pts} x {_away_pts}**")
 
-            pc1, pc2, pc3, pc4 = st.columns([1.1, .8, 1.1, 2.2])
-            with pc1:
-                st.markdown(f"<div class='score-box'><div class='score-team'>Univolei</div><div class='score-points'>{_home_pts}</div></div>", unsafe_allow_html=True)
-            with pc2:
-                st.markdown("<div class='score-box'><div class='score-x'>×</div></div>", unsafe_allow_html=True)
-            with pc3:
-                st.markdown(f"<div class='score-box'><div class='score-team'>Adversário</div><div class='score-points'>{_away_pts}</div></div>", unsafe_allow_html=True)
-            with pc4:
-                st.markdown(f"<div class='set-summary'>Sets: <b>{_home_sets_w} × {_away_sets_w}</b> | Set atual: <b>{st.session_state.set_number}</b></div>", unsafe_allow_html=True)
             df_hm = current_set_df(st.session_state.frames, st.session_state.match_id, st.session_state.set_number)
         except Exception:
             df_hm = None
@@ -1647,6 +1645,57 @@ if st.session_state.game_mode:
             include_adv_errors=show_adv_errs_gm,
             return_debug=False
         )
+
+        # === Placar (GM) imediatamente acima da quadra — NAO MUDAR OU RETIRAR !!!
+
+
+        st.markdown('<div class="gm-score-row">', unsafe_allow_html=True)
+
+
+        frames = st.session_state.frames
+
+
+        df_set = current_set_df(frames, st.session_state.match_id, st.session_state.set_number)
+
+
+        home_pts, away_pts = set_score_from_df(df_set)
+
+
+        stf = frames["sets"]; sm = stf[stf["match_id"] == st.session_state.match_id]
+
+
+        home_sets_w = int((sm["winner_team_id"] == 1).sum()); away_sets_w = int((sm["winner_team_id"] == 2).sum())
+
+
+        sc1, sc2, sc3, sc4 = st.columns([1.1, .8, 1.1, 2.2])
+
+
+        with sc1:
+
+
+            st.markdown(f"<div class='score-box'><div class='score-team'>Univolei</div><div class='score-points'>{home_pts}</div></div>", unsafe_allow_html=True)
+
+
+        with sc2:
+
+
+            st.markdown("<div class='score-box'><div class='score-x'>×</div></div>", unsafe_allow_html=True)
+
+
+        with sc3:
+
+
+            st.markdown(f"<div class='score-box'><div class='score-team'>Adversário</div><div class='score-points'>{away_pts}</div></div>", unsafe_allow_html=True)
+
+
+        with sc4:
+
+
+            st.markdown(f"<div class='set-summary'>Sets: <b>{home_sets_w}</b> × <b>{away_sets_w}</b>  |  Set atual: <b>{st.session_state.set_number}</b></div>", unsafe_allow_html=True)
+
+
+        st.markdown('</div>', unsafe_allow_html=True)
+
 
         render_court_html(
             pts_succ, pts_errs, pts_adv, pts_adv_err,
@@ -1835,6 +1884,7 @@ with st.container():
             st.caption("Sem jogadoras cadastradas para o nosso time.")
 
         # Atalhos
+        st.markdown('<div class="gm-quick-row">', unsafe_allow_html=True)
         st.markdown("**Atalhos**")
         atalho_specs = [
             ("d",    "Diag"),
@@ -1847,7 +1897,6 @@ with st.container():
             ("b",    "Bloq"),
             ("sa",   "Saque"),
             ("rede", "Rede"),
-            ("redo", "Refazer"),
         ]
         acols = st.columns(12)
         for i, (code, label) in enumerate(atalho_specs):
@@ -2027,10 +2076,3 @@ if __name__ == "__main__":
     if not st.session_state.get("_boot_rerun_done", False):
         st.session_state["_boot_rerun_done"] = True
         st.rerun()
-        
-        
-        
-        
-        
-        
-        

@@ -269,41 +269,89 @@ iframe[title^="streamlit-component"]{
 }
 /* ====== FIM ANTI-DUPLICAÇÃO ====== */
 
-/* marker missing earlier; see previous cell for CSS content */
-
-
-/* ====== MOBILE RENDER FIXES (final) ====== */
-/* 1) Evita botões 100% de largura no Render (mantém pílulas) */
+/* ===== MOBILE GAME LAYOUT — stable wrappers ===== */
 @media (max-width: 640px){
-  .stButton > button{
-    width: auto !important;
-    min-width: 0 !important;
-    display: inline-flex !important;
-    align-items: center; justify-content: center;
-  }
-  /* 2) Linhas gerais podem quebrar para caber (Jogadoras/Atalhos) */
-  [data-testid="stHorizontalBlock"]{
+  .gm-players-row [data-testid="stHorizontalBlock"],
+  .gm-quick-row [data-testid="stHorizontalBlock"]{
     flex-wrap: wrap !important;
     gap: 6px !important;
   }
-  /* 3) Mas o PLACAR deve permanecer em uma única linha */
-  [data-testid="stHorizontalBlock"]:has(.score-box){
+  .gm-players-row [data-testid="stHorizontalBlock"] > div,
+  .gm-quick-row [data-testid="stHorizontalBlock"] > div{
+    flex: 0 0 calc(100%/6) !important;
+    max-width: calc(100%/6) !important;
+  }
+  .gm-players-row .stButton > button,
+  .gm-quick-row .stButton > button{
+    width: 100% !important;
+    font-size: 14px !important;
+    padding: 6px 0 !important;
+    line-height: 1.15 !important;
+  }
+
+  .btn-xxs .stButton > button{
+    padding: 4px 6px !important;
+    font-size: .78rem !important;
+    line-height: 1.1 !important;
+  }
+  [data-testid="stHorizontalBlock"]:has(.btn-xxs){ flex-wrap: nowrap !important; gap:6px !important; }
+
+  .score-points{ font-size: 36px !important; }
+  .score-team{ font-size: 13px !important; }
+  .score-x{ font-size: 22px !important; padding-top: 2px !important; }
+  .set-summary{ font-size: .95rem !important; white-space: nowrap !important; }
+  [data-testid="stHorizontalBlock"]:has(.score-box){ flex-wrap: nowrap !important; justify-content:center !important; }
+  [data-testid="stHorizontalBlock"]:has(.score-box) > div{ flex:0 0 auto !important; width:auto !important; }
+
+  .stRadio, .stSelectbox, .stNumberInput, .stTextInput{ font-size: 14px !important; margin: 2px 0 !important; }
+  .stRadio [role="radiogroup"]{ gap: 6px !important; }
+  .stSelectbox > div > div{ padding: .10rem .30rem !important; }
+}
+/* ===== END MOBILE GAME LAYOUT ===== */
+
+
+/* ===== MOBILE GAME LAYOUT — no :has dependencies (final) ===== */
+@media (max-width: 640px){
+  /* Players/Atalhos rows */
+  .gm-players-row [data-testid="stHorizontalBlock"],
+  .gm-quick-row [data-testid="stHorizontalBlock"]{
+    display:flex !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+  }
+  .gm-players-row [data-testid="stHorizontalBlock"] > div,
+  .gm-quick-row  [data-testid="stHorizontalBlock"] > div{
+    flex: 0 0 calc(100%/6) !important;
+    max-width: calc(100%/6) !important;
+  }
+  .gm-players-row .stButton > button,
+  .gm-quick-row  .stButton > button{
+    width: 100% !important;
+    font-size: 14px !important;
+    padding: 6px 0 !important;
+    line-height: 1.15 !important;
+  }
+
+  /* Scoreboard row stays inline */
+  .gm-score-row [data-testid="stHorizontalBlock"]{
+    display:flex !important;
     flex-wrap: nowrap !important;
     justify-content: center !important;
   }
-  [data-testid="stHorizontalBlock"]:has(.score-box) > div{
+  .gm-score-row [data-testid="stHorizontalBlock"] > div{
     flex: 0 0 auto !important;
     width: auto !important;
   }
-  /* 4) Grupo dos botões do SET (reabrir/fechar/remover) em linha e menores */
-  [data-testid="stHorizontalBlock"]:has(.btn-xxs){
-    flex-wrap: nowrap !important;
-    gap: 6px !important;
-  }
+  .gm-score-row .score-points{ font-size: 36px !important; }
+  .gm-score-row .score-team{ font-size: 13px !important; }
+  .gm-score-row .score-x{ font-size: 22px !important; padding-top: 2px !important; }
+  .gm-score-row .set-summary{ font-size: .95rem !important; white-space: nowrap !important; }
+
+  /* Set buttons smaller; align inline naturally via their container */
   .btn-xxs .stButton > button{
     padding: 4px 6px !important;
-    font-size: .75rem !important;
+    font-size: .78rem !important;
     line-height: 1.1 !important;
   }
 }
-/* ====== END MOBILE RENDER FIXES ====== */
+/* ===== END: MOBILE GAME LAYOUT — no :has ===== */
