@@ -130,92 +130,10 @@ def _paint_adv_rede_buttons():
 # =========================
 BASE_DIR = Path(__file__).parent.resolve()
 def load_css(filename: str = "univolei.css"):
-    for css_path in (BASE_DIR / filename, Path.cwd() / filename):
-        if css_path.exists():
-            st.markdown(f"<style>{css_path.read_text(encoding='utf-8')}</style>", unsafe_allow_html=True)
-            return str(css_path)  # caminho efetivamente usado
-    print(f"[load_css] CSS não encontrado: {filename} | BASE_DIR={BASE_DIR} | CWD={Path.cwd()}")
-    return None
-
-_css_path = load_css("univolei.css")
-st.caption(f"CSS carregado: {'SIM' if _css_path else 'NÃO'}  {(_css_path or '')}")
-st.markdown('<span class="uv-css-ok" style="display:none">CSS OK</span>', unsafe_allow_html=True)
-st.markdown("""
-<script>
-(function(){
-  const N = 6; // botões por linha (troque para 5 se quiser 5 por linha)
-
-  function addRowClassByTitle(substr, cls){
-    // Encontra o título (ex.: "Jogadoras", "Atalhos")
-    const md = [...document.querySelectorAll('div[data-testid="stMarkdownContainer"]')]
-      .find(el => (el.innerText || '').toLowerCase().includes(substr.toLowerCase()));
-    if(!md) return false;
-
-    // Pega o bloco de colunas logo após o título e marca com a classe
-    let sib = md.parentElement;
-    for(let i=0;i<30 && sib;i++){
-      sib = sib.nextElementSibling;
-      if(sib && sib.matches('div[data-testid="stHorizontalBlock"]')){
-        sib.classList.add(cls);
-        return true;
-      }
-    }
-    return false;
-  }
-
-  function forceGrid(){
-    // Seleciona o stHorizontalBlock das duas linhas, mesmo que haja wrappers
-    const rows = document.querySelectorAll(
-      '.gm-players-row[data-testid="stHorizontalBlock"], .gm-players-row div[data-testid="stHorizontalBlock"],' +
-      '.gm-quick-row[data-testid="stHorizontalBlock"],  .gm-quick-row  div[data-testid="stHorizontalBlock"]'
-    );
-
-    rows.forEach(row=>{
-      // Força o container a ser um grid flex com wrap
-      row.style.setProperty('display','flex','important');
-      row.style.setProperty('flex-wrap','wrap','important');
-      row.style.setProperty('gap','6px','important');
-      row.style.setProperty('align-items','stretch','important');
-
-      // Cada coluna ocupa 1/N da largura
-      row.querySelectorAll('div[data-testid="column"]').forEach(col=>{
-        col.style.setProperty('flex', `0 0 calc(100%/${N})`, 'important');
-        col.style.setProperty('width', `calc(100%/${N})`, 'important');
-        col.style.setProperty('max-width', `calc(100%/${N})`, 'important');
-        col.style.setProperty('min-width', '0', 'important');
-        col.style.setProperty('box-sizing', 'border-box', 'important');
-      });
-
-      // Botão preenche a célula (pílula)
-      row.querySelectorAll('.stButton > button').forEach(btn=>{
-        btn.style.setProperty('width','100%','important');
-        btn.style.setProperty('display','inline-flex','important');
-        btn.style.setProperty('align-items','center','important');
-        btn.style.setProperty('justify-content','center','important');
-        btn.style.setProperty('border-radius','9999px','important');
-      });
-    });
-  }
-
-  function apply(){
-    const ok1 = addRowClassByTitle('Jogadoras', 'gm-players-row');
-    const ok2 = addRowClassByTitle('Atalhos',   'gm-quick-row');
-    forceGrid();
-    console.log('[uv] grid fix', {ok1, ok2});
-  }
-
-  // Debounce para re-renders do Streamlit
-  let t = null;
-  const run = () => { clearTimeout(t); t = setTimeout(apply, 60); };
-
-  if (document.readyState !== 'loading') run();
-  else document.addEventListener('DOMContentLoaded', run);
-
-  new MutationObserver(run).observe(document.body, {childList:true, subtree:true});
-})();
-</script>
-""", unsafe_allow_html=True)
-
+    css_path = BASE_DIR / filename
+    if css_path.exists():
+        st.markdown(f"<style>{css_path.read_text(encoding='utf-8')}</style>", unsafe_allow_html=True)
+load_css("univolei.css")
 # === CSS anti-gap para QUALQUER iframe de components.html ===
 st.markdown("""
 <style>
@@ -1459,30 +1377,27 @@ if st.session_state._do_rerun_after:
     st.rerun()
 
 # =========================
-# PLACAR (top) – visível fora do Modo Jogo
-if not st.session_state.game_mode:
-    # =========================
-    with st.container():
-        st.markdown('<div class="sectionCard">', unsafe_allow_html=True)
+# PLACAR (top)
+# =========================
+with st.container():
+    st.markdown('<div class="sectionCard">', unsafe_allow_html=True)
 
-        frames = st.session_state.frames
-        df_set = current_set_df(frames, st.session_state.match_id, st.session_state.set_number)
-        home_pts, away_pts = set_score_from_df(df_set)
-        stf = frames["sets"]; sm = stf[stf["match_id"] == st.session_state.match_id]
-        home_sets_w = int((sm["winner_team_id"] == 1).sum()); away_sets_w = int((sm["winner_team_id"] == 2).sum())
+    frames = st.session_state.frames
+    df_set = current_set_df(frames, st.session_state.match_id, st.session_state.set_number)
+    home_pts, away_pts = set_score_from_df(df_set)
+    stf = frames["sets"]; sm = stf[stf["match_id"] == st.session_state.match_id]
+    home_sets_w = int((sm["winner_team_id"] == 1).sum()); away_sets_w = int((sm["winner_team_id"] == 2).sum())
 
-        st.markdown('<div class="gm-score-row">', unsafe_allow_html=True)
-        pc1, pc2, pc3, pc4 = st.columns([1.1, .8, 1.1, 2.2])
-        with pc1:
-            st.markdown(f"<div class='score-box'><div class='score-team'>{home_name}</div><div class='score-points'>{home_pts}</div></div>", unsafe_allow_html=True)
-        with pc2:
-            st.markdown("<div class='score-box'><div class='score-x'>×</div></div>", unsafe_allow_html=True)
-        with pc3:
-            st.markdown(f"<div class='score-box'><div class='score-team'>{away_name}</div><div class='score-points'>{away_pts}</div></div>", unsafe_allow_html=True)
-        with pc4:
-            st.markdown(f"<div class='set-summary'>Sets: <b>{home_sets_w}</b> × <b>{away_sets_w}</b> &nbsp;|&nbsp; Set atual: <b>{st.session_state.set_number}</b></div>", unsafe_allow_html=True)
+    pc1, pc2, pc3, pc4 = st.columns([1.1, .8, 1.1, 2.2])
+    with pc1:
+        st.markdown(f"<div class='score-box'><div class='score-team'>{home_name}</div><div class='score-points'>{home_pts}</div></div>", unsafe_allow_html=True)
+    with pc2:
+        st.markdown("<div class='score-box'><div class='score-x'>×</div></div>", unsafe_allow_html=True)
+    with pc3:
+        st.markdown(f"<div class='score-box'><div class='score-team'>{away_name}</div><div class='score-points'>{away_pts}</div></div>", unsafe_allow_html=True)
+    with pc4:
+        st.markdown(f"<div class='set-summary'>Sets: <b>{home_sets_w}</b> × <b>{away_sets_w}</b> &nbsp;|&nbsp; Set atual: <b>{st.session_state.set_number}</b></div>", unsafe_allow_html=True)
 
-        st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
 # =========================
@@ -1568,7 +1483,7 @@ if st.session_state.game_mode:
             st.caption("Sem jogadoras")
 
         st.markdown('</div>', unsafe_allow_html=True)
-        # >>> MOBILE (VISUAL) – Jogadoras + ADV (SEM IFRAME)
+         # >>> MOBILE (VISUAL) – Jogadoras + ADV (SEM IFRAME)
         if False:
             try:
                 _labels_players = []
@@ -1727,57 +1642,6 @@ if st.session_state.game_mode:
             include_adv_errors=show_adv_errs_gm,
             return_debug=False
         )
-
-        # === Placar (GM) imediatamente acima da quadra — NAO MUDAR OU RETIRAR !!!
-
-
-        st.markdown('<div class="gm-score-row">', unsafe_allow_html=True)
-
-
-        frames = st.session_state.frames
-
-
-        df_set = current_set_df(frames, st.session_state.match_id, st.session_state.set_number)
-
-
-        home_pts, away_pts = set_score_from_df(df_set)
-
-
-        stf = frames["sets"]; sm = stf[stf["match_id"] == st.session_state.match_id]
-
-
-        home_sets_w = int((sm["winner_team_id"] == 1).sum()); away_sets_w = int((sm["winner_team_id"] == 2).sum())
-
-
-        sc1, sc2, sc3, sc4 = st.columns([1.1, .8, 1.1, 2.2])
-
-
-        with sc1:
-
-
-            st.markdown(f"<div class='score-box'><div class='score-team'>Univolei</div><div class='score-points'>{home_pts}</div></div>", unsafe_allow_html=True)
-
-
-        with sc2:
-
-
-            st.markdown("<div class='score-box'><div class='score-x'>×</div></div>", unsafe_allow_html=True)
-
-
-        with sc3:
-
-
-            st.markdown(f"<div class='score-box'><div class='score-team'>Adversário</div><div class='score-points'>{away_pts}</div></div>", unsafe_allow_html=True)
-
-
-        with sc4:
-
-
-            st.markdown(f"<div class='set-summary'>Sets: <b>{home_sets_w}</b> × <b>{away_sets_w}</b>  |  Set atual: <b>{st.session_state.set_number}</b></div>", unsafe_allow_html=True)
-
-
-        st.markdown('</div>', unsafe_allow_html=True)
-
 
         render_court_html(
             pts_succ, pts_errs, pts_adv, pts_adv_err,
