@@ -270,3 +270,40 @@ iframe[title^="streamlit-component"]{
 /* ====== FIM ANTI-DUPLICAÇÃO ====== */
 
 /* marker missing earlier; see previous cell for CSS content */
+
+
+/* ====== MOBILE RENDER FIXES (final) ====== */
+/* 1) Evita botões 100% de largura no Render (mantém pílulas) */
+@media (max-width: 640px){
+  .stButton > button{
+    width: auto !important;
+    min-width: 0 !important;
+    display: inline-flex !important;
+    align-items: center; justify-content: center;
+  }
+  /* 2) Linhas gerais podem quebrar para caber (Jogadoras/Atalhos) */
+  [data-testid="stHorizontalBlock"]{
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+  }
+  /* 3) Mas o PLACAR deve permanecer em uma única linha */
+  [data-testid="stHorizontalBlock"]:has(.score-box){
+    flex-wrap: nowrap !important;
+    justify-content: center !important;
+  }
+  [data-testid="stHorizontalBlock"]:has(.score-box) > div{
+    flex: 0 0 auto !important;
+    width: auto !important;
+  }
+  /* 4) Grupo dos botões do SET (reabrir/fechar/remover) em linha e menores */
+  [data-testid="stHorizontalBlock"]:has(.btn-xxs){
+    flex-wrap: nowrap !important;
+    gap: 6px !important;
+  }
+  .btn-xxs .stButton > button{
+    padding: 4px 6px !important;
+    font-size: .75rem !important;
+    line-height: 1.1 !important;
+  }
+}
+/* ====== END MOBILE RENDER FIXES ====== */
