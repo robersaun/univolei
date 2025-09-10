@@ -470,3 +470,24 @@ iframe[title^="streamlit-component"]{
     align-items: center; justify-content: center;
   }
 }
+
+/* HARD OVERRIDE (Render): classe gerada pelo Emotion que você viu no DevTools */
+@media (max-width: 740px){
+  .st-emotion-cache-52v4ru{
+    min-width: 0 !important;
+    width: auto !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+}
+
+/* Fallback genérico (nome da classe pode mudar): force dentro das linhas Jogadoras/Atalhos */
+@media (max-width: 740px){
+  .gm-players-row [class^="st-emotion-cache"],
+  .gm-quick-row  [class^="st-emotion-cache"]{
+    min-width: 0 !important;
+    width: auto !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+}
