@@ -64,10 +64,6 @@ if st.session_state.get("show_tutorial", False):
     st.button("❌ Fechar Tutorial", key="close_tutorial_btn",
               on_click=lambda: st.session_state.__setitem__("show_tutorial", False))
 
-
-
-
-
 Nossos acertos", value=True, key="gm_show_succ")
         with f2: show_errors_gm    = st.checkbox("Nossos erros",   value=True, key="gm_show_err")
         with f3: show_adv_pts_gm   = st.checkbox("ADV acertos",    value=True, key="gm_show_adv_ok")
@@ -82,6 +78,50 @@ Nossos acertos", value=True, key="gm_show_succ")
             "Mostrar número/ADV nas bolinhas",
             value
 
+
+-----------------------------
+muitos erros, melhor reverter para a minha versao estável e vc tentar novamente fazer apenas esses ajustes, sem cometer os erros que já pedi para nao fazer:
+1. reduzir bastante os espaços em branco (enviei uma imagem exemplificando)
+2. sets: 0 x 0 | set atual: 1 - Placar: 1 x 0 deixe de forma otimizada em apenas uma linha junto aos nomes dos times e numeração do placar (preste muita atnação em como deixei na ultima imagem que deixei e vc ja tinha conseguido ajustar)
+3. placar pode ser um pouco até maior nas fontes e mais próximo a quadra (continua logo acima da quadra)
+4. adicione novamente o botao refazer razlly do lado de rede, pode ser em um tom vermelho um pouco mais escuro para diferenciar. vc ja tinha feito isso mas errou em algum momento. (vc já conseugiu isso tb mas errou muito ao fazer isso)
+5. o nome "ADV" em cima da quadra,  é possível inserir o nome do adversario do jogo atual dinamicamente aqui? (APENAS AQUI, TOME CUIDADO PARA NAO INSERIR EM OUTRO LUGAR OU BOTAO COMO JÁ FEZ UMA VEZ) se sim ja faça e tb o vermelho no botao refazer rally, apenas esses 2 topicos sem errar ou retirar nada, com mto cuidado, consegue? me envie a nova versao do index final
+
+São apenas esses ajustes!!! tome extremo cuidado, nao retire nada de nada, nao erre em nada, tome cuidado com os caracateres das funcoes mobile e nao cometa erros que ja cometeu ou que já arrumamos, muito cuidado meeesmo, pfv, falta pouco!
+consegue? me envie as versões finais para download, mas preste muita atencao!!!!!!!! NAO COMETA OS MESMOS ERRROS ANTERIORES, CON FUNCOES MOBILE, RETIRADA E ALTERACOES DE POSICOES QUE NAO PEDI, ETC ETC
+
+-----------------------------
+
+vc cometeu erros primários que já tinhamos superado, botoes jogadoras e atalhos duplicaram novamente, placar nao está mais acima da rede, informacoes de sets: 0x0 | set atual e set 1   placar estao em duas linhas e nao em uma como já pedi e vc tinha ajustado, mas o refazer rally está ok. tome cuidado para corrigir e reverter apenas isso, preciso finalizar!!!
+
+
+
+-----------------------------
+aleluia!!! conseguimos a primeira versao com botoes menores no mobile!!!
+vamos manter isso!!
+mas temos um caminho pela frente ainda. sem retirar ou errar em mais nada, veja meus codes atuais e as imagens que criei, do lado esquerdo com quadrado em volta vermelho e quadrados indicandos os espços em branco e com destaque verde do lado direito como eu gostaria.
+1. irá verirficar que reduzi bastante os espaços em branco (pode até reduzir mais se conseguir)
+2. sets: 0 x 0 | set atual: 1 - Placar: 1 x 0 verá que eu coloquei apenas em uma linha, dessa forma otimizada (preste muita atnação em como deixei)
+3. placar um pouco até maior nas fontes e próximo a quadra (cortei ela na imagem mas permanece exatamente como esta no tamanho, apenas deve aproximar mais dos numeros do placar)
+4. por ultimo, adicione novamente o botao refazer razlly do lado de rede, pode ser em um tom vermelho um pouco mais escuro para diferenciar. vc ja tinha feito isso mas errou em algum momento.
+
+São apenas esses ajustes!!! tome extremo cuidado, nao retire nada de nada, nao erre em nada, tome cuidado com os caracateres das funcoes mobile e nao cometa erros que ja cometeu ou que já arrumamos, muito cuidado meeesmo, pfv, falta pouco!
+
+-----------------------------
+claude v1
+Como desenvolvedor python muito experiente, realize as ações que eu pedir, mas
+
+1. Tome extremo cuidado para não errar em nada
+
+2. Não retire nada do meu código, muito menos comentários (extremamente importante), especialmente os lugares que eu indicar no proprio codigo pra vc nao fazer isso (ex:  #NAO MUDAR OU RETIRAR !!!), mesmo que vc ache que está certo, pois nesse caso nao está, fez errado e eu estou te afirmando que está certo da forma que está. Se eu lhe enviar um codigo com 900 linhas e vc precisar acrescentar ou retirar alguma específica das alterações que eu pedi, ok, mas de resto nao altere ou retire nada, muito menos me envie códigos parciais, tipo aqueles "restante de suas funções aqui"
+
+3. Aprenda com seus erros, o que quero dizer com isso, que se eu te retornar com uum ero no prompt e vc corrigir, na seguna e outras vzes, nao deixe mais esse erro se repetir.
+
+ok?
+
+meu projeto já está bem estrutura e todas as funcionalidades estao ok nesse momento, minha única dificuldade é nos espaços em branco entre as alturas dos componentes que gostaria de otimizar muito e especialmente nos botoes de numeracao e nomes de jogadoras e nos botoes de atalhos, que localmente carregam o css e ficam bonns (lado a lado e pequenos) mas no render ou no site streamlit que subi meu codigo, indicam que o css é carregado mas os botoes indificualmente ficam cada um com a largura total do celular. esse problema é especialmente no modo jogo e na versao mobile do codigo.
+
+Consegue ajustar apenas isso, sem retirar ou errar em nada de nada, me enviando o codigo completo e corrigido, final 100% sem cortes e erros? tome extremo cuidado antes de gerar uma nova versão e me envie o codigo pronto para download (arquivo)
 
 -----------------------------
 TEMOS NOSSA PRIMEIRA VERSAO ESTAVEL, mas ainda temos bastante a ajustar.

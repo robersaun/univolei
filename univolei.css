@@ -491,3 +491,21 @@ iframe[title^="streamlit-component"]{
     box-sizing: border-box !important;
   }
 }
+
+
+/* === UV PATCH (compact + undo color + scoreboard tweaks) === */
+.gm-score-row { margin: 2px 0 !important; }
+.gm-preline { display:none !important; } /* esconde linha antiga "Set N — Placar" sem remover do código */
+
+.pill-undo .stButton button{
+  background:#b91c1c !important; color:#fff !important; border:1px solid #7f1d1d !important;
+}
+
+/* fontes um pouco maiores no placar */
+.score-points{ font-size:56px; }      /* era 52 */
+@media (max-width:480px){
+  .score-points{ font-size:42px !important; }  /* era 38 */
+}
+
+/* cola mais o texto da direita do placar */
+.set-summary{ margin-top:2px !important; }

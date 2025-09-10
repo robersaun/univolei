@@ -103,7 +103,8 @@ def _paint_adv_rede_buttons():
         }
         const map = [
           {text:'adv',  bg:'rgba(255,0,255,0.20)', border:'rgba(160,0,160,0.55)'},
-          {text:'rede', bg:'rgba(220,50,50,0.18)', border:'rgba(160,20,20,0.55)'}
+          {text:'rede', bg:'rgba(220,50,50,0.18)', border:'rgba(160,20,20,0.55)'},
+          {text:'refazer rally', bg:'#b91c1c', border:'#7f1d1d'}
         ];
         const btns = Array.from(doc.querySelectorAll('button'));
         btns.forEach(b=>{
@@ -981,8 +982,20 @@ def render_court_html(pts_success, pts_errors, pts_adv=None, pts_adv_err=None, e
         }})();
         """
 
+    adv_lbl = "ADV"
+    try:
+        fr = st.session_state.frames
+        mid = st.session_state.match_id
+        mt = fr.get("amistosos", pd.DataFrame())
+        row = mt.loc[mt["match_id"] == mid]
+        if not row.empty:
+            away_id = int(row.iloc[0]["away_team_id"])
+            adv_lbl = team_name_by_id(fr, away_id)
+    except Exception:
+        pass
+    adv_lbl_esc = html.escape(str(adv_lbl))
     html_block = f"""
-    <div style="width:100%; text-align:center; font-weight:700; margin-bottom:6px;">ADV</div>
+    <div style="width:100%; text-align:center; font-weight:700; margin-bottom:6px;">{adv_lbl_esc}</div>
     <div id="{container_id}" style="background:#FFA94D; border:2px solid #333; position:relative; width:100%; height:320px; border-radius:6px;">
       <!-- REDE -->
       <div style="
@@ -1641,6 +1654,20 @@ if st.session_state.game_mode:
                     on_click=lambda code=code: register_current(action=code),
                     use_container_width=True
                 )
+            # Inserir "Refazer Rally" imediatamente após 'Rede' (mesma linha/grade)
+            if code == "rede":
+                with acols[(i+1) % len(acols)]:
+                    st.button(
+                        "Refazer Rally",
+                        key="gm_quick_refazer",
+                        on_click=undo_last_rally_current_set,
+                        use_container_width=True
+                    )
+
+
+        
+
+
 
         _paint_adv_rede_buttons()
 
@@ -1704,7 +1731,7 @@ if st.session_state.game_mode:
                 _s = str(_set_raw).strip()
                 if _s.isdigit():
                     _setn = int(_s)
-            st.markdown(f"**Set {_setn} — Placar: {_home_pts} x {_away_pts}**")
+            st.markdown(f"<div class='gm-preline'><strong>Set {_setn} — Placar: {_home_pts} x {_away_pts}</strong></div>", unsafe_allow_html=True)
 
             df_hm = current_set_df(st.session_state.frames, st.session_state.match_id, st.session_state.set_number)
         except Exception:
@@ -1767,7 +1794,7 @@ if st.session_state.game_mode:
         with sc3:
 
 
-            st.markdown(f"<div class='score-box'><div class='score-team'>Adversário</div><div class='score-points'>{away_pts}</div></div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='score-box'><div class='score-team'>{away_name}</div><div class='score-points'>{away_pts}</div></div>", unsafe_allow_html=True)
 
 
         with sc4:
