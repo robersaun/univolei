@@ -141,6 +141,50 @@ _css_path = load_css("univolei.css")
 st.caption(f"CSS carregado: {'SIM' if _css_path else 'NÃO'}  {(_css_path or '')}")
 st.markdown('<span class="uv-css-ok" style="display:none">CSS OK</span>', unsafe_allow_html=True)
 
+# Marca as linhas corretas no DOM (Jogadoras / Atalhos) para aplicar CSS no mobile
+st.markdown("""
+<script>
+(function(){
+  function addRowClassByTitle(substr, cls){
+    // Procura um Markdown container cujo texto contenha 'substr' (ex: "Jogadoras", "Atalhos")
+    const md = [...document.querySelectorAll('div[data-testid="stMarkdownContainer"]')]
+      .find(el => (el.innerText || '').toLowerCase().includes(substr.toLowerCase()));
+    if(!md) return false;
+
+    // Acha o próximo bloco horizontal (st.columns) após esse título e aplica a classe 'cls'
+    let sib = md.parentElement;
+    for(let i=0;i<30 && sib;i++){
+      sib = sib.nextElementSibling;
+      if(sib && sib.matches('div[data-testid="stHorizontalBlock"]')){
+        sib.classList.add(cls);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function tagOnce(){
+    try{
+      const ok1 = addRowClassByTitle('Jogadoras', 'gm-players-row');
+      const ok2 = addRowClassByTitle('Atalhos',   'gm-quick-row');
+      console.log('[uv] tag rows:', {ok1, ok2});
+    }catch(e){ console.log('[uv] tag error', e); }
+  }
+
+  // Debounce para re-render do Streamlit
+  let timer = null;
+  const run = () => { clearTimeout(timer); timer = setTimeout(tagOnce, 80); };
+
+  if (document.readyState !== 'loading') run();
+  else document.addEventListener('DOMContentLoaded', run);
+
+  // Observa mudanças no app (Streamlit re-render) e re-aplica
+  const obs = new MutationObserver(run);
+  obs.observe(document.body, {childList:true, subtree:true});
+})();
+</script>
+""", unsafe_allow_html=True)
+
 
 # === CSS anti-gap para QUALQUER iframe de components.html ===
 st.markdown("""

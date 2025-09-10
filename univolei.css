@@ -410,3 +410,63 @@ iframe[title^="streamlit-component"]{
 }
 /* ===== END: MOBILE GAME – SET BUTTONS LIKE TOP TOOLBAR (FINAL) ===== */
 .uv-css-ok{ display:inline-block !important; background:#16a34a; color:#fff; padding:2px 8px; border-radius:9999px; font-size:.75rem; }
+
+/* ==== MOBILE (Render) — grid estável para Jogadoras/Atalhos ==== */
+@media (max-width: 740px){
+  /* O bloco de colunas dessas seções vira grid com wrap */
+  .gm-players-row,
+  .gm-quick-row{
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+    align-items: stretch !important;
+  }
+  /* Cada coluna fica com 1/6 da largura (duas linhas de 6) */
+  .gm-players-row > div[data-testid="column"],
+  .gm-quick-row  > div[data-testid="column"]{
+    flex: 0 0 calc(100%/6) !important;
+    width: calc(100%/6) !important;
+    max-width: calc(100%/6) !important;
+    min-width: 0 !important;
+  }
+  /* Botão ocupa 100% da célula, pílula compacta */
+  .gm-players-row .stButton > button,
+  .gm-quick-row  .stButton > button{
+    width: 100% !important;
+    display: inline-flex !important;
+    align-items: center; justify-content: center;
+    font-size: 14px !important;
+    line-height: 1.15 !important;
+    padding: 6px 0 !important;
+    border-radius: 9999px !important;
+  }
+}
+/* ==== Robustez extra no mobile para Jogadoras/Atalhos (Render) ==== */
+@media (max-width: 740px){
+  /* Se a classe estiver aplicada DIRETAMENTE no stHorizontalBlock */
+  div.gm-players-row[data-testid="stHorizontalBlock"],
+  div.gm-quick-row[data-testid="stHorizontalBlock"]{
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+    align-items: stretch !important;
+  }
+
+  /* Aceitar colunas como DESCENDENTES (não apenas filhos diretos) */
+  .gm-players-row div[data-testid="column"],
+  .gm-quick-row  div[data-testid="column"]{
+    flex: 0 0 calc(100%/6) !important;
+    width: calc(100%/6) !important;
+    max-width: calc(100%/6) !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Botão ocupa 100% da célula */
+  .gm-players-row .stButton > button,
+  .gm-quick-row  .stButton > button{
+    width: 100% !important;
+    display: inline-flex !important;
+    align-items: center; justify-content: center;
+  }
+}
