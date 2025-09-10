@@ -269,89 +269,143 @@ iframe[title^="streamlit-component"]{
 }
 /* ====== FIM ANTI-DUPLICAÇÃO ====== */
 
-/* ===== MOBILE GAME LAYOUT — stable wrappers ===== */
-@media (max-width: 640px){
-  .gm-players-row [data-testid="stHorizontalBlock"],
-  .gm-quick-row [data-testid="stHorizontalBlock"]{
-    flex-wrap: wrap !important;
-    gap: 6px !important;
-  }
-  .gm-players-row [data-testid="stHorizontalBlock"] > div,
-  .gm-quick-row [data-testid="stHorizontalBlock"] > div{
-    flex: 0 0 calc(100%/6) !important;
-    max-width: calc(100%/6) !important;
-  }
-  .gm-players-row .stButton > button,
-  .gm-quick-row .stButton > button{
-    width: 100% !important;
-    font-size: 14px !important;
-    padding: 6px 0 !important;
-    line-height: 1.15 !important;
-  }
 
+/* ==============================
+   MOBILE GAME – SET/FILTROS FIX
+   ============================== */
+@media (max-width: 640px){
+
+  /* Evitar extrapolar: botões super compactos ocupam a largura da coluna e podem quebrar texto */
   .btn-xxs .stButton > button{
-    padding: 4px 6px !important;
-    font-size: .78rem !important;
-    line-height: 1.1 !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    white-space: normal !important;
+    overflow-wrap: anywhere !important;
+    word-break: break-word !important;
+    display: inline-flex !important;
+    align-items: center; justify-content: center;
   }
-  [data-testid="stHorizontalBlock"]:has(.btn-xxs){ flex-wrap: nowrap !important; gap:6px !important; }
 
-  .score-points{ font-size: 36px !important; }
-  .score-team{ font-size: 13px !important; }
-  .score-x{ font-size: 22px !important; padding-top: 2px !important; }
-  .set-summary{ font-size: .95rem !important; white-space: nowrap !important; }
-  [data-testid="stHorizontalBlock"]:has(.score-box){ flex-wrap: nowrap !important; justify-content:center !important; }
-  [data-testid="stHorizontalBlock"]:has(.score-box) > div{ flex:0 0 auto !important; width:auto !important; }
-
-  .stRadio, .stSelectbox, .stNumberInput, .stTextInput{ font-size: 14px !important; margin: 2px 0 !important; }
-  .stRadio [role="radiogroup"]{ gap: 6px !important; }
-  .stSelectbox > div > div{ padding: .10rem .30rem !important; }
-}
-/* ===== END MOBILE GAME LAYOUT ===== */
-
-
-/* ===== MOBILE GAME LAYOUT — no :has dependencies (final) ===== */
-@media (max-width: 640px){
-  /* Players/Atalhos rows */
-  .gm-players-row [data-testid="stHorizontalBlock"],
-  .gm-quick-row [data-testid="stHorizontalBlock"]{
-    display:flex !important;
+  /* Filtro Gráficos: permitir quebra em múltiplas linhas dentro da coluna */
+  .stRadio [role="radiogroup"]{
+    display: flex !important;
     flex-wrap: wrap !important;
     gap: 6px !important;
   }
-  .gm-players-row [data-testid="stHorizontalBlock"] > div,
-  .gm-quick-row  [data-testid="stHorizontalBlock"] > div{
-    flex: 0 0 calc(100%/6) !important;
-    max-width: calc(100%/6) !important;
+  .stRadio [role="radiogroup"] > *{
+    flex: 0 0 auto !important;
+    max-width: 100% !important;
   }
-  .gm-players-row .stButton > button,
-  .gm-quick-row  .stButton > button{
-    width: 100% !important;
-    font-size: 14px !important;
-    padding: 6px 0 !important;
-    line-height: 1.15 !important;
-  }
+}
+/* ===== END: MOBILE GAME – SET/FILTROS FIX ===== */
 
-  /* Scoreboard row stays inline */
-  .gm-score-row [data-testid="stHorizontalBlock"]{
+
+/* =======================================
+   MOBILE GAME – SET BUTTONS MICRO (final)
+   ======================================= */
+@media (max-width: 640px){
+  /* container */
+  .btn-xxs{ margin:0 !important; padding:0 !important; }
+  .btn-xxs [data-testid="stHorizontalBlock"]{
     display:flex !important;
     flex-wrap: nowrap !important;
-    justify-content: center !important;
+    gap: 4px !important;
   }
-  .gm-score-row [data-testid="stHorizontalBlock"] > div{
-    flex: 0 0 auto !important;
-    width: auto !important;
-  }
-  .gm-score-row .score-points{ font-size: 36px !important; }
-  .gm-score-row .score-team{ font-size: 13px !important; }
-  .gm-score-row .score-x{ font-size: 22px !important; padding-top: 2px !important; }
-  .gm-score-row .set-summary{ font-size: .95rem !important; white-space: nowrap !important; }
-
-  /* Set buttons smaller; align inline naturally via their container */
+  /* cards e botões */
+  .btn-xxs .stButton{ margin:0 !important; }
   .btn-xxs .stButton > button{
-    padding: 4px 6px !important;
-    font-size: .78rem !important;
-    line-height: 1.1 !important;
+    width: auto !important;
+    min-width: 0 !important;
+    padding: 2px 6px !important;
+    font-size: .72rem !important;
+    line-height: 1 !important;
+    min-height: 24px !important;
+    white-space: nowrap !important;
   }
 }
-/* ===== END: MOBILE GAME LAYOUT — no :has ===== */
+/* ===== END: MOBILE GAME – SET BUTTONS MICRO ===== */
+
+
+/* ============================================
+   MOBILE GAME – SET BUTTONS FORCE INLINE SMALL
+   ============================================ */
+@media (max-width: 640px){
+  .btn-xxs{ display: inline-block !important; margin:0 !important; padding:0 !important; }
+  .btn-xxs .stButton{
+    width: auto !important;
+    display: inline-block !important;
+    margin: 0 !important;
+  }
+  .btn-xxs .stButton > button{
+    width: auto !important;
+    min-width: 0 !important;
+    padding: 1px 6px !important;
+    font-size: .70rem !important;
+    line-height: 1 !important;
+    min-height: 22px !important;
+    white-space: nowrap !important;
+  }
+}
+/* ===== END: MOBILE GAME – SET BUTTONS FORCE INLINE SMALL ===== */
+
+
+/* =====================================
+   MOBILE GAME – WHITESPACE COMPACT
+   ===================================== */
+@media (max-width: 640px){
+  /* Compactar o cartão principal no mobile */
+  .sectionCard{ padding: 8px 10px !important; }
+
+  /* Reduzir espaços verticais entre elementos dentro do card */
+  .sectionCard .element-container{ margin-bottom: 4px !important; }
+  .sectionCard [data-testid="stVerticalBlock"]{ gap: 4px !important; }
+  .sectionCard [data-testid="stHorizontalBlock"]{ margin: 0 !important; }
+
+  /* Títulos/legendas e markdown mais colados */
+  .sectionCard .stMarkdown, 
+  .sectionCard h1, .sectionCard h2, .sectionCard h3, .sectionCard h4, .sectionCard p{
+    margin: 2px 0 !important; padding: 0 !important;
+  }
+
+  /* Grupo SET micro + gap mínimo */
+  .btn-xxs [data-testid="stHorizontalBlock"]{ gap: 2px !important; }
+  .btn-xxs .stButton{ margin: 0 !important; }
+  .btn-xxs .stButton > button{
+    padding: 1px 6px !important;
+    font-size: .68rem !important;
+    line-height: 1.0 !important;
+    min-height: 20px !important;
+  }
+
+  /* “Filtros Gráficos” e componentes com menos espaço */
+  .sectionCard .stRadio{ margin: 0 !important; }
+  .sectionCard .stRadio [role="radiogroup"]{ gap: 4px !important; flex-wrap: wrap !important; }
+  .sectionCard .stSelectbox, .sectionCard .stNumberInput, .sectionCard .stTextInput{ margin: 0 !important; }
+  .sectionCard .stSelectbox > div > div{ padding: .08rem .24rem !important; }
+}
+/* ===== END: MOBILE GAME – WHITESPACE COMPACT ===== */
+
+
+/* =====================================================
+   MOBILE GAME – SET BUTTONS LIKE TOP TOOLBAR (FINAL)
+   ===================================================== */
+@media (max-width: 640px){
+  /* container enxuto e em linha */
+  .btn-xxs{ margin:0 !important; padding:0 !important; display:block !important; }
+  .btn-xxs [data-testid="stHorizontalBlock"]{
+    display:flex !important; flex-wrap:nowrap !important; gap:4px !important; align-items:center !important;
+  }
+  .btn-xxs .element-container{ margin-bottom:0 !important; }
+
+  /* botões com o mesmo "look" dos iniciais (pílula pequena, inline) */
+  .btn-xxs .stButton{ margin:0 !important; display:inline-block !important; }
+  .btn-xxs .stButton > button{
+    width:auto !important; min-width:0 !important;
+    padding:3px 10px !important;
+    font-size:.75rem !important; line-height:1 !important; min-height:22px !important;
+    border-radius:9999px !important;
+    white-space:nowrap !important;
+    display:inline-flex !important; align-items:center; justify-content:center;
+  }
+}
+/* ===== END: MOBILE GAME – SET BUTTONS LIKE TOP TOOLBAR (FINAL) ===== */
