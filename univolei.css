@@ -1,7 +1,12 @@
 /* =========================
    BASE / DESKTOP (padrão)
    ========================= */
+   div.stVerticalBlock.st-emotion-cache-tn0cau.e52wr8w2
+   {
+    padding: 0%;
+   }
 
+  
 /* Container e títulos */
 .block-container { padding: .15rem 0; max-width: 1600px; }
 h1, h2, h3 { margin: .05rem 0 .1rem; }
@@ -14,7 +19,7 @@ h1, h2, h3 { margin: .05rem 0 .1rem; }
 /* Cartão de seção */
 .sectionCard{
   border:1px solid #e1e6ef; background:#fff; border-radius:8px;
-  padding:4px 6px; margin:4px 0; overflow:hidden;
+  padding:4px 6px; margin:4px 0; overflow:hidden; top: -50px; position:relative;
 }
 
 /* Controles gerais */
@@ -59,10 +64,19 @@ h1, h2, h3 { margin: .05rem 0 .1rem; }
 div[role="radiogroup"] > label{ margin-right:.35rem; font-size:.85rem; }
 
 /* Badges */
-.badge{
-  background:#f5f7fb; border:1px solid #e1e6ef; border-radius:999px;
-  padding:3px 6px; font-size:.90rem; white-space:nowrap;
+.badge {
+  background:#f5f7fb;
+  border:1px solid #e1e6ef;
+  border-radius:999px;
+  padding:3px 6px;
+  font-size:.90rem;
+  white-space:nowrap;
+
+  display: flex;               /* ativa flexbox */
+  align-items: center;         /* centraliza na vertical */
+  justify-content: center;     /* centraliza na horizontal */
 }
+
 .badge b{ font-weight:800; }
 
 /* Tabelas comuns */
@@ -93,10 +107,10 @@ div[role="radiogroup"] > label{ margin-right:.35rem; font-size:.85rem; }
 
 /* Placar */
 .score-box{ text-align:center; }
-.score-team{ font-size:16px; font-weight:800; }
-.score-points{ font-size:52px; font-weight:900; line-height:1; }
-.score-x{ font-size:34px; font-weight:900; padding-top:10px; }
-.set-summary{ font-size:1.12rem; font-weight:800; }
+.score-team{ font-size:40px; font-weight:800; }
+.score-points{ font-size:200px; font-weight:900; line-height:1; }
+.score-x{ font-size:40px; font-weight:900; padding-top:10px; }
+.set-summary{ font-size:1.12rem; font-weight:800; font-size: 20px; }
 
 /* KPIs */
 .kpi{ display:flex; flex-direction:column; gap:1px; border:1px solid #e1e6ef; border-radius:6px; padding:4px 6px; }
@@ -155,7 +169,7 @@ iframe[title^="streamlit-component"]{
   div[role="radiogroup"] > label{ margin-right:6px !important; font-size:12px !important; padding:1px 3px !important; }
 
   /* Cards/KPI mais compactos */
-  .sectionCard{ padding:6px !important; border-radius:6px !important; }
+  .sectionCard{ padding:6px !important; border-radius:6px !important;  top: -50px;}
   .kpi{ padding:3px 4px !important; border-radius:5px !important; }
   .kpi .v{ font-size:1rem !important; }
   .kpi .t{ font-size:.70rem !important; }
@@ -166,23 +180,8 @@ iframe[title^="streamlit-component"]{
   .score-x{ font-size:26px !important; padding-top:6px !important; }
   .set-summary{ font-size:.94rem !important; }
 
-  /* Quadra mais baixa */
-  #uv-court-main, #uv-court-gm{ height:260px !important; }
 
-  /* Conteúdo “mobile-only” visível só aqui */
-  .mobile-only{ display:block !important; }
-
-  /* Botões HTML auxiliares (linhas mobile) */
-  #gm-mob-players, #gm-mob-quick{ margin:2px 0 !important; }
-  .uv-row{ display:flex; flex-wrap:wrap; gap:6px; }
-  .uv-btn{
-    padding:6px 8px; font-size:13px; line-height:1; border-radius:8px;
-    border:1px solid #ccd3e0; background:#f7f9ff;
-    width:auto; min-width:36px; min-height:26px;
-  }
-  .uv-btn.adv{ background:#263238; color:#fff; border-color:#000; opacity:.95; }
-  .uv-btn.rede{ background:#ffe5e5; border-color:#ffb0b0; }
-}
+  
 
 /* Regras contra min-width do Streamlit em layout estreito */
 @media (max-width:640px){
@@ -217,9 +216,9 @@ iframe[title^="streamlit-component"]{
 /* =========================
    DENSIDADE MÁXIMA (desktop ≥ 992px)
    ========================= */
-@media (min-width: 992px){
+@media (min-width: 200px){
   .block-container{ padding:.05rem 0 !important; }
-  .sectionCard{ padding:2px 4px !important; margin:2px 0 !important; }
+  .sectionCard{ padding:2px 4px !important; margin:2px 0 !important; top: -50px;}
 
   /* Menos ar entre blocos e colunas */
   [data-testid="stVerticalBlock"] > div{ margin:2px 0 !important; }
@@ -247,18 +246,44 @@ iframe[title^="streamlit-component"]{
   .kpi-table th, .kpi-table td{ padding:2px 3px !important; }
 
   /* Placar mais enxuto */
-  .score-team{ font-size:14px !important; }
-  .score-points{ font-size:44px !important; }
-  .score-x{ font-size:26px !important; padding-top:4px !important; }
+  .score-team{ font-size:200px !important; }
+  .score-points{ font-size:250px !important; }
+  .score-x{ font-size:200px !important; padding-top:4px !important; }
   .set-summary{ font-size:1rem !important; }
 
   /* Quadra menor no desktop */
   #uv-court-main, #uv-court-gm{ height:320px !important; }
 }
 
-/* ====== ANTI-DUPLICAÇÃO DETERMINÍSTICA (MODO JOGO, MOBILE) ====== */
+
+
+
+/* ==============================
+   MOBILE GAME – SET/FILTROS FIX
+   ============================== */
+   /*     MOBILE   */
+  /* Quadra mais baixa */
+  #uv-court-main, #uv-court-gm{ height:260px !important; }
+
+  /* Conteúdo “mobile-only” visível só aqui */
+  .mobile-only{ display:block !important; }
+
+  /* Botões HTML auxiliares (linhas mobile) */
+  #gm-mob-players, #gm-mob-quick{ margin:2px 0 !important; }
+  .uv-row{ display:flex; flex-wrap:wrap; gap:6px; }
+  .uv-btn{
+    padding:6px 8px; font-size:13px; line-height:1; border-radius:8px;
+    border:1px solid #ccd3e0; background:#f7f9ff;
+    width:auto; min-width:36px; min-height:26px;
+  }
+  .uv-btn.adv{ background:#263238; color:#fff; border-color:#000; opacity:.95; }
+  .uv-btn.rede{ background:#ffe5e5; border-color:#ffb0b0; }
+}
+
+   /* ====== ANTI-DUPLICAÇÃO DETERMINÍSTICA (MODO JOGO, MOBILE) ====== */
 /* Mantenha SOMENTE os botões HTML (menores) no mobile; esconda os de Streamlit */
-@media (max-width:640px){
+@media (max-width:640px)
+{
   /* Quando o wrapper do GM estiver presente */
   .gm-tight .gm-desktop-only{ display:none !important; }
 
@@ -268,11 +293,6 @@ iframe[title^="streamlit-component"]{
   body:has(#gm-mob-quick)   .gm-desktop-only{ display:none !important; }
 }
 /* ====== FIM ANTI-DUPLICAÇÃO ====== */
-
-
-/* ==============================
-   MOBILE GAME – SET/FILTROS FIX
-   ============================== */
 @media (max-width: 640px){
 
   /* Evitar extrapolar: botões super compactos ocupam a largura da coluna e podem quebrar texto */
@@ -354,7 +374,9 @@ iframe[title^="streamlit-component"]{
    ===================================== */
 @media (max-width: 640px){
   /* Compactar o cartão principal no mobile */
-  .sectionCard{ padding: 8px 10px !important; }
+  .sectionCard{ top: -50px; padding: 8px 10px !important; }
+  .sectionCard{ top: -50px!important; }
+  
 
   /* Reduzir espaços verticais entre elementos dentro do card */
   .sectionCard .element-container{ margin-bottom: 4px !important; }
@@ -509,3 +531,628 @@ iframe[title^="streamlit-component"]{
 
 /* cola mais o texto da direita do placar */
 .set-summary{ margin-top:2px !important; }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* Remove margem superior do container que envolve a badge */
+.stElementContainer .stMarkdown {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  top: -100px !important;
+}
+
+/* Remove margem dos <p> dentro do Markdown */
+.stMarkdown p {
+  margin-top: -10px !important;
+  margin-bottom: 0 !important;
+  padding: 0 !important;
+}
+
+/* Remove margem dos containers acima da badge */
+div[data-testid="stVerticalBlock"] > div {
+  margin-top: 2px !important;
+}
+
+.badge {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+
+/* =========================================================
+   DIV-LINHAS: controles finos de espaçamento vertical
+   ========================================================= */
+#div1, #div2, #div3, #div4, #div5, #div6, #div7{
+  margin: -200px 0 !important;
+  padding: 0 !important; 
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* Placar quase colado à quadra, e filtros colados na quadra */
+#div5{ margin-bottom: 2px !important; }
+#div6{ margin-top: 0 !important; margin-bottom: 2px !important; }
+#div7{ margin-top: 2px !important; }
+
+/* Quando dentro de um sectionCard, tiramos “ar” automático desses blocos */
+.sectionCard #div1, .sectionCard #div2, .sectionCard #div3,
+.sectionCard #div4, .sectionCard #div5, .sectionCard #div6, .sectionCard #div7{
+  display:block;   /* garante que apareçam no DOM */
+}
+/* =====================================================
+   ULTRA COMPACT – div1..div7 (Modo Jogo)
+   Colar no FINAL do univolei.css
+   ===================================================== */
+
+/* 1) Zera/gira o “ar” do WRAPPER que o Streamlit cria em volta de cada linha */
+.element-container:has(#div1),
+.element-container:has(#div2),
+.element-container:has(#div3),
+.element-container:has(#div4),
+.element-container:has(#div5),
+.element-container:has(#div6),
+.element-container:has(#div7){
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* 2) E também do DIV interno que o Streamlit insere dentro do wrapper */
+.element-container:has(#div1) > div,
+.element-container:has(#div2) > div,
+.element-container:has(#div3) > div,
+.element-container:has(#div4) > div,
+.element-container:has(#div5) > div,
+.element-container:has(#div6) > div,
+.element-container:has(#div7) > div{
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* 3) Remove margens típicas de markdown/títulos nessas linhas */
+.element-container:has(#div1) .stMarkdown,
+.element-container:has(#div2) .stMarkdown,
+.element-container:has(#div3) .stMarkdown,
+.element-container:has(#div4) .stMarkdown,
+.element-container:has(#div5) .stMarkdown,
+.element-container:has(#div6) .stMarkdown,
+.element-container:has(#div7) .stMarkdown{
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* 4) Os blocos horizontais dessas linhas também sem “respiro” */
+.element-container:has(#div1) [data-testid="stHorizontalBlock"],
+.element-container:has(#div2) [data-testid="stHorizontalBlock"],
+.element-container:has(#div3) [data-testid="stHorizontalBlock"],
+.element-container:has(#div4) [data-testid="stHorizontalBlock"],
+.element-container:has(#div5) [data-testid="stHorizontalBlock"],
+.element-container:has(#div6) [data-testid="stHorizontalBlock"],
+.element-container:has(#div7) [data-testid="stHorizontalBlock"]{
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+/* 5) Cola o bloco da quadra/div5 com as duas linhas seguintes (div6, div7) */
+.element-container:has(#div5) + .element-container,
+.element-container:has(#div5) + .element-container + .element-container{
+  margin-top: 0 !important;
+}
+
+/* 6) Botões/inputs nessas linhas sem margens adicionais */
+.element-container:has(#div1) .stButton,
+.element-container:has(#div2) .stButton,
+.element-container:has(#div3) .stButton,
+.element-container:has(#div4) .stButton,
+.element-container:has(#div5) .stButton,
+.element-container:has(#div6) .stButton,
+.element-container:has(#div7) .stButton{
+  margin: 0 !important;
+}
+.element-container:has(#div1) .stButton > button,
+.element-container:has(#div2) .stButton > button,
+.element-container:has(#div3) .stButton > button,
+.element-container:has(#div4) .stButton > button,
+.element-container:has(#div5) .stButton > button,
+.element-container:has(#div6) .stButton > button,
+.element-container:has(#div7) .stButton > button{
+  margin: 0 !important;
+}
+
+/* 7) (Opcional) Se ainda aparecer espaço, ative a linha abaixo para o container do card:
+.sectionCard .element-container:has(#div1),
+.sectionCard .element-container:has(#div2),
+.sectionCard .element-container:has(#div3),
+.sectionCard .element-container:has(#div4),
+.sectionCard .element-container:has(#div5),
+.sectionCard .element-container:has(#div6),
+.sectionCard .element-container:has(#div7){ margin:0 !important; }
+*/
+
+
+
+
+
+
+
+
+
+
+
+
+/* =====================================================
+   ULTRA COMPACT (por intervalo) — Jogadoras (#div3 ➜ #div4)
+   Coloque este arquivo DEPOIS do seu univolei.css
+   ===================================================== */
+
+/* 0) Garanta que os marcadores não tenham margens negativas antigas */
+#div1,#div2,#div3,#div4,#div5,#div6,#div7{ 
+  margin: 0 !important; 
+  padding: 0 !important; 
+}
+
+/* 1) Zere o wrapper que CONTÉM cada marcador */
+.element-container:has(#div1),
+.element-container:has(#div2),
+.element-container:has(#div3),
+.element-container:has(#div4),
+.element-container:has(#div5),
+.element-container:has(#div6),
+.element-container:has(#div7){
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* 2) Define um gap padrão ultra-compacto para usar abaixo */
+:root{ --uv-gap: 0px; }
+
+/* 3) ENTRE #div3 (início) E #div4 (fim) — colar tudo */
+.element-container:has(#div3) ~ .element-container:has(~ .element-container:has(#div4)){
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* 3a) Dentro desses wrappers, zere margens internas padrão do Streamlit */
+.element-container:has(#div3) ~ .element-container:has(~ .element-container:has(#div4)) [data-testid="stVerticalBlock"] > div{
+  margin: var(--uv-gap) 0 !important;
+}
+.element-container:has(#div3) ~ .element-container:has(~ .element-container:has(#div4)) [data-testid="stHorizontalBlock"]{
+  margin: var(--uv-gap) 0 !important;
+  gap: 4px !important; /* ajuste fino do espaço horizontal entre colunas/botões */
+}
+.element-container:has(#div3) ~ .element-container:has(~ .element-container:has(#div4)) .stButton,
+.element-container:has(#div3) ~ .element-container:has(~ .element-container:has(#div4)) .stSelectbox,
+.element-container:has(#div3) ~ .element-container:has(~ .element-container:has(#div4)) .stRadio,
+.element-container:has(#div3) ~ .element-container:has(~ .element-container:has(#div4)) .stTextInput,
+.element-container:has(#div3) ~ .element-container:has(~ .element-container:has(#div4)) .stNumberInput,
+.element-container:has(#div3) ~ .element-container:has(~ .element-container:has(#div4)) .stMarkdown{
+  margin: 0 !important;
+}
+
+/* 4) (Opcional) Se quiser o mesmo para ATALHOS (#div4 ➜ #div5), descomente abaixo:
+.element-container:has(#div4) ~ .element-container:has(~ .element-container:has(#div5)){
+  margin: 0 !important;
+  padding: 0 !important;
+}
+.element-container:has(#div4) ~ .element-container:has(~ .element-container:has(#div5)) [data-testid="stVerticalBlock"] > div{
+  margin: var(--uv-gap) 0 !important;
+}
+.element-container:has(#div4) ~ .element-container:has(~ .element-container:has(#div5)) [data-testid="stHorizontalBlock"]{
+  margin: var(--uv-gap) 0 !important;
+  gap: 4px !important;
+}
+*/
+
+
+
+
+/* =====================================================
+   DEBUG VISUAL — MOSTRA o que o seletor está pegando
+   Use apenas para teste; remova em produção.
+   ===================================================== */
+   .element-container:has(#div3){ outline:1px dashed #00a; outline-offset:2px; }
+   .element-container:has(#div4){ outline:1px dashed #a00; outline-offset:2px; }
+   
+   /* Tudo que está ENTRE #div3 e #div4 fica com fundo levemente marcado */
+   .element-container:has(#div3) ~ .element-container:has(~ .element-container:has(#div4)){
+     background: rgba(0,0,0,0.02) !important;
+   }
+   
+
+/* =====================================================
+   UNI-VOLEI — ULTRA COMPACT *COM MARCA VISUAL*
+   Intervalo: ENTRE #div3 (início) e #div4 (fim)
+   Coloque ESTE arquivo DEPOIS do seu univolei.css
+   ===================================================== */
+
+/* === MARCA VISUAL (não remova) ====================== */
+.element-container:has(#div3){ outline:2px dotted #1e3a8a; outline-offset:2px; }
+.element-container:has(#div4){ outline:2px dotted #b91c1c; outline-offset:2px; }
+/* Tudo ENTRE os marcadores fica com leve fundo para conferência */
+.element-container:has(#div3) ~ .element-container:has(~ .element-container:has(#div4)){
+  background: rgba(0,0,0,.03) !important;
+}
+
+/* -----------------------------------------------------
+   REGRAS GERAIS DOS MARCADORES (zera qualquer “ar” neles)
+   ----------------------------------------------------- */
+#div1,#div2,#div3,#div4,#div5,#div6,#div7{ margin:0 !important; padding:0 !important; }
+.element-container:has(#div1),
+.element-container:has(#div2),
+.element-container:has(#div3),
+.element-container:has(#div4),
+.element-container:has(#div5),
+.element-container:has(#div6),
+.element-container:has(#div7){
+  margin:0 !important; padding:0 !important;
+}
+/* zera o DIV interno que o Streamlit cria dentro do wrapper */
+.element-container:has(#div1) > div,
+.element-container:has(#div2) > div,
+.element-container:has(#div3) > div,
+.element-container:has(#div4) > div,
+.element-container:has(#div5) > div,
+.element-container:has(#div6) > div,
+.element-container:has(#div7) > div{
+  margin:0 !important; padding:0 !important;
+}
+
+/* -----------------------------------------------------
+   CORTA O ESPAÇO IMEDIATAMENTE ANTES e DEPOIS dos marcadores
+   (remove o “ar” acima do #div3 e abaixo do #div4)
+   ----------------------------------------------------- */
+.element-container:has(+ .element-container:has(#div3)){   /* anterior ao #div3 */
+  margin-bottom: 0 !important; padding-bottom: 0 !important;
+}
+.element-container:has(#div4) + .element-container{         /* imediatamente após #div4 */
+  margin-top: 0 !important; padding-top: 0 !important;
+}
+
+/* -----------------------------------------------------
+   MODO ULTRA-COMPACTO *SÓ* ENTRE #div3 e #div4
+   (aperta TUDO ao máximo, sem quebrar os botões)
+   ----------------------------------------------------- */
+:root{ --uv-gap-vert: 0px; --uv-gap-hz: 4px; --uv-btn-vpad: 2px; --uv-btn-hpad: 8px; }
+
+/* Zera margens/paddings dos wrappers no intervalo */
+.element-container:has(#div3) ~ .element-container:has(~ .element-container:has(#div4)){
+  margin:0 !important; padding:0 !important;
+}
+
+/* Zera margens internas padrão do Streamlit no intervalo */
+.element-container:has(#div3) ~ .element-container:has(~ .element-container:has(#div4))
+  [data-testid="stVerticalBlock"] > div{
+  margin: var(--uv-gap-vert) 0 !important;
+}
+.element-container:has(#div3) ~ .element-container:has(~ .element-container:has(#div4))
+  [data-testid="stHorizontalBlock"]{
+  margin: var(--uv-gap-vert) 0 !important;
+  gap: var(--uv-gap-hz) !important;
+}
+
+/* Legendas/Markdown/captions praticamente colados */
+.element-container:has(#div3) ~ .element-container:has(~ .element-container:has(#div4))
+  .stMarkdown,
+.element-container:has(#div3) ~ .element-container:has(~ .element-container:has(#div4))
+  .stCaptionContainer{
+  margin: 0 !important; padding: 0 !important; line-height: 1.1 !important;
+}
+
+/* Componentes (radios, selects, inputs) colados */
+.element-container:has(#div3) ~ .element-container:has(~ .element-container:has(#div4))
+  .stRadio,
+.element-container:has(#div3) ~ .element-container:has(~ .element-container:has(#div4))
+  .stSelectbox,
+.element-container:has(#div3) ~ .element-container:has(~ .element-container:has(#div4))
+  .stTextInput,
+.element-container:has(#div3) ~ .element-container:has(~ .element-container:has(#div4))
+  .stNumberInput{
+  margin: 0 !important;
+}
+/* radios mais enxutos */
+.element-container:has(#div3) ~ .element-container:has(~ .element-container:has(#div4))
+  .stRadio [role="radiogroup"] > label{
+  margin-right: 8px !important; padding: 0 !important; line-height: 1 !important;
+}
+
+/* BOTÕES (jogadoras): mínimos aceitáveis no desktop */
+.element-container:has(#div3) ~ .element-container:has(~ .element-container:has(#div4))
+  .stButton{ margin:0 !important; }
+.element-container:has(#div3) ~ .element-container:has(~ .element-container:has(#div4))
+  .stButton > button{
+  padding: var(--uv-btn-vpad) var(--uv-btn-hpad) !important;
+  min-height: 22px !important;
+  line-height: 1 !important;
+  border-radius: 10px !important;
+  width: auto !important;
+}
+
+/* As colunas que contêm os botões sem respiro extra vertical */
+.element-container:has(#div3) ~ .element-container:has(~ .element-container:has(#div4))
+  [data-testid="column"]{
+  padding-top: 0 !important; padding-bottom: 0 !important;
+}
+
+/* -----------------------------------------------------
+   (OPCIONAL) Repita para ATALHOS (#div4 ➜ #div5)
+   — descomente se quiser colar também a segunda faixa.
+   ----------------------------------------------------- */
+.element-container:has(#div4) ~ .element-container:has(~ .element-container:has(#div5)){
+  margin:0 !important; padding:0 !important;
+}
+.element-container:has(#div4) ~ .element-container:has(~ .element-container:has(#div5))
+  [data-testid="stVerticalBlock"] > div{ margin: var(--uv-gap-vert) 0 !important; }
+.element-container:has(#div4) ~ .element-container:has(~ .element-container:has(#div5))
+  [data-testid="stHorizontalBlock"]{ margin: var(--uv-gap-vert) 0 !important; gap: var(--uv-gap-hz) !important; }
+.element-container:has(#div4) ~ .element-container:has(~ .element-container:has(#div5)) .stButton > button{
+  padding: var(--uv-btn-vpad) var(--uv-btn-hpad) !important; min-height: 22px !important; line-height: 1 !important;
+}
+
+
+
+
+
+
+
+/* ====================================================
+   UV WHITESPACE KILLER — RANGE div3 ➜ div4 (v2)
+   Mantém listras de debug e cola TUDO no meio.
+   Basta injetar este CSS DEPOIS do univolei.css.
+   ==================================================== */
+
+/* Deixe as listras de debug visíveis (marcadores) */
+.element-container:has(#div3){ outline:1px dashed #2b6cb0; outline-offset:2px; }
+.element-container:has(#div4){ outline:1px dashed #c53030; outline-offset:2px; }
+
+/* Classe aplicada via JS aos wrappers ENTRE #div3 e #div4 */
+.element-container.uv-compact-34{
+  margin:0 !important;
+  padding:0 !important;
+}
+
+/* Zera margens internas padrão nesses wrappers */
+.element-container.uv-compact-34 > div{ margin:0 !important; padding:0 !important; }
+.element-container.uv-compact-34 [data-testid="stVerticalBlock"] > div{ margin:0 !important; }
+.element-container.uv-compact-34 [data-testid="stHorizontalBlock"]{ margin:0 !important; gap:4px !important; }
+
+/* Componentes comuns sem respiro */
+.element-container.uv-compact-34 .stButton,
+.element-container.uv-compact-34 .stSelectbox,
+.element-container.uv-compact-34 .stRadio,
+.element-container.uv-compact-34 .stTextInput,
+.element-container.uv-compact-34 .stNumberInput,
+.element-container.uv-compact-34 .stMarkdown,
+.element-container.uv-compact-34 .stCaptionContainer{
+  margin:0 !important; padding:0 !important;
+}
+
+/* Botões pílula ocupam 100% da célula e sem margem extra */
+.element-container.uv-compact-34 .stButton > button{
+  margin:0 !important;
+  width:100% !important;
+  min-width:0 !important;
+  display:inline-flex !important;
+  align-items:center; justify-content:center;
+  line-height:1.05 !important;
+  padding:6px 0 !important;
+  border-radius:9999px !important;
+}
+
+/* Colunas dentro do range sem largura mínima */
+.element-container.uv-compact-34 [data-testid="column"],
+.element-container.uv-compact-34 [data-testid="column"] > div{
+  min-width:0 !important; width:auto !important; max-width:100% !important;
+}
+
+/* Remover qualquer “respiro” de containers de iframe (se existirem) */
+.element-container.uv-compact-34:has(> iframe){ margin:0 !important; padding:0 !important; }
+.element-container.uv-compact-34 > iframe{ display:block !important; width:100% !important; border:0 !important; background:transparent !important; }
+
+/* Pequeno ajuste visual no título 'Atalhos' quando estiver no range */
+.element-container.uv-compact-34 .stMarkdown p,
+.element-container.uv-compact-34 .stCaptionContainer p{ margin:0 !important; }
+
+/* === (opcional) reduza ainda mais o espaçamento horizontal entre botões === */
+/* .element-container.uv-compact-34 [data-testid="stHorizontalBlock"]{ gap:2px !important; } */
+
+
+/* ===== GM HARD COMPACT: placar (#div5), quadra (#div6), filtros (#div7) ===== */
+
+/* mata margens/paddings do wrapper .element-container desses IDs */
+.element-container:has(#div5),
+.element-container:has(#div6),
+.element-container:has(#div7){
+  margin:0 !important; padding:0 !important; height:auto !important; min-height:0 !important;
+}
+
+/* e também do DIV interno padrão do Streamlit */
+.element-container:has(#div5) > div,
+.element-container:has(#div6) > div,
+.element-container:has(#div7) > div{
+  margin:0 !important; padding:0 !important;
+}
+
+/* blocos horizontais/verticais dentro deles, sem “respiro” */
+.element-container:has(#div5) [data-testid="stVerticalBlock"] > div,
+.element-container:has(#div6) [data-testid="stVerticalBlock"] > div,
+.element-container:has(#div7) [data-testid="stVerticalBlock"] > div{
+  margin:0 !important;
+}
+.element-container:has(#div5) [data-testid="stHorizontalBlock"],
+.element-container:has(#div6) [data-testid="stHorizontalBlock"],
+.element-container:has(#div7) [data-testid="stHorizontalBlock"]{
+  margin:0 !important; gap:4px !important;
+}
+
+/* cola os três blocos em sequência (…div4 -> div5 -> div6 -> div7) */
+.element-container:has(#div4) + .element-container,
+.element-container:has(#div5) + .element-container,
+.element-container:has(#div6) + .element-container{
+  margin-top:0 !important;
+}
+
+/* ajustes finos visuais */
+.gm-score-row{ margin:0 !important; padding:0 !important; }
+#div5, #div6, #div7{ margin:0 !important; padding:0 !important; }
+
+
+
+
+/* Fallback sem :has — quando o JS marcar o wrapper com .uv-squash */
+.element-container.uv-squash,
+.element-container.uv-squash > div{
+  margin:0 !important;
+  padding:0 !important;
+  min-height:0 !important;
+}
+
+/* colar itens do placar e da linha auxiliar */
+.gm-score-row{ margin:0 !important; }
+.gm-preline{ margin:0 !important; }
+
+/* === UV DENSIDADE EXTREMA — compacta distância vertical entre linhas === */
+.element-container{ margin:0 0 4px !important; padding:0 !important; }
+[data-testid="stVerticalBlock"]{ gap:2px !important; }
+[data-testid="stVerticalBlock"] > div{ margin:2px 0 !important; }
+[data-testid="stHorizontalBlock"]{ margin:2px 0 !important; gap:4px !important; align-items:flex-start !important; }
+.block-container p, .block-container h1, .block-container h2, .block-container h3, .block-container h4 { margin:2px 0 !important; }
+.stRadio, .stSelectbox, .stTextInput, .stNumberInput, .stButton, .stDataFrame { margin:0 0 4px !important; }
+.stMarkdown{ margin:0 !important; }
+div[data-testid="stMarkdownContainer"] > p:empty { margin:0 !important; padding:0 !important; }
+
+/* Remove offsets que empurravam cartões para baixo */
+.sectionCard{ top: 0 !important; margin:2px 0 !important; padding:4px 6px !important; }
+@media (max-width:640px){
+  .sectionCard{ top: 0 !important; padding:6px 8px !important; }
+}
+
+/* Streamlit components (iframes) sem respiro */
+.element-container:has(> iframe){ margin:0 !important; padding:0 !important; }
+iframe.uv-collapse{ display:none !important; height:0 !important; min-height:0 !important; }
+
+/* Placar — evitar altura exagerada no desktop */
+.score-team{ font-size:28px !important; } /* valor razoável */
+.score-x{ font-size:28px !important; padding-top:4px !important; }
+.set-summary{ font-size:16px !important; }
+
+
+/* ===== Debug: dotted guides (match style of #div3/#div4) ===== */
+/* Em cima da linha que começa com "Resultado" (#div2) */
+.element-container:has(#div2){ outline:2px dotted #1e3a8a !important; outline-offset:2px; }
+
+/* Abaixo do placar (#div5) */
+.element-container:has(#div5){ border-bottom:2px dotted #b91c1c !important; }
+
+/* Acima e abaixo da faixa de componentes pós-quadra (#div7) */
+.element-container:has(#div7){ border-top:2px dotted #b91c1c !important; border-bottom:2px dotted #b91c1c !important; }
+
+
+/* ===============================
+   HEADER/TOOLBAR TRANSPARENT FIX
+   =============================== */
+header[data-testid="stHeader"],
+header[data-testid="stHeader"] *,
+div[data-testid="stToolbar"],
+div[data-testid="stDecoration"]{
+  background-color: transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+
+/* ===== DOTTED GUIDES (precise, requested) ===== */
+/* Em cima da linha 'Resultado' (#div2) */
+.element-container:has(#div2){ border-top:2px dotted #1e3a8a !important; }
+
+/* Abaixo do placar (#div5) */
+.element-container:has(#div5){ border-bottom:2px dotted #b91c1c !important; }
+
+/* Acima e abaixo da linha de componentes pós-quadra (#div7) */
+.element-container:has(#div7){ border-top:2px dotted #b91c1c !important; border-bottom:2px dotted #b91c1c !important; }
+
+
+/* ==========================================================
+   COMPACT GAME AREAS — SAFE (apenas #div2, #div5, #div6, #div7)
+   Reduz espaços exatamente nos blocos marcados na imagem.
+   ========================================================== */
+
+/* 1) Linha "Resultado" (#div2) e o bloco anterior imediato */
+.element-container:has(#div2){
+  margin-top: 4px !important;
+  margin-bottom: 4px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+/* Ajusta o container imediatamente ANTERIOR à linha Resultado */
+.element-container:has(+ .element-container:has(#div2)){
+  margin-bottom: 4px !important;
+}
+
+/* 2) Placar (#div5) — antes e depois */
+.element-container:has(#div5){
+  margin-top: 4px !important;
+  margin-bottom: 4px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+/* Ajusta o container imediatamente ANTERIOR ao placar */
+.element-container:has(+ .element-container:has(#div5)){
+  margin-bottom: 4px !important;
+}
+
+/* 3) Quadra (#div6) — acima e abaixo */
+.element-container:has(#div6){
+  margin-top: 4px !important;
+  margin-bottom: 4px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+/* Container imediatamente DEPOIS da quadra (#div7) */
+.element-container:has(#div6) + .element-container{
+  margin-top: 4px !important;
+}
+
+/* 4) Faixa pós-quadra (#div7) */
+.element-container:has(#div7){
+  margin-top: 4px !important;
+  margin-bottom: 4px !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* 5) Margens internas mínimas de títulos/markdown nesses blocos */
+#div2 .stMarkdown p, #div2 h1, #div2 h2, #div2 h3,
+#div5 .stMarkdown p, #div5 h1, #div5 h2, #div5 h3,
+#div6 .stMarkdown p, #div6 h1, #div6 h2, #div6 h3,
+#div7 .stMarkdown p, #div7 h1, #div7 h2, #div7 h3{
+  margin-top: 0 !important;
+  margin-bottom: 4px !important;
+  padding: 0 !important;
+}
+
+/* 6) Evita respiro extra do container markdown pai imediato */
+#div2 ~ div[data-testid="stMarkdownContainer"],
+#div5 ~ div[data-testid="stMarkdownContainer"],
+#div6 ~ div[data-testid="stMarkdownContainer"],
+#div7 ~ div[data-testid="stMarkdownContainer"]{
+  margin: 0 !important; padding: 0 !important;
+}
+
