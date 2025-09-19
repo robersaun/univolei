@@ -1061,10 +1061,14 @@ with st.container():
     bar1, bar2, bar3 = st.columns([1.6, 2.5, 3.2])
     with bar1:
         if home_name and away_name:
-            st.markdown(f'<div class="badge"><b>{home_name}</b>&nbsp&nbsp&nbspX&nbsp&nbsp&nbsp<b>{away_name}</b>&nbsp&nbsp—&nbsp&nbsp'
-                        f'{(date_str if hasattr(date_str, "strftime") 
-                            else datetime.strptime(date_str, "%Y-%m-%d")).strftime("%d/%m/%Y")}'f'</div>',
-                            unsafe_allow_html=True)
+            st.markdown(
+                (
+                    f'<div class="badge"><b>{home_name}</b> &nbsp; X &nbsp; <b>{away_name}</b> — '
+                    f'{(datetime.strptime(date_str, "%Y-%m-%d") if isinstance(date_str, str) else date_str).strftime("%d/%m/%Y")}'
+                    f'</div>'
+                ),
+                unsafe_allow_html=True
+            )
     with bar2:
         st.session_state.game_mode = st.toggle("🎮 Modo Jogo", value=st.session_state.game_mode, key="game_mode_toggle")        
     with bar3:
