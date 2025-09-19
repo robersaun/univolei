@@ -1053,25 +1053,54 @@ def _go_hist():
         "Se não abrir, use a barra lateral do Streamlit."
     )
     print("[HIST-LINK] Exibido link para " + rel, flush=True)
+
+# =========================
+# Barra do sistema
+# =========================
+with st.container():
+    bar1, bar2, bar3 = st.columns([1.6, 2.5, 3.2])
+    with bar1:
+        if home_name and away_name:
+            st.markdown(f'<div class="badge"><b>{home_name}</b>&nbsp&nbsp&nbspX&nbsp&nbsp&nbsp<b>{away_name}</b>&nbsp&nbsp—&nbsp&nbsp'
+                        f'{(date_str if hasattr(date_str, "strftime") 
+                            else datetime.strptime(date_str, "%Y-%m-%d")).strftime("%d/%m/%Y")}'f'</div>',
+                            unsafe_allow_html=True)
+    with bar2:
+        st.session_state.game_mode = st.toggle("🎮 Modo Jogo", value=st.session_state.game_mode, key="game_mode_toggle")        
+    with bar3:
+        if not st.session_state.game_mode:
+            st.session_state.auto_close = st.toggle("Auto 25/15+2", value=st.session_state.auto_close, key="auto_close_toggle")
+    st.markdown('</div>', unsafe_allow_html=True)
+# rerun pós-callbacks
+if st.session_state._do_rerun_after:
+    st.session_state._do_rerun_after = False
+    st.rerun()
+
+st.markdown('<div class="sectionCard">', unsafe_allow_html=True)
+    
 # =========================
 # Topo (Time, Jogo, Tutorial, Histórico)
 # =========================
 top1, top2, top3, top4 = st.columns([2.5, 1, 1, 1])
 with top1:
-    st.button("⚙️ Time", use_container_width=True, key="top_config_team_btn",
-              on_click=lambda: st.session_state.__setitem__("show_config_team", True))
+    if not st.session_state.game_mode:
+        st.button("⚙️ Time", use_container_width=True, key="top_config_team_btn",
+                on_click=lambda: st.session_state.__setitem__("show_config_team", True))
 with top2:
-    st.button("🆕 Jogo", use_container_width=True, key="top_new_game_btn",
-              on_click=lambda: st.session_state.__setitem__("show_cadastro", True))
+    if not st.session_state.game_mode:
+        st.button("🆕 Jogo", use_container_width=True, key="top_new_game_btn",
+            on_click=lambda: st.session_state.__setitem__("show_cadastro", True))
 with top3:
-    st.button("📘 Tutorial", use_container_width=True, key="top_tutorial_btn",
-              on_click=lambda: st.session_state.__setitem__("show_tutorial", True))
+    if not st.session_state.game_mode:
+        st.button("📘 Tutorial", use_container_width=True, key="top_tutorial_btn",
+            on_click=lambda: st.session_state.__setitem__("show_tutorial", True))
 with top4:
     # Abrir Histórico (link direto — evita issues com switch_page)
-    st.markdown(
-        '<a href="/historico" target="_self" style="display:block;text-align:center;padding:.4rem .6rem;border:1px solid rgba(49,51,63,.2);border-radius:.5rem;font-weight:600;">🗂️ Histórico</a>',
-        unsafe_allow_html=True
-    )
+    if not st.session_state.game_mode:
+        st.markdown(
+            '<a href="/historico" target="_self" style="display:block;text-align:center;padding:.4rem .6rem;border:1px solid rgba(49,51,63,.2);border-radius:.5rem;font-weight:600;">🗂️ Histórico</a>',
+            unsafe_allow_html=True
+        )
 
 # =========================
 # Sets
@@ -1341,26 +1370,7 @@ if (st.session_state.match_id is None or st.session_state.show_cadastro) and not
                       use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
     st.stop()
-# =========================
-# Barra do sistema
-# =========================
-with st.container():
-    st.markdown('<div class="sectionCard">', unsafe_allow_html=True)
-    bar1, bar2, bar3 = st.columns([1.6, 2.5, 3.2])
-    with bar1:
-        if home_name and away_name:
-            st.markdown(f'<div class="badge"><b>{home_name}</b> x <b>{away_name}</b> — {date_str}</div>', unsafe_allow_html=True)
-    with bar2:
-        st.session_state.auto_close = st.toggle("Auto 25/15+2", value=st.session_state.auto_close, key="auto_close_toggle")
-        st.session_state.game_mode = st.toggle("🎮 Modo Jogo", value=st.session_state.game_mode, key="game_mode_toggle")        
-    with bar3:
-        st.session_state.graph_filter = st.radio("Filtro Gráficos:", options=["Nós","Adversário","Ambos"],
-            horizontal=True, index=["Nós","Adversário","Ambos"].index(st.session_state.graph_filter), key="graph_filter_radio")
-    st.markdown('</div>', unsafe_allow_html=True)
-# rerun pós-callbacks
-if st.session_state._do_rerun_after:
-    st.session_state._do_rerun_after = False
-    st.rerun()
+
 # =========================
 # PLACAR (top) – visível fora do Modo Jogo
 if not st.session_state.game_mode:
@@ -1385,6 +1395,8 @@ if not st.session_state.game_mode:
         st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sectionCard">', unsafe_allow_html=True)
+    
 # =========================
 # MODO JOGO
 # =========================
@@ -1396,7 +1408,7 @@ if st.session_state.game_mode:
         #st.subheader("🎮 Modo Jogo")
         # Linha compacta
         st.markdown('<div id="div2" class="gm-row">', unsafe_allow_html=True)
-        cR, cP, cM, cA = st.columns([1.1, 1.1, 1.6, 1.5])
+        cR, cP, cM = st.columns([1.1, 1.1, 1.6])
         with cR:
             st.markdown("**Resultado**")
             st.session_state.q_result = st.radio(
@@ -1418,26 +1430,9 @@ if st.session_state.game_mode:
                 index=["Número", "Nome"].index(st.session_state.player_label_mode),
                 key="player_label_mode_gm", label_visibility="collapsed"
             )
-        with cA:
-            st.markdown("**Ação**")
-            action_options = list(ACT_MAP.values())
-            current_action = ACT_MAP.get(st.session_state.q_action, "Diagonal")
-            def on_action_change_gm():
-                selected_label = st.session_state.get("q_action_select_gm")
-                if not selected_label:
-                    return
-                code = REVERSE_ACT_MAP.get(selected_label, "d")
-                st.session_state["q_action"] = code
-                if st.session_state.get("last_selected_player") is None:
-                    st.warning("Selecione uma jogadora antes de escolher a ação.")
-                    return
-                register_current(action=code)
-            st.selectbox(
-                "", action_options, index=action_options.index(current_action),
-                key="q_action_select_gm", on_change=on_action_change_gm,
-                label_visibility="collapsed"
-            )
-        # Linha de botões de jogadoras + ADV
+
+        st.markdown('<div class="sectionCard">', unsafe_allow_html=True)
+            # Linha de botões de jogadoras + ADV
         st.markdown('</div>', unsafe_allow_html=True)  # close div2
         st.markdown('<div id="div3" class="gm-row">', unsafe_allow_html=True)
         st.markdown('<div class="gm-players-row">', unsafe_allow_html=True)
@@ -1676,28 +1671,29 @@ if st.session_state.game_mode:
     st.markdown('</div>', unsafe_allow_html=True)  # fecha #div6
 
     # === F I L T R O S  abaixo da quadra ===
-    st.markdown('<div id="div7" style="margin:0;padding:0;">', unsafe_allow_html=True)
-    f1, f2, f3, f4, f5, f6 = st.columns([1.0, 1.0, 1.0, 1.2, 1.2, 1.2])
-    with f1: 
-        nums_all = resolve_our_roster_numbers(st.session_state.frames)
-        player_opts = ["Todas"] + nums_all
-        c1, c2 = st.columns([0.40, 0.60])
-        with c1:
-            st.markdown("<div class='uv-inline-label'>Jogadora</div>", unsafe_allow_html=True)
-        with c2:
-            picked = st.selectbox("", options=player_opts, index=0, key="hm_players_filter_main", label_visibility="collapsed")
-        sel_players = None if picked == "Todas" else [picked]
+    if not st.session_state.game_mode:
+        st.markdown('<div id="div7" style="margin:0;padding:0;">', unsafe_allow_html=True)
+        f1, f2, f3, f4, f5, f6 = st.columns([1.0, 1.0, 1.0, 1.2, 1.2, 1.2])
+        with f1: 
+            nums_all = resolve_our_roster_numbers(st.session_state.frames)
+            player_opts = ["Todas"] + nums_all
+            c1, c2 = st.columns([0.40, 0.60])
+            with c1:
+                st.markdown("<div class='uv-inline-label'>Jogadora</div>", unsafe_allow_html=True)
+            with c2:
+                picked = st.selectbox("", options=player_opts, index=0, key="hm_players_filter_main", label_visibility="collapsed")
+            sel_players = None if picked == "Todas" else [picked]
 
-    with f2: 
-        st.session_state.show_heat_numbers = st.checkbox(
-            "Mostrar número/ADV nas bolinhas",
-            value=st.session_state.show_heat_numbers, key="hm_show_numbers_main"
-        )
-    with f3: show_success   = st.checkbox("Nossos acertos", value=True, key="hm_show_succ_main")        
-    with f4: show_errors    = st.checkbox("Nossos erros",   value=True, key="hm_show_err_main")
-    with f5: show_adv_pts   = st.checkbox("ADV acertos",    value=True, key="hm_show_adv_ok_main")
-    with f6: show_adv_err   = st.checkbox("ADV erros",      value=True, key="hm_show_adv_err_main")
-    st.markdown('</div>', unsafe_allow_html=True)  # fecha #div7
+        with f2: 
+            st.session_state.show_heat_numbers = st.checkbox(
+                "Mostrar número/ADV nas bolinhas",
+                value=st.session_state.show_heat_numbers, key="hm_show_numbers_main"
+            )
+        with f3: show_success   = st.checkbox("Nossos acertos", value=True, key="hm_show_succ_main")        
+        with f4: show_errors    = st.checkbox("Nossos erros",   value=True, key="hm_show_err_main")
+        with f5: show_adv_pts   = st.checkbox("ADV acertos",    value=True, key="hm_show_adv_ok_main")
+        with f6: show_adv_err   = st.checkbox("ADV erros",      value=True, key="hm_show_adv_err_main")
+        st.markdown('</div>', unsafe_allow_html=True)  # fecha #div7
 
     # --- SCRIPT: “amassa” os wrappers do Streamlit ao redor de #div5/#div6/#div7 (sem :has) ---
     components.html("""
@@ -1732,32 +1728,37 @@ if st.session_state.game_mode:
 # Painel principal
 # =========================
 with st.container():
-    st.markdown('<div class="sectionCard">', unsafe_allow_html=True)
     frames = st.session_state.frames
     df_set = current_set_df(frames, st.session_state.match_id, st.session_state.set_number)
     left, right = st.columns([1.25, 1.0])
     # -------- ESQUERDA --------
     with left:
-        st.markdown("**🎯 Registrar Rally**")
-        def on_submit_text_main():
-            raw = st.session_state.get("line_input_text", "").strip()
-            if not raw:
-                return
-            quick_register_line(raw)
-            st.session_state["line_input_text"] = ""
-            st.session_state["q_side"] = "Nós"
-            st.session_state["q_result"] = "Acerto"
-            st.session_state["q_action"] = "d"
-            st.session_state["q_position"] = "Frente"
-        st.text_input(
-            "Digite código:", key="line_input_text",
-            placeholder="Ex: 1 9 d", label_visibility="collapsed",
-            on_change=on_submit_text_main
-        )
-        def _cb_register_main():
-            register_current()
-            st.session_state["line_input_text"] = ""
-        c_reg, c_undo = st.columns([1, 1])
+        bar4, bar5 = st.columns([1.6, 2.5])
+        with bar4:
+            st.markdown("**🎯 Registrar Rally**")
+            def on_submit_text_main():
+                raw = st.session_state.get("line_input_text", "").strip()
+                if not raw:
+                    return
+                quick_register_line(raw)
+                st.session_state["line_input_text"] = ""
+                st.session_state["q_side"] = "Nós"
+                st.session_state["q_result"] = "Acerto"
+                st.session_state["q_action"] = "d"
+                st.session_state["q_position"] = "Frente"
+            st.text_input(
+                "Digite código:", key="line_input_text",
+                placeholder="Ex: 1 9 d", label_visibility="collapsed",
+                on_change=on_submit_text_main
+            )
+            def _cb_register_main():
+                register_current()
+                st.session_state["line_input_text"] = ""
+            c_reg, c_undo = st.columns([1, 1])
+        with bar5:
+            if not st.session_state.game_mode:
+                st.session_state.graph_filter = st.radio("Filtro Gráficos:", options=["Nós","Adversário","Ambos"],
+                    horizontal=True, index=["Nós","Adversário","Ambos"].index(st.session_state.graph_filter), key="graph_filter_radio")
         with c_reg:
             st.button("Registrar", use_container_width=True, key="btn_register_main", on_click=_cb_register_main)
         with c_undo:
