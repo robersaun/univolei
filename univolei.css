@@ -18,7 +18,7 @@ h1, h2, h3 { margin: .05rem 0 .1rem; }
 
 /* Cartão de seção */
 .sectionCard{
-  border:1px solid #e1e6ef; background:#fff; border-radius:8px;
+  border:1px solid #e1e6ef;  border-radius:8px;
   padding:4px 6px; margin:4px 0; overflow:hidden; top: -50px; position:relative;
 }
 
@@ -69,7 +69,7 @@ div[role="radiogroup"] > label{ margin-right:.35rem; font-size:.85rem; }
   border:1px solid #e1e6ef;
   border-radius:999px;
   padding:3px 6px;
-  font-size:.90rem;
+  font-size:1.2rem;
   white-space:nowrap;
 
   display: flex;               /* ativa flexbox */
@@ -675,7 +675,7 @@ div[data-testid="stVerticalBlock"] > div {
   margin: 0 !important;
 }
 
-/* 7) (Opcional) Se ainda aparecer espaço, ative a linha abaixo para o container do card:
+/* 7) (Opcional) Se ainda aparecer espaço, ative a linha abaixo para o container do card:*/
 .sectionCard .element-container:has(#div1),
 .sectionCard .element-container:has(#div2),
 .sectionCard .element-container:has(#div3),
@@ -683,7 +683,9 @@ div[data-testid="stVerticalBlock"] > div {
 .sectionCard .element-container:has(#div5),
 .sectionCard .element-container:has(#div6),
 .sectionCard .element-container:has(#div7){ margin:0 !important; }
-*/
+
+
+
 
 
 
@@ -768,13 +770,13 @@ div[data-testid="stVerticalBlock"] > div {
    DEBUG VISUAL — MOSTRA o que o seletor está pegando
    Use apenas para teste; remova em produção.
    ===================================================== */
-   .element-container:has(#div3){ outline:1px dashed #00a; outline-offset:2px; }
-   .element-container:has(#div4){ outline:1px dashed #a00; outline-offset:2px; }
+/*#desativada MAS SE PRECISAR, ATIVAR   .element-container:has(#div3){ outline:1px dashed #00a; outline-offset:2px; }*/
+/*.element-container:has(#div4){ outline:1px dashed #a00; outline-offset:2px; }  */
    
-   /* Tudo que está ENTRE #div3 e #div4 fica com fundo levemente marcado */
-   .element-container:has(#div3) ~ .element-container:has(~ .element-container:has(#div4)){
-     background: rgba(0,0,0,0.02) !important;
-   }
+/* Tudo que está ENTRE #div3 e #div4 fica com fundo levemente marcado */
+.element-container:has(#div3) ~ .element-container:has(~ .element-container:has(#div4)){
+  background: rgba(0,0,0,0.02) !important;
+}
    
 
 /* =====================================================
@@ -784,8 +786,8 @@ div[data-testid="stVerticalBlock"] > div {
    ===================================================== */
 
 /* === MARCA VISUAL (não remova) ====================== */
-.element-container:has(#div3){ outline:2px dotted #1e3a8a; outline-offset:2px; }
-.element-container:has(#div4){ outline:2px dotted #b91c1c; outline-offset:2px; }
+/*#desativada MAS SE PRECISAR, ATIVAR   .element-container:has(#div3){ outline:2px dotted #1e3a8a; outline-offset:2px; }   */
+/*.element-container:has(#div4){ outline:2px dotted #b91c1c; outline-offset:2px; }  */
 /* Tudo ENTRE os marcadores fica com leve fundo para conferência */
 .element-container:has(#div3) ~ .element-container:has(~ .element-container:has(#div4)){
   background: rgba(0,0,0,.03) !important;
@@ -919,8 +921,8 @@ div[data-testid="stVerticalBlock"] > div {
    ==================================================== */
 
 /* Deixe as listras de debug visíveis (marcadores) */
-.element-container:has(#div3){ outline:1px dashed #2b6cb0; outline-offset:2px; }
-.element-container:has(#div4){ outline:1px dashed #c53030; outline-offset:2px; }
+/*.element-container:has(#div3){ outline:1px dashed #2b6cb0; outline-offset:2px; }
+.element-container:has(#div4){ outline:1px dashed #c53030; outline-offset:2px; }  */
 
 /* Classe aplicada via JS aos wrappers ENTRE #div3 e #div4 */
 .element-container.uv-compact-34{
@@ -1056,18 +1058,16 @@ iframe.uv-collapse{ display:none !important; height:0 !important; min-height:0 !
 
 /* ===== Debug: dotted guides (match style of #div3/#div4) ===== */
 /* Em cima da linha que começa com "Resultado" (#div2) */
-.element-container:has(#div2){ outline:2px dotted #1e3a8a !important; outline-offset:2px; }
+/*#desativada MAS SE PRECISAR, ATIVAR   .element-container:has(#div2){ outline:2px dotted #1e3a8a !important; outline-offset:2px; }    */
 
 /* Abaixo do placar (#div5) */
-.element-container:has(#div5){ border-bottom:2px dotted #b91c1c !important; }
+/*.element-container:has(#div5){ border-bottom:2px dotted #b91c1c !important; }  */
 
 /* Acima e abaixo da faixa de componentes pós-quadra (#div7) */
-.element-container:has(#div7){ border-top:2px dotted #b91c1c !important; border-bottom:2px dotted #b91c1c !important; }
+/*.element-container:has(#div7){ border-top:2px dotted #b91c1c !important; border-bottom:2px dotted #b91c1c !important; }*/
 
 
-/* ===============================
-   HEADER/TOOLBAR TRANSPARENT FIX
-   =============================== */
+/* HEADER/TOOLBAR TRANSPARENT FIX */
 header[data-testid="stHeader"],
 header[data-testid="stHeader"] *,
 div[data-testid="stToolbar"],
@@ -1077,82 +1077,15 @@ div[data-testid="stDecoration"]{
   box-shadow: none !important;
 }
 
-
-/* ===== DOTTED GUIDES (precise, requested) ===== */
+/* DOTTED GUIDES (precise) */
 /* Em cima da linha 'Resultado' (#div2) */
-.element-container:has(#div2){ border-top:2px dotted #1e3a8a !important; }
+/*.element-container:has(#div2){ border-top:2px dotted #1e3a8a !important; }*/
 
 /* Abaixo do placar (#div5) */
-.element-container:has(#div5){ border-bottom:2px dotted #b91c1c !important; }
+/*.element-container:has(#div5){ border-bottom:2px dotted #b91c1c !important; }  */
 
 /* Acima e abaixo da linha de componentes pós-quadra (#div7) */
-.element-container:has(#div7){ border-top:2px dotted #b91c1c !important; border-bottom:2px dotted #b91c1c !important; }
-
-
-/* ==========================================================
-   COMPACT GAME AREAS — SAFE (apenas #div2, #div5, #div6, #div7)
-   Reduz espaços exatamente nos blocos marcados na imagem.
-   ========================================================== */
-
-/* 1) Linha "Resultado" (#div2) e o bloco anterior imediato */
-.element-container:has(#div2){
-  margin-top: 4px !important;
-  margin-bottom: 4px !important;
-  padding-top: 0 !important;
-  padding-bottom: 0 !important;
-}
-/* Ajusta o container imediatamente ANTERIOR à linha Resultado */
-.element-container:has(+ .element-container:has(#div2)){
-  margin-bottom: 4px !important;
-}
-
-/* 2) Placar (#div5) — antes e depois */
-.element-container:has(#div5){
-  margin-top: 4px !important;
-  margin-bottom: 4px !important;
-  padding-top: 0 !important;
-  padding-bottom: 0 !important;
-}
-/* Ajusta o container imediatamente ANTERIOR ao placar */
-.element-container:has(+ .element-container:has(#div5)){
-  margin-bottom: 4px !important;
-}
-
-/* 3) Quadra (#div6) — acima e abaixo */
-.element-container:has(#div6){
-  margin-top: 4px !important;
-  margin-bottom: 4px !important;
-  padding-top: 0 !important;
-  padding-bottom: 0 !important;
-}
-/* Container imediatamente DEPOIS da quadra (#div7) */
-.element-container:has(#div6) + .element-container{
-  margin-top: 4px !important;
-}
-
-/* 4) Faixa pós-quadra (#div7) */
-.element-container:has(#div7){
-  margin-top: 4px !important;
-  margin-bottom: 4px !important;
-  padding-top: 0 !important;
-  padding-bottom: 0 !important;
-}
-
-/* 5) Margens internas mínimas de títulos/markdown nesses blocos */
-#div2 .stMarkdown p, #div2 h1, #div2 h2, #div2 h3,
-#div5 .stMarkdown p, #div5 h1, #div5 h2, #div5 h3,
-#div6 .stMarkdown p, #div6 h1, #div6 h2, #div6 h3,
-#div7 .stMarkdown p, #div7 h1, #div7 h2, #div7 h3{
-  margin-top: 0 !important;
-  margin-bottom: 4px !important;
-  padding: 0 !important;
-}
-
-/* 6) Evita respiro extra do container markdown pai imediato */
-#div2 ~ div[data-testid="stMarkdownContainer"],
-#div5 ~ div[data-testid="stMarkdownContainer"],
-#div6 ~ div[data-testid="stMarkdownContainer"],
-#div7 ~ div[data-testid="stMarkdownContainer"]{
-  margin: 0 !important; padding: 0 !important;
-}
-
+/*.element-container:has(#div7){
+  border-top:2px dotted #b91c1c !important;
+  border-bottom:2px dotted #b91c1c !important;
+}*/
