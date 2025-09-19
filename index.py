@@ -1080,7 +1080,7 @@ if st.session_state._do_rerun_after:
     st.session_state._do_rerun_after = False
     st.rerun()
 
-st.markdown('<div class="sectionCard">', unsafe_allow_html=True)
+#st.markdown('<div class="sectionCard">', unsafe_allow_html=True)
     
 # =========================
 # Topo (Time, Jogo, Tutorial, Histórico)
@@ -1400,8 +1400,7 @@ if not st.session_state.game_mode:
         st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sectionCard">', unsafe_allow_html=True)
-    
+     
 # =========================
 # MODO JOGO
 # =========================
@@ -1429,17 +1428,18 @@ if st.session_state.game_mode:
                 key="gm_q_position", label_visibility="collapsed"
             )
         with cM:
-            st.markdown("**Mostrar botões por**")
-            st.session_state.player_label_mode = st.radio(
-                "", ["Número", "Nome"], horizontal=True,
-                index=["Número", "Nome"].index(st.session_state.player_label_mode),
-                key="player_label_mode_gm", label_visibility="collapsed"
-            )
+            if not st.session_state.game_mode:
+                st.markdown("**Mostrar botões por**")
+                st.session_state.player_label_mode = st.radio(
+                    "", ["Número", "Nome"], horizontal=True,
+                    index=["Número", "Nome"].index(st.session_state.player_label_mode),
+                    key="player_label_mode_gm", label_visibility="collapsed"
+                )
          # Linha de botões de jogadoras + ADV
         st.markdown('</div>', unsafe_allow_html=True)  # close div2
         st.markdown('<div id="div3" class="gm-row">', unsafe_allow_html=True)
         st.markdown('<div class="gm-players-row">', unsafe_allow_html=True)
-        st.caption("Jogadoras (toque rápido define lado = Nós)")
+        st.markdown("**Jogadoras (toque rápido define lado = Nós)**")
         nums = resolve_our_roster_numbers(st.session_state.frames)
         name_map = {r["number"]: r["name"] for r in roster_for_ui(st.session_state.frames)}
         if nums:
