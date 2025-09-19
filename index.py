@@ -1109,93 +1109,94 @@ with top4:
 # =========================
 # Sets
 # =========================
-top5, top6, top7, top8, top9, top10 = st.columns([0.5, 1, 1, 1, 1, 1])
-sets_df = frames.get("sets", pd.DataFrame())
-sets_match_all = sets_df.loc[sets_df.get("match_id", pd.Series(dtype="Int64")) == st.session_state.match_id].sort_values("set_number")
-sel_vals = sets_match_all["set_number"].tolist() if not sets_match_all.empty else [1]
-with top5:
-    st.markdown("<div class='uv-inline-label'>Opções do Set e da Partida:</div>", unsafe_allow_html=True)
-with top6:
-    set_picked = st.selectbox("Set:", sel_vals, label_visibility="collapsed", key="set_select")
-def _reopen_set():
-    frames_local = st.session_state.frames
-    stf = frames_local["sets"]
-    mask = (stf["match_id"]==st.session_state.match_id) & (stf["set_number"]==int(set_picked))
-    if mask.any():
-        stf.loc[mask, "winner_team_id"] = np.nan
-        frames_local["sets"] = stf
-        save_all(Path(st.session_state.db_path), frames_local)
-    st.session_state.set_number = int(set_picked)
-    st.session_state.frames = frames_local
-    st.session_state.data_rev += 1
-    st.success(f"Set {set_picked} reaberto.")
-def _close_set():
-    frames_local = st.session_state.frames
-    df_cur = current_set_df(frames_local, st.session_state.match_id, int(set_picked))
-    if df_cur.empty: 
-        st.warning("Sem rallies neste set.")
-        return
-    hp, ap = set_score_from_df(df_cur)
-    if hp == ap: 
-        st.warning("Empate — defina o set antes.")
-        return
-    st.session_state.set_number = int(set_picked)
-    _apply_set_winner_and_proceed(hp, ap)
-    st.session_state.data_rev += 1
-with top7:
-    st.button("🔓 Reabrir Set", use_container_width=True, key="reopen_btn", on_click=_reopen_set)
-    st.markdown('</div>', unsafe_allow_html=True)
-with top8:
-    st.button("✅ Fechar Set", use_container_width=True, key="close_set_btn", on_click=_close_set)
-    st.markdown('</div>', unsafe_allow_html=True)
-with top9:
-    def _remove_empty_set():
-            frames_local = st.session_state.frames
-            stf = frames_local["sets"]; rl = frames_local["rallies"]; mid = st.session_state.match_id
-            sets_m = stf[stf["match_id"]==mid]
-            if sets_m.empty: 
-                st.warning("Sem sets cadastrados.")
-                return
-            max_set = int(sets_m["set_number"].max())
-            sub = rl[(rl["match_id"]==mid) & (rl["set_number"]==max_set)]
-            if not sub.empty: 
-                st.warning(f"O Set {max_set} tem rallies e não será removido.")
-                return
-            stf = stf[~((stf["match_id"]==mid) & (stf["set_number"]==max_set))]; frames_local["sets"] = stf
-            save_all(Path(st.session_state.db_path), frames_local)
-            st.success(f"Set {max_set} removido.")
-            st.session_state.frames = frames_local
-            st.session_state.data_rev += 1
-            st.markdown('<div class="btn-xxs">', unsafe_allow_html=True)
-    st.button("🗑️ Remover Set Vazio", use_container_width=True, key="remove_empty_set_btn", on_click=_remove_empty_set)
-    st.markdown('</div>', unsafe_allow_html=True)
-########   
-# Finalizar partida direto
-def _finalizar_partida():
-    if st.session_state.match_id is None: return
-    mid = st.session_state.match_id
-    try:
-        finalize_match(st.session_state.frames, mid)
-    except Exception:
-        pass
-    # Força is_closed na tabela
-    try:
+if not st.session_state.game_mode:
+    top5, top6, top7, top8, top9, top10 = st.columns([0.5, 1, 1, 1, 1, 1])
+    sets_df = frames.get("sets", pd.DataFrame())
+    sets_match_all = sets_df.loc[sets_df.get("match_id", pd.Series(dtype="Int64")) == st.session_state.match_id].sort_values("set_number")
+    sel_vals = sets_match_all["set_number"].tolist() if not sets_match_all.empty else [1]
+    with top5:
+        st.markdown("<div class='uv-inline-label'>Opções do Set e da Partida:</div>", unsafe_allow_html=True)
+    with top6:
+        set_picked = st.selectbox("Set:", sel_vals, label_visibility="collapsed", key="set_select")
+    def _reopen_set():
         frames_local = st.session_state.frames
-        mt = frames_local.get("amistosos", pd.DataFrame())
-        mt.loc[mt["match_id"] == mid, "is_closed"] = True
-        mt.loc[mt["match_id"] == mid, "closed_at"] = datetime.now().isoformat(timespec="seconds")
-        frames_local["amistosos"] = mt
-        save_all(Path(st.session_state.db_path), frames_local)
+        stf = frames_local["sets"]
+        mask = (stf["match_id"]==st.session_state.match_id) & (stf["set_number"]==int(set_picked))
+        if mask.any():
+            stf.loc[mask, "winner_team_id"] = np.nan
+            frames_local["sets"] = stf
+            save_all(Path(st.session_state.db_path), frames_local)
+        st.session_state.set_number = int(set_picked)
         st.session_state.frames = frames_local
-    except Exception:
-        pass
-    st.success("Partida finalizada.")
-    st.session_state.match_id = None
-    st.session_state.set_number = None
-    st.session_state._do_rerun_after = True
-with top10:
-    st.button("🏁 Finalizar Partida", use_container_width=True, on_click=_finalizar_partida)
-    
+        st.session_state.data_rev += 1
+        st.success(f"Set {set_picked} reaberto.")
+    def _close_set():
+        frames_local = st.session_state.frames
+        df_cur = current_set_df(frames_local, st.session_state.match_id, int(set_picked))
+        if df_cur.empty: 
+            st.warning("Sem rallies neste set.")
+            return
+        hp, ap = set_score_from_df(df_cur)
+        if hp == ap: 
+            st.warning("Empate — defina o set antes.")
+            return
+        st.session_state.set_number = int(set_picked)
+        _apply_set_winner_and_proceed(hp, ap)
+        st.session_state.data_rev += 1
+    with top7:
+        st.button("🔓 Reabrir Set", use_container_width=True, key="reopen_btn", on_click=_reopen_set)
+        st.markdown('</div>', unsafe_allow_html=True)
+    with top8:
+        st.button("✅ Fechar Set", use_container_width=True, key="close_set_btn", on_click=_close_set)
+        st.markdown('</div>', unsafe_allow_html=True)
+    with top9:
+        def _remove_empty_set():
+                frames_local = st.session_state.frames
+                stf = frames_local["sets"]; rl = frames_local["rallies"]; mid = st.session_state.match_id
+                sets_m = stf[stf["match_id"]==mid]
+                if sets_m.empty: 
+                    st.warning("Sem sets cadastrados.")
+                    return
+                max_set = int(sets_m["set_number"].max())
+                sub = rl[(rl["match_id"]==mid) & (rl["set_number"]==max_set)]
+                if not sub.empty: 
+                    st.warning(f"O Set {max_set} tem rallies e não será removido.")
+                    return
+                stf = stf[~((stf["match_id"]==mid) & (stf["set_number"]==max_set))]; frames_local["sets"] = stf
+                save_all(Path(st.session_state.db_path), frames_local)
+                st.success(f"Set {max_set} removido.")
+                st.session_state.frames = frames_local
+                st.session_state.data_rev += 1
+                st.markdown('<div class="btn-xxs">', unsafe_allow_html=True)
+        st.button("🗑️ Remover Set Vazio", use_container_width=True, key="remove_empty_set_btn", on_click=_remove_empty_set)
+        st.markdown('</div>', unsafe_allow_html=True)
+    ########   
+    # Finalizar partida direto
+    def _finalizar_partida():
+        if st.session_state.match_id is None: return
+        mid = st.session_state.match_id
+        try:
+            finalize_match(st.session_state.frames, mid)
+        except Exception:
+            pass
+        # Força is_closed na tabela
+        try:
+            frames_local = st.session_state.frames
+            mt = frames_local.get("amistosos", pd.DataFrame())
+            mt.loc[mt["match_id"] == mid, "is_closed"] = True
+            mt.loc[mt["match_id"] == mid, "closed_at"] = datetime.now().isoformat(timespec="seconds")
+            frames_local["amistosos"] = mt
+            save_all(Path(st.session_state.db_path), frames_local)
+            st.session_state.frames = frames_local
+        except Exception:
+            pass
+        st.success("Partida finalizada.")
+        st.session_state.match_id = None
+        st.session_state.set_number = None
+        st.session_state._do_rerun_after = True
+    with top10:
+        st.button("🏁 Finalizar Partida", use_container_width=True, on_click=_finalizar_partida)
+        
 
 
 # =========================
@@ -1434,9 +1435,7 @@ if st.session_state.game_mode:
                 index=["Número", "Nome"].index(st.session_state.player_label_mode),
                 key="player_label_mode_gm", label_visibility="collapsed"
             )
-
-        st.markdown('<div class="sectionCard">', unsafe_allow_html=True)
-            # Linha de botões de jogadoras + ADV
+         # Linha de botões de jogadoras + ADV
         st.markdown('</div>', unsafe_allow_html=True)  # close div2
         st.markdown('<div id="div3" class="gm-row">', unsafe_allow_html=True)
         st.markdown('<div class="gm-players-row">', unsafe_allow_html=True)
