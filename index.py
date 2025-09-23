@@ -1194,7 +1194,7 @@ def display_dataframe(df, height=None, width='content', extra_class: str = ""):
     html_table = df.to_html(classes=classes, index=False, escape=False)
 
     height_css = f"{int(height)}px" if isinstance(height, (int, float)) else "auto"
-    width_css = "100%" if use_container_width else "auto"
+    width_css = "100%" if width == 'stretch' else "auto"  # CORREÇÃO AQUI
 
     styled_html = f"""
     <div style="overflow:auto; height:{height_css}; width:{width_css};">
