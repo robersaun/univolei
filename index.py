@@ -26,6 +26,8 @@ from db_excel import save_all
 import pandas as _pd
 import datetime as _dt
 import os
+
+
 os.environ["STREAMLIT_SERVER_FILE_WATCHER"] = "false"
 
 from db_excel import (
@@ -1140,13 +1142,18 @@ SMALL_RC = {
     "legend.fontsize": 7,
 }
 mpl.rcParams.update(SMALL_RC)
-def small_fig(w=2.8, h=1.25):
+def small_fig(w=3.2, h=1.8):  # Aumentei as dimensões mínimas
+    # Garantir que as dimensões sejam pelo menos 1.0
+    w = max(1.0, w)
+    h = max(1.0, h)
+    
     fig, ax = plt.subplots(figsize=(w, h), dpi=110)
     ax.grid(True, alpha=0.15)
     for side in ("top", "right"): ax.spines[side].set_visible(False)
     ax.margins(x=0.02)
     ax.tick_params(length=2.5, width=0.6, pad=1.5)
     return fig, ax
+
 def trim_ax(ax, xlabel="", ylabel="", legend=False, max_xticks=6, max_yticks=5):
     from matplotlib.ticker import MaxNLocator
     if xlabel: ax.set_xlabel(xlabel, fontsize=7, labelpad=1.5)
@@ -1158,10 +1165,7 @@ def trim_ax(ax, xlabel="", ylabel="", legend=False, max_xticks=6, max_yticks=5):
     return ax.get_figure()
 def bar_chart_safe(obj, title=None, rotate_xticks=0):
     """Bar chart sem Altair/Arrow/pyarrow. Aceita Series (1 série) ou DataFrame (agrupado)."""
-    import numpy as np
-    import pandas as pd
-
-    fig, ax = small_fig(3.6, 1.6)
+    fig, ax = small_fig(4.0, 2.0)
 
     if isinstance(obj, pd.Series):
         s = obj.fillna(0)
