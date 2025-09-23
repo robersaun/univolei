@@ -1182,7 +1182,7 @@ def bar_chart_safe(obj, title=None, rotate_xticks=0):
         ax.set_xticklabels([str(i) for i in idx], rotation=rotate_xticks, ha="right", fontsize=7)
         ax.legend(loc="best", fontsize=7)
 
-    st.pyplot(trim_ax(ax, legend=True), use_container_width=True)
+    st.pyplot(trim_ax(ax, legend=True), width=True)
 
 # =========================
 # DataFrame HTML
