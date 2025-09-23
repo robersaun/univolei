@@ -269,13 +269,18 @@ SMALL_RC = {
     "legend.fontsize": 7,
 }
 mpl.rcParams.update(SMALL_RC)
-def small_fig(w=2.8, h=1.25):
+def small_fig(w=3.2, h=1.8):
+    # CORREÇÃO: Aumentar o mínimo para valores mais seguros
+    w = max(2.0, w)  # Mínimo de 2.0 em vez de 0.5
+    h = max(1.5, h)  # Mínimo de 1.5 em vez de 0.5
+    
     fig, ax = plt.subplots(figsize=(w, h), dpi=110)
     ax.grid(True, alpha=0.15)
     for side in ("top", "right"): ax.spines[side].set_visible(False)
     ax.margins(x=0.02)
     ax.tick_params(length=2.5, width=0.6, pad=1.5)
     return fig, ax
+
 def trim_ax(ax, xlabel="", ylabel="", legend=False, max_xticks=6, max_yticks=5):
     from matplotlib.ticker import MaxNLocator
     if xlabel: ax.set_xlabel(xlabel, fontsize=7, labelpad=1.5)
