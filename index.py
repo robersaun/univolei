@@ -46,7 +46,7 @@ BACKUP_DIR = BASE_DIR / "backups"
 LOGS_DIR   = BASE_DIR / "logs"
 LOGS_DIR.mkdir(parents=True, exist_ok=True)
 BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-
+BACKUP_DIRS = [BACKUP_DIR]  # mantém o comportamento local
 
 # =========================
 # IMPORTANTE: GRAVÇÕES -> Frequência de persistência por destino
@@ -60,8 +60,6 @@ SYNC_CFG = {
     # online (lento): só checkpoints (ou manual)
     "gsheets": {"set_open", "set_close", "match_close", "manual"},
 }
-
-
 
 # =========================
 # Config + Estilos
@@ -202,17 +200,18 @@ if _cfg_path.exists():
 # >>> Fixos solicitados por você (podem ser sobrescritos por env/secrets se quiser no futuro)
 GOOGLE_DRIVE_ROOT_FOLDER_URL = "https://drive.google.com/drive/folders/10PDkcUb4yGhrEmiNKwNo7mzZBGJIN_5r"
 GOOGLE_SHEETS_SPREADSHEET_ID = "1FLBTjIMAgQjGM76XbNZT3U_lIDGUsWQbea2QCmdXbYI"
+GOOGLE_WEBHOOK_URL = ""
 # >>> Valores devem vir SOMENTE do config.ini
 
 # >>> SE QUISER PUXAR DO CONFIG.INI ->> MAS ESTAVA DANDO ERRO AO SUBIR NO STREAMLIT, GIT, ETC...
 #GOOGLE_DRIVE_ROOT_FOLDER_URL   = CONFIG["backup"].get("drive_folder_url", "")
 #GOOGLE_SHEETS_SPREADSHEET_ID   = CONFIG["online"].get("gsheet_id", "")
-BACKUP_DIRS = [BACKUP_DIR]  # mantém o comportamento local
+
 
 # Propaga para CONFIG (sem ENV/secrets; apenas reafirma o que veio do config.ini)
-CONFIG["online"]["webhook_url"]      = CONFIG["online"].get("webhook_url", "")
-CONFIG["online"]["gsheet_id"]        = CONFIG["online"].get("gsheet_id", "")
-CONFIG["backup"]["drive_folder_url"] = CONFIG["backup"].get("drive_folder_url", "")
+CONFIG["online"]["webhook_url"]      = GOOGLE_WEBHOOK_URL#CONFIG["online"].get("webhook_url", "")
+CONFIG["online"]["gsheet_id"]        = GOOGLE_SHEETS_SPREADSHEET_ID#CONFIG["online"].get("gsheet_id", "")
+CONFIG["backup"]["drive_folder_url"] = GOOGLE_DRIVE_ROOT_FOLDER_URL#CONFIG["backup"].get("drive_folder_url", "")
 
 
 def _normalize_gsheet_id(raw_id):
