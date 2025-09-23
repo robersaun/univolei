@@ -198,11 +198,13 @@ if _cfg_path.exists():
 
 
 # >>> Fixos solicitados por você (podem ser sobrescritos por env/secrets se quiser no futuro)
-#GOOGLE_DRIVE_ROOT_FOLDER_URL = "https://drive.google.com/drive/folders/10PDkcUb4yGhrEmiNKwNo7mzZBGJIN_5r"
-#GOOGLE_SHEETS_SPREADSHEET_ID = "1V6lwFuWn94bhRcLg3yMZOa6Rs4q4U64q"
+GOOGLE_DRIVE_ROOT_FOLDER_URL = "https://drive.google.com/drive/folders/10PDkcUb4yGhrEmiNKwNo7mzZBGJIN_5r"
+GOOGLE_SHEETS_SPREADSHEET_ID = "1FLBTjIMAgQjGM76XbNZT3U_lIDGUsWQbea2QCmdXbYI"
 # >>> Valores devem vir SOMENTE do config.ini
-GOOGLE_DRIVE_ROOT_FOLDER_URL   = CONFIG["backup"].get("drive_folder_url", "")
-GOOGLE_SHEETS_SPREADSHEET_ID   = CONFIG["online"].get("gsheet_id", "")
+
+# >>> SE QUISER PUXAR DO CONFIG.INI ->> MAS ESTAVA DANDO ERRO AO SUBIR NO STREAMLIT, GIT, ETC...
+#GOOGLE_DRIVE_ROOT_FOLDER_URL   = CONFIG["backup"].get("drive_folder_url", "")
+#GOOGLE_SHEETS_SPREADSHEET_ID   = CONFIG["online"].get("gsheet_id", "")
 BACKUP_DIRS = [BACKUP_DIR]  # mantém o comportamento local
 
 # Propaga para CONFIG (sem ENV/secrets; apenas reafirma o que veio do config.ini)
