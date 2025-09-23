@@ -213,19 +213,37 @@ CONFIG["online"]["gsheet_id"]        = CONFIG["online"].get("gsheet_id", "")
 CONFIG["backup"]["drive_folder_url"] = CONFIG["backup"].get("drive_folder_url", "")
 
 
-def _normalize_gsheet_id(raw: str) -> str:
-    s = (raw or "").strip()
-    if not s:
+def _normalize_gsheet_id(raw_id):
+    """
+    Normaliza ID da planilha - versão corrigida e mais permissiva
+    """
+    if not raw_id:
         return ""
-    # Se vier a URL completa de Planilhas, extrai o ID
+    
+    s = str(raw_id).strip()
+    print(f"🔍 [NORMALIZE DEBUG] Input: '{s}'")
+    
+    # Se for URL completa, extrai o ID
     if "spreadsheets/d/" in s:
-        return s.split("spreadsheets/d/")[1].split("/")[0]
-    # Se vier uma pasta/Doc/Slide, invalida
-    if "/drive/folders/" in s or "/document/d/" in s or "/presentation/d/" in s:
-        return ""
-    # Caso contrário, assume que já é um ID
-    return s
-
+        parts = s.split("spreadsheets/d/")
+        if len(parts) > 1:
+            id_part = parts[1].split("/")[0]
+            print(f"🔍 [NORMALIZE DEBUG] Extraído de URL: '{id_part}'")
+            
+            # Verificação básica de ID válido
+            if id_part and len(id_part) >= 10:
+                return id_part
+    
+    # Se já parece um ID (mais permissivo)
+    if s and len(s) >= 10:
+        # Remove caracteres problemáticos mas mantém o ID
+        clean_id = ''.join(c for c in s if c.isalnum() or c in '_-')
+        if clean_id:
+            print(f"🔍 [NORMALIZE DEBUG] ID limpo: '{clean_id}'")
+            return clean_id
+    
+    print(f"🔍 [NORMALIZE DEBUG] ID inválido, retornando vazio")
+    return ""
 
 # Sidebar de conferência
 try:
@@ -238,6 +256,143 @@ try:
 except Exception:
     pass
 
+def debug_gsheet_validation():
+    """
+    Função temporária para debug
+    """
+    spreadsheet_id = _get_spreadsheet_id()
+    print(f"🔍 [DEBUG] ID obtido: '{spreadsheet_id}'")
+    print(f"🔍 [DEBUG] Tipo: {type(spreadsheet_id)}")
+    print(f"🔍 [DEBUG] Tamanho: {len(spreadsheet_id) if spreadsheet_id else 0}")
+    
+    # Testa a normalização
+    normalized = _normalize_gsheet_id(spreadsheet_id)
+    print(f"🔍 [DEBUG] Normalizado: '{normalized}'")
+    
+    return normalized
+
+def sync_all(frames):
+    """
+    Sincroniza todos os frames com Google Sheets - versão corrigida
+    Retorna string de status.
+    """
+    try:
+        if not is_enabled():
+            return "Google Sheets não habilitado"
+        
+        spreadsheet_id = _get_spreadsheet_id()
+        
+        # DEBUG - Log para verificar o ID
+        print(f"🔍 [GSHEETS DEBUG] ID obtido: '{spreadsheet_id}'")
+        
+        if not spreadsheet_id:
+            return "ID da planilha não configurado"
+        
+        # Verificação mais permissiva do ID
+        if len(spreadsheet_id) < 10 or not all(c.isalnum() or c in '_-' for c in spreadsheet_id):
+            return f"GSHEETS: ID inválido - '{spreadsheet_id}'"
+        
+        print(f"🔍 [GSHEETS DEBUG] ID validado: {spreadsheet_id}")
+        
+        client = _get_gspread_client()
+        if not client:
+            return "GSHEETS: erro (gspread/credenciais ausentes)"
+
+        # Tenta abrir a planilha
+        try:
+            print(f"🔍 [GSHEETS DEBUG] Tentando abrir planilha...")
+            sh = client.open_by_key(spreadsheet_id)
+            print(f"🔍 [GSHEETS DEBUG] Planilha aberta: {sh.title}")
+        except Exception as e:
+            error_msg = str(e)
+            print(f"🔍 [GSHEETS DEBUG] Erro ao abrir: {error_msg}")
+            
+            if "This operation is not supported for this document" in error_msg:
+                return ("GSHEETS: erro — o gsheet_id aponta para um item que NÃO é uma "
+                        "planilha do Google Sheets (pode ser Doc/Slide/Pasta/XLSX). "
+                        "Use o ID de uma planilha nativa: /spreadsheets/d/<ID>/edit")
+            elif "not found" in error_msg.lower() or "Unable to open spreadsheet" in error_msg:
+                return f"GSHEETS: erro — planilha não encontrada. Verifique o ID: {spreadsheet_id}"
+            else:
+                return f"GSHEETS: erro ao abrir planilha ({error_msg})"
+
+        # Sincroniza cada frame
+        success_count = 0
+        error_messages = []
+        
+        for tab_name, df in frames.items():
+            if not isinstance(df, pd.DataFrame) or df.empty:
+                continue
+
+            try:
+                # Normaliza nome da aba
+                ws_title = str(tab_name)[:95].replace("/", "_").replace("\\", "_").replace(":", " ")
+                print(f"🔍 [GSHEETS DEBUG] Processando aba: {ws_title}")
+
+                # Tenta abrir a worksheet; se não existir, cria
+                try:
+                    ws = sh.worksheet(ws_title)
+                    print(f"🔍 [GSHEETS DEBUG] Aba existente: {ws_title}")
+                except Exception:
+                    print(f"🔍 [GSHEETS DEBUG] Criando nova aba: {ws_title}")
+                    ws = sh.add_worksheet(
+                        title=ws_title, 
+                        rows=max(1000, len(df) + 100), 
+                        cols=max(26, len(df.columns) + 10)
+                    )
+
+                # Limpa a worksheet completamente
+                ws.clear()
+                print(f"🔍 [GSHEETS DEBUG] Aba limpa: {ws_title}")
+
+                # Prepara valores: cabeçalho + dados
+                values = [df.columns.tolist()]  # Cabeçalho
+                if not df.empty:
+                    # Converte dados para string, tratando NaN
+                    df_strings = df.astype(object).where(pd.notna(df), "").astype(str)
+                    values.extend(df_strings.values.tolist())
+                
+                print(f"🔍 [GSHEETS DEBUG] Dados preparados: {len(values)} linhas, {len(values[0]) if values else 0} colunas")
+
+                # Ajusta tamanho se a API permitir
+                try:
+                    rows_needed = max(100, len(values) + 50)
+                    cols_needed = max(26, len(values[0]) if values else 10)
+                    ws.resize(rows=rows_needed, cols=cols_needed)
+                    print(f"🔍 [GSHEETS DEBUG] Tamanho ajustado: {rows_needed} rows, {cols_needed} cols")
+                except Exception as resize_error:
+                    print(f"🔍 [GSHEETS DEBUG] Não foi possível ajustar tamanho: {resize_error}")
+
+                # Envia dados para o Google Sheets
+                if values:
+                    print(f"🔍 [GSHEETS DEBUG] Enviando dados...")
+                    ws.update("A1", values, value_input_option="RAW")
+                    print(f"🔍 [GSHEETS DEBUG] Dados enviados com sucesso")
+                
+                success_count += 1
+                print(f"🔍 [GSHEETS DEBUG] ✅ Aba {ws_title} sincronizada")
+
+            except Exception as e:
+                error_msg = f"Erro na aba '{ws_title}': {str(e)}"
+                error_messages.append(error_msg)
+                print(f"🔍 [GSHEETS DEBUG] ❌ {error_msg}")
+
+        # Prepara resultado final
+        if success_count > 0 and not error_messages:
+            result = f"GSHEETS: ok ({success_count} abas) -> {spreadsheet_id}"
+        elif success_count > 0 and error_messages:
+            result = f"GSHEETS: parcial ({success_count} ok, {len(error_messages)} erros) -> {spreadsheet_id}. Erros: {'; '.join(error_messages[:3])}"
+        else:
+            result = f"GSHEETS: falha total -> {spreadsheet_id}. Erros: {'; '.join(error_messages[:3])}"
+        
+        print(f"🔍 [GSHEETS DEBUG] Resultado final: {result}")
+        return result
+
+    except Exception as e:
+        error_msg = f"GSHEETS: erro geral ({str(e)})"
+        print(f"🔍 [GSHEETS DEBUG] ❌ ERRO GERAL: {error_msg}")
+        return error_msg
+    
 def _get_gspread_client():
     """
     Retorna um cliente gspread autenticado, tentando nesta ordem:
