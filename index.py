@@ -2902,13 +2902,16 @@ with st.container():
                 c3, c4 = st.columns(2)
                 with c3:
                     st.markdown("**Fundamentos – Acertos (NOS vs ADV)**")
+                    # Definir ok_mask para filtrar ações válidas
+                    ok_mask = dfA["action"].notna() & (dfA["action"] != "")
                     f_ok = (dfA[ok_mask]
                             .groupby(["action","who_scored"]).size()
                             .unstack(fill_value=0))
                     bar_chart_safe(f_ok, rotate_xticks=30)
                 with c4:
                     st.markdown("**Fundamentos – Erros (NOS vs ADV)**")
-                    f_er = (dfA[~ok_mask]
+                    # Usar a mesma máscara já definida
+                    f_er = (dfA[ok_mask]
                             .groupby(["action","who_scored"]).size()
                             .unstack(fill_value=0))
                     bar_chart_safe(f_er, rotate_xticks=30)
