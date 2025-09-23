@@ -1,0 +1,20 @@
+[online]
+# URL do webhook (Apps Script) - opcional
+webhook_url = 
+# ID da planilha Google Sheets (apenas o ID, não a URL completa)
+gsheet_id = 
+
+[backup]
+# URL da pasta do Google Drive para backups
+drive_folder_url = 
+
+[secrets]
+# Configurações sensíveis - usar via Streamlit Secrets
+
+[gcp]
+# Modo de autenticação: "path", "inline" ou deixe vazio para usar Secrets
+credentials_mode = 
+# Caminho para o arquivo de credenciais (se usar mode=path)
+credentials_path = 
+# JSON inline (se usar mode=inline) - NÃO RECOMENDADO para git
+inline_json = 
