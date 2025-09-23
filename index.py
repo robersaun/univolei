@@ -25,6 +25,8 @@ from pathlib import Path as _P
 from db_excel import save_all
 import pandas as _pd
 import datetime as _dt
+import os
+os.environ["STREAMLIT_SERVER_FILE_WATCHER"] = "false"
 
 from db_excel import (
 
@@ -476,7 +478,7 @@ def _get_gspread_client():
 
         # === B) GOOGLE_APPLICATION_CREDENTIALS ===
     try:
-        import os
+        
         cred_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "").strip()
         if cred_path:
             creds = Credentials.from_service_account_file(cred_path, scopes=scopes)
@@ -3164,7 +3166,7 @@ except Exception:
 # Boot para Render
 # =========================
 if __name__ == "__main__":
-    import os
+    
     port = int(os.environ.get("PORT", 10000))
     if not st.session_state.get("_boot_rerun_done", False):
         st.session_state["_boot_rerun_done"] = True
