@@ -152,7 +152,7 @@ def _render_latency_panel(max_rows: int = 12):
 
     # Sempre renderizar via HTML para evitar import do pyarrow
     try:
-        display_dataframe(df, height=220, use_container_width=True)
+        display_dataframe(df, height=220, width='stretch')
     except Exception:
         # Fallback 100% HTML (sem Arrow)
         try:
@@ -445,104 +445,111 @@ def sync_all(frames):
     
 def _get_gspread_client():
     """
-    Retorna um cliente gspread autenticado, priorizando Streamlit Secrets.
+    Retorna cliente gspread autenticado - PRIORIZA Streamlit Secrets
     """
     try:
         import gspread
         from google.oauth2.service_account import Credentials
-    except ImportError:
+        
+        scopes = [
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive",
+        ]
+
+        # 1) PRIMEIRO: Streamlit Secrets (funciona no Streamlit Cloud)
+        try:
+            if hasattr(st, 'secrets') and 'gcp_service_account' in st.secrets:
+                sa_info = dict(st.secrets["gcp_service_account"])
+                print("🔍 [AUTH] Usando Streamlit Secrets")
+                creds = Credentials.from_service_account_info(sa_info, scopes=scopes)
+                return gspread.authorize(creds)
+        except Exception as e:
+            print(f"🔍 [AUTH] Erro com Streamlit Secrets: {e}")
+
+        # 2) SEGUNDO: Variável de ambiente (fallback)
+        try:
+            import os
+            cred_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "").strip()
+            if cred_path and os.path.exists(cred_path):
+                print(f"🔍 [AUTH] Usando variável de ambiente: {cred_path}")
+                creds = Credentials.from_service_account_file(cred_path, scopes=scopes)
+                return gspread.authorize(creds)
+        except Exception as e:
+            print(f"🔍 [AUTH] Erro com variável de ambiente: {e}")
+
+        # 3) TERCEIRO: config.ini (último recurso)
+        try:
+            gcp_cfg = CONFIG.get("gcp", {})
+            mode = (gcp_cfg.get("credentials_mode") or "").strip().lower()
+            if mode == "path":
+                cpath = (gcp_cfg.get("credentials_path") or "").strip()
+                if cpath and os.path.exists(cpath):
+                    print(f"🔍 [AUTH] Usando config.ini path: {cpath}")
+                    creds = Credentials.from_service_account_file(cpath, scopes=scopes)
+                    return gspread.authorize(creds)
+            elif mode == "inline":
+                import json
+                inline = gcp_cfg.get("inline_json")
+                if inline:
+                    print("🔍 [AUTH] Usando config.ini inline JSON")
+                    sa_info = json.loads(inline)
+                    creds = Credentials.from_service_account_info(sa_info, scopes=scopes)
+                    return gspread.authorize(creds)
+        except Exception as e:
+            print(f"🔍 [AUTH] Erro com config.ini: {e}")
+
+        print("🔍 [AUTH] Nenhum método de autenticação funcionou")
+        return None
+        
+    except Exception as e:
+        print(f"🔍 [AUTH] Erro geral: {e}")
         return None
 
-    scopes = [
-        "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive",
-    ]
-
-    # PRIMEIRO: Tenta Streamlit Secrets (RECOMENDADO)
-    try:
-        if hasattr(st, 'secrets') and 'gcp_service_account' in st.secrets:
-            sa_info = st.secrets['gcp_service_account']
-            
-            # Se for string, converte para dict
-            if isinstance(sa_info, str):
-                import json
-                sa_info = json.loads(sa_info)
-            
-            creds = Credentials.from_service_account_info(sa_info, scopes=scopes)
-            client = gspread.authorize(creds)
-            print("✅ Autenticado via Streamlit Secrets")
-            return client
-    except Exception as e:
-        print(f"❌ Erro com Streamlit Secrets: {e}")
-
-    # SEGUNDO: Tenta config.ini (apenas se não tiver private_key)
-    try:
-        gcp_cfg = CONFIG.get("gcp", {})
-        mode = gcp_cfg.get("credentials_mode", "").strip().lower()
-        
-        if mode == "inline":
-            import json
-            inline_json = gcp_cfg.get("inline_json", "").strip()
-            if inline_json:
-                sa_info = json.loads(inline_json)
-                # VERIFICA se não contém private_key real (apenas placeholder)
-                if "PRIVATE_KEY_PLACEHOLDER" in sa_info.get("private_key", ""):
-                    print("⚠️  Credencial no config.ini é apenas placeholder")
-                    return None
-                creds = Credentials.from_service_account_info(sa_info, scopes=scopes)
-                client = gspread.authorize(creds)
-                print("✅ Autenticado via config.ini")
-                return client
-    except Exception as e:
-        print(f"❌ Erro com config.ini: {e}")
-
-    # TERCEIRO: Variável de ambiente
-    try:
-        import os
-        cred_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "").strip()
-        if cred_path and os.path.exists(cred_path):
-            creds = Credentials.from_service_account_file(cred_path, scopes=scopes)
-            client = gspread.authorize(creds)
-            print("✅ Autenticado via variável de ambiente")
-            return client
-    except Exception as e:
-        print(f"❌ Erro com variável de ambiente: {e}")
-
-    print("❌ Nenhum método de autenticação funcionou")
-    return None
-
 def debug_google_auth():
-    """Função temporária para debug da autenticação"""
+    """Debug detalhado da autenticação Google"""
     try:
-        print("🔍 Iniciando debug da autenticação Google...")
+        st.sidebar.subheader("🔧 Debug Google Auth")
         
-        # Verifica se secrets existe
+        # Verifica secrets
         if hasattr(st, 'secrets'):
-            print("✅ Streamlit Secrets está disponível")
+            st.sidebar.write("✅ Streamlit Secrets disponível")
+            
             if 'gcp_service_account' in st.secrets:
                 sa = st.secrets['gcp_service_account']
-                if isinstance(sa, dict) and 'client_email' in sa:
-                    print(f"✅ Service Account encontrado: {sa['client_email']}")
-                else:
-                    print("❌ Service Account não encontrado nos secrets")
+                st.sidebar.write(f"✅ Service Account encontrado")
+                st.sidebar.write(f"📧 Client Email: {sa.get('client_email', 'Não encontrado')}")
+                st.sidebar.write(f"🆔 Project ID: {sa.get('project_id', 'Não encontrado')}")
+                
+                # Verifica private_key
+                pk = sa.get('private_key', '')
+                if pk:
+                    st.sidebar.write(f"🔑 Private Key: {len(pk)} caracteres")
+                    if 'BEGIN PRIVATE KEY' in pk:
+                        st.sidebar.write("✅ Formato da private_key parece correto")
+                    else:
+                        st.sidebar.write("❌ Formato da private_key pode estar errado")
             else:
-                print("❌ gcp_service_account não encontrado nos secrets")
+                st.sidebar.write("❌ gcp_service_account não encontrado")
         else:
-            print("❌ Streamlit Secrets não disponível")
+            st.sidebar.write("❌ Streamlit Secrets não disponível")
         
-        # Testa a autenticação
+        # Testa autenticação
         client = _get_gspread_client()
         if client:
-            print("✅ Autenticação Google Sheets: SUCESSO")
+            st.sidebar.success("✅ Autenticação Google Sheets: SUCESSO")
             return True
         else:
-            print("❌ Autenticação Google Sheets: FALHOU")
+            st.sidebar.error("❌ Autenticação Google Sheets: FALHOU")
             return False
             
     except Exception as e:
-        print(f"❌ Erro no debug: {e}")
+        st.sidebar.error(f"❌ Erro no debug: {e}")
         return False
 
+# Adicione temporariamente no sidebar para testar
+if st.sidebar.button("Testar Autenticação Google"):
+    debug_google_auth()
+    
 # Chame esta função em algum lugar para testar
 debug_google_auth()
 if st.sidebar.button("🔧 Testar Google Sheets"):
@@ -1175,12 +1182,12 @@ def bar_chart_safe(obj, title=None, rotate_xticks=0):
         ax.set_xticklabels([str(i) for i in idx], rotation=rotate_xticks, ha="right", fontsize=7)
         ax.legend(loc="best", fontsize=7)
 
-    st.pyplot(trim_ax(ax, legend=True), use_container_width=True)
+    st.pyplot(trim_ax(ax, legend=True), width='stretch')
 
 # =========================
 # DataFrame HTML
 # =========================
-def display_dataframe(df, height=None, use_container_width=False, extra_class: str = ""):
+def display_dataframe(df, height=None, width='content', extra_class: str = ""):
     if df is None or len(df) == 0:
         st.write("_Sem dados._"); return
     classes = ('custom-table ' + extra_class).strip()
@@ -2077,11 +2084,11 @@ if st.session_state.match_id is None:
             pick = st.selectbox("Selecione o jogo para carregar:", options=val, format_func=lambda v: label[val.index(v)])
             c1, c2 = st.columns([1,1])
             with c1:
-                if st.button("Carregar jogo", use_container_width=True):
+                if st.button("Carregar jogo", width='stretch'):
                     st.session_state.match_id = int(pick); st.session_state.set_number = 1
                     st.session_state._do_rerun_after = True
             with c2:
-                if st.button("Fechar", use_container_width=True):
+                if st.button("Fechar", width='stretch'):
                     st.session_state._do_rerun_after = True
             st.markdown('</div>', unsafe_allow_html=True)
         if st.session_state._do_rerun_after:
@@ -2209,15 +2216,15 @@ if st.session_state._do_rerun_after:
 top1, top2, top3, top4 = st.columns([2.5, 1, 1, 1])
 with top1:
     if not st.session_state.game_mode:
-        st.button("⚙️ Time", use_container_width=True, key="top_config_team_btn",
+        st.button("⚙️ Time", width='stretch', key="top_config_team_btn",
                 on_click=lambda: st.session_state.__setitem__("show_config_team", True))
 with top2:
     if not st.session_state.game_mode:
-        st.button("🆕 Jogo", use_container_width=True, key="top_new_game_btn",
+        st.button("🆕 Jogo", width='stretch', key="top_new_game_btn",
             on_click=lambda: st.session_state.__setitem__("show_cadastro", True))
 with top3:
     if not st.session_state.game_mode:
-        st.button("📘 Tutorial", use_container_width=True, key="top_tutorial_btn",
+        st.button("📘 Tutorial", width='stretch', key="top_tutorial_btn",
             on_click=lambda: st.session_state.__setitem__("show_tutorial", True))
 with top4:
     # Abrir Histórico (link direto — evita issues com switch_page)
@@ -2265,10 +2272,10 @@ if not st.session_state.game_mode:
         _apply_set_winner_and_proceed(hp, ap)
         st.session_state.data_rev += 1
     with top7:
-        st.button("🔓 Reabrir Set", use_container_width=True, key="reopen_btn", on_click=_reopen_set)
+        st.button("🔓 Reabrir Set", width='stretch', key="reopen_btn", on_click=_reopen_set)
         st.markdown('</div>', unsafe_allow_html=True)
     with top8:
-        st.button("✅ Fechar Set", use_container_width=True, key="close_set_btn", on_click=_close_set)
+        st.button("✅ Fechar Set", width='stretch', key="close_set_btn", on_click=_close_set)
         st.markdown('</div>', unsafe_allow_html=True)
     with top9:
         def _remove_empty_set():
@@ -2289,7 +2296,7 @@ if not st.session_state.game_mode:
                 st.session_state.frames = frames_local
                 st.session_state.data_rev += 1
                 st.markdown('<div class="btn-xxs">', unsafe_allow_html=True)
-        st.button("🗑️ Remover Set Vazio", use_container_width=True, key="remove_empty_set_btn", on_click=_remove_empty_set)
+        st.button("🗑️ Remover Set Vazio", width='stretch', key="remove_empty_set_btn", on_click=_remove_empty_set)
         st.markdown('</div>', unsafe_allow_html=True)
     ########   
     # Finalizar partida direto
@@ -2326,7 +2333,7 @@ if not st.session_state.game_mode:
         st.session_state.set_number = None
         st.session_state._do_rerun_after = True
     with top10:
-        st.button("🏁 Finalizar Partida", use_container_width=True, on_click=_finalizar_partida)
+        st.button("🏁 Finalizar Partida", width='stretch', on_click=_finalizar_partida)
         
 
 
@@ -2499,11 +2506,11 @@ if (st.session_state.match_id is None or st.session_state.show_cadastro) and not
         with cgjb1:
             st.button("Criar Jogo", key="create_game_btn",
                       on_click=lambda: _create_new_match(st.session_state.get("new_game_opponent","").strip(), st.session_state.get("new_game_date", date.today())),
-                      use_container_width=True)
+                      width='stretch')
         with cgjb2:
             st.button("Fechar", key="close_new_game_btn",
                       on_click=lambda: st.session_state.__setitem__("show_cadastro", False),
-                      use_container_width=True)
+                      width='stretch')
         st.markdown('</div>', unsafe_allow_html=True)
     st.stop()
 
@@ -2586,13 +2593,13 @@ if st.session_state.game_mode:
                             st.session_state.__setitem__("last_selected_player", n),
                             st.session_state.__setitem__("q_side", "Nós")
                         ),
-                        use_container_width=True
+                        width='stretch'
                     )
             with jcols[(len(nums)) % num_cols]:
                 st.button(
                     "ADV", key="gm_adv_btn",
                     on_click=lambda: st.session_state.__setitem__("q_side", "Adv"),
-                    use_container_width=True
+                    width='stretch'
                 )
             _paint_adv_rede_buttons()
         else:
@@ -2667,7 +2674,7 @@ if st.session_state.game_mode:
                 st.button(
                     label, key=f"gm_quick_{code}",
                     on_click=lambda code=code: register_current(action=code),
-                    use_container_width=True
+                    width='stretch'
                 )
             # Inserir "Refazer Rally" imediatamente após 'Rede' (mesma linha/grade)
             if code == "rede":
@@ -2676,7 +2683,7 @@ if st.session_state.game_mode:
                         "Refazer Rally",
                         key="gm_quick_refazer",
                         on_click=undo_last_rally_current_set,
-                        use_container_width=True
+                        width='stretch'
                     )
         
         _paint_adv_rede_buttons()
@@ -2894,9 +2901,9 @@ with st.container():
                 st.session_state.graph_filter = st.radio("Filtro Gráficos:", options=["Nós","Adversário","Ambos"],
                     horizontal=True, index=["Nós","Adversário","Ambos"].index(st.session_state.graph_filter), key="graph_filter_radio")
         with c_reg:
-            st.button("Registrar", use_container_width=True, key="btn_register_main", on_click=_cb_register_main)
+            st.button("Registrar", width='stretch', key="btn_register_main", on_click=_cb_register_main)
         with c_undo:
-            st.button("↩️ Desfazer", use_container_width=True, key="btn_undo_main", on_click=undo_last_rally_current_set)
+            st.button("↩️ Desfazer", width='stretch', key="btn_undo_main", on_click=undo_last_rally_current_set)
         # Seleções rápidas (lado/resultado/posição/ação)
         s1, s2, s3, s4 = st.columns([1.0, 1.0, 1.0, 1.6])
         with s1:
@@ -2944,7 +2951,7 @@ with st.container():
                 label_txt = str(n) if btn_mode == "Número" else (name_map.get(n) or str(n))
                 with pcols[i % num_cols]:
                     st.button(
-                        f"{label_txt}", key=f"main_pill_{n}", use_container_width=True,
+                        f"{label_txt}", key=f"main_pill_{n}", width='stretch',
                         on_click=lambda n=n: (
                             st.session_state.__setitem__("last_selected_player", n),
                             st.session_state.__setitem__("q_side", "Nós")
@@ -2952,7 +2959,7 @@ with st.container():
                     )
             with pcols[(len(nums)) % num_cols]:
                 st.button(
-                    "ADV", key="main_adv_btn", use_container_width=True,
+                    "ADV", key="main_adv_btn", width='stretch',
                     on_click=lambda: st.session_state.__setitem__("q_side", "Adv")
                 )
             _paint_adv_rede_buttons()
@@ -2979,7 +2986,7 @@ with st.container():
                 st.button(
                     label, key=f"main_quick_{code}",
                     on_click=lambda code=code: register_current(action=code),
-                    use_container_width=True
+                    width='stretch'
                 )
         _paint_adv_rede_buttons()
         st.markdown("---")
@@ -3028,7 +3035,7 @@ with st.container():
                 )
                 if not dbg_hm.empty:
                     view = dbg_hm[["rally_no","player_number","action_u","res_u","who_u","used_x","used_y","origem","cor"]].tail(30)
-                    display_dataframe(view, height=220, use_container_width=True)
+                    display_dataframe(view, height=220, width='stretch')
                 else:
                     st.write("_Sem registros elegíveis._")
     # -------- DIREITA --------
@@ -3048,7 +3055,7 @@ with st.container():
                 "score_home":"H",
                 "score_away":"A",
             }, inplace=True)
-            display_dataframe(preview, height=260, use_container_width=True)
+            display_dataframe(preview, height=260, width='stretch')
         else:
             st.caption("_Sem rallies no set atual._")
         # Resumo rápido por ação (nossos pontos/erros) — com proteção total ao 'Ação'
@@ -3076,7 +3083,7 @@ with st.container():
             if "Ação" in by_action.columns and not by_action.empty:
                 by_action = by_action.sort_values(by="Ação", kind="stable")
             cols_disp = [c for c in ["Ação","Pontos","Erros"] if c in by_action.columns]
-            display_dataframe(by_action[cols_disp], height=200, use_container_width=True)
+            display_dataframe(by_action[cols_disp], height=200, width='stretch')
         # ========= GRÁFICOS E TABELAS RÁPIDAS DO SET (ACRESCENTADOS) =========
         st.markdown("---")
         st.markdown("**📈 Placar (evolução no set)**")
@@ -3089,7 +3096,7 @@ with st.container():
             ax3.plot(df_set["rally_no"], df_set["score_away"], marker="o", markersize=2.6, linewidth=1.0, label=away_name or "Adv")
             ax3.set_xlabel("Rally"); ax3.set_ylabel("Pontos")
             ax3.legend(loc="best", fontsize=7)
-            st.pyplot(trim_ax(ax3, legend=True), use_container_width=True)
+            st.pyplot(trim_ax(ax3, legend=True), width='stretch')
         # Pontos (Nossos)
         st.markdown("**🏅 Pontos (Nossos)**")
         if df_set is not None and not df_set.empty:
@@ -3101,7 +3108,7 @@ with st.container():
                    .groupby("Jog", dropna=False).size().rename("Pontos").reset_index()
                    .sort_values(["Pontos","Jog"], ascending=[False, True])
             )
-            display_dataframe(tbl_pontos, height=160, use_container_width=True)
+            display_dataframe(tbl_pontos, height=160, width='stretch')
         # Erros (Nossos)
         st.markdown("**⚠️ Erros (Nossos)**")
         if df_set is not None and not df_set.empty:
@@ -3113,7 +3120,7 @@ with st.container():
                    .groupby("Jog", dropna=False).size().rename("Erros").reset_index()
                    .sort_values(["Erros","Jog"], ascending=[False, True])
             )
-            display_dataframe(tbl_erros, height=160, use_container_width=True)
+            display_dataframe(tbl_erros, height=160, width='stretch')
         # Histórico (sequência de rallies) - set atual inteiro (compacto)
         st.markdown("**🕒 Histórico (sequência de rallies)**")
         # ---- KPIs adicionais e gráficos ----
@@ -3177,7 +3184,7 @@ with st.container():
                 "rally_no":"#","player_number":"Jog","action":"Ação",
                 "result":"Resultado","who_scored":"Quem","score_home":"H","score_away":"A"
             })
-            display_dataframe(hist, height=220, use_container_width=True)
+            display_dataframe(hist, height=220, width='stretch')
         if show_debug_ui() and st.session_state.get("dbg_prints"):
             st.markdown("---")
             st.markdown("**🧰 Debug (logs recentes)**")
