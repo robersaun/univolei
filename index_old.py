@@ -9,63 +9,15 @@ import matplotlib as mpl
 import streamlit.components.v1 as components
 import html
 import numpy as np
-import time as _time
+import time
 from datetime import date, datetime
 import json
-from db_duck import ensure_db as duck_ensure, replace_all as duck_replace
-import logging, os
-import gsheets_sync
 from io import BytesIO
-from parser_free import parse_line
-import html as html_mod
-from string import Template
-import datetime as _dt, pandas as _pd, json as _json
-import configparser, os as _os
-from pathlib import Path as _P
-from db_excel import save_all
-import pandas as _pd
-import datetime as _dt
-
 from db_excel import (
-
     init_or_load, save_all, add_set,
     append_rally, last_open_match, finalize_match
-)   
-# =========================
-# [1] CONFIGURAÇÃO INICIAL (dinâmica e segura)
-# =========================
-BASE_DIR = Path(__file__).parent.resolve()
-DEFAULT_XLSX = BASE_DIR / "volei_base_dados.xlsx"
-DEFAULT_DUCK = BASE_DIR / "volei_base_dados.dv"
-
-CONFIG = {"online": {}, "backup": {}, "secrets": {}, "gcp": {}}  # <- inclui gcp aqui
-_cfg_path = BASE_DIR / "config.ini"
-BACKUP_DIR = BASE_DIR / "backups"
-LOGS_DIR   = BASE_DIR / "logs"
-LOGS_DIR.mkdir(parents=True, exist_ok=True)
-BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-
-
-# =========================
-# IMPORTANTE: GRAVÇÕES -> Frequência de persistência por destino
-# =========================
-# Frequência de persistência por destino (pode ir logo após carregar o config.ini)
-SYNC_CFG = {
-    # rápido e offline: por lance + checkpoints
-    "duck":    {"rally", "set_open", "set_close", "match_close", "manual"},
-    # arquivo para interoperabilidade: só checkpoints (ou manual)
-    "xlsx":    {"set_open", "set_close", "match_close", "manual"},
-    # online (lento): só checkpoints (ou manual)
-    "gsheets": {"set_open", "set_close", "match_close", "manual"},
-}
-
-
-
-# =========================
-# Config + Estilos
-# =========================
-st.set_page_config(page_title="Vôlei Scout – UniVolei", layout="wide", initial_sidebar_state="collapsed")
-
+)
+from parser_free import parse_line
 # =========================
 # DEBUG: console + UI
 # =========================
@@ -75,582 +27,52 @@ def debug_print(*args, **kwargs):
         print("[UV-DEBUG]", *args, **kwargs, flush=True)
 def show_debug_ui() -> bool:
     return bool(DEBUG_PRINTS)
+# =========================
+# Config + Estilos
+# =========================
+st.set_page_config(page_title="Vôlei Scout – UniVolei", layout="wide", initial_sidebar_state="collapsed")
 
-# =========================
-# --- Debug helper (safe) ---
-# =========================
-def dbg_print(*args, **kwargs):
-    """Prints to Streamlit only if st.session_state.get('debug', False) is True; logs always if _logger exists."""
-    try:
-        if 'debug' in st.session_state and st.session_state.get('debug'):
-            try:
-                st.write(*args, **kwargs)
-            except Exception:
-                pass
-        try:
-            _logger  # type: ignore
-            _logger.debug(" ".join(str(a) for a in args))
-        except Exception:
-            pass
-    except Exception:
-        pass
-st.sidebar.caption(f"Excel: {st.session_state.get('db_path','(definir)')}")
-st.sidebar.caption(f"DuckDB: {st.session_state.get('duck_path','(definir)')}")
-st.sidebar.caption(f"Último salvamento: {st.session_state.get('last_save_at','-')}")
-try:
-    st.sidebar.caption(f"Webhook: {'on' if CONFIG['online'].get('webhook_url') else 'off'}")
-except Exception:
-    pass
-
-# =========================
-# ===== Mini painel de latência =====
-# =========================
-
-def _perf_begin(reason: str):
-    return {
-        "ts": _dt.datetime.now().isoformat(timespec="seconds"),
-        "reason": reason,
-        "steps": [],       # [{"label":"XLSX","ms":12.3}, ...]
-        "statuses": [],    # mesmas strings que você já mostra
-        "total_ms": 0.0,
+st.markdown("""
+<style>
+.uv-inline-label{ font-weight:600; line-height:1; padding-top:6px; margin:0; }
+[data-testid="stSelectbox"]{ margin:0 !important; }
+</style>
+""", unsafe_allow_html=True)
+# anti-scroll-jump (iframe utilitário que se auto-colapsa)
+components.html("""
+<script>
+(function(){
+  // marca e colapsa o PRÓPRIO iframe + containers
+  try{
+    const f = window.frameElement;
+    if (f){
+      f.classList.add('uv-collapse');
+      f.style.height = '0px'; f.style.minHeight = '0px';
+      const ec = f.closest('.element-container');
+      if(ec){
+        ec.style.margin='0'; ec.style.padding='0'; ec.style.height='0'; ec.style.minHeight='0';
+      }
+      const p = f.parentElement;
+      if(p){ p.style.margin='0'; p.style.padding='0'; p.style.height='0'; p.style.minHeight='0'; }
     }
-
-def _perf_step(perf: dict, label: str, t0: float):
-    ms = (_time.perf_counter() - t0) * 1000.0
-    perf["steps"].append({"label": label, "ms": round(ms, 1)})
-
-def _perf_commit(perf: dict, statuses: list[str]):
-    perf["statuses"] = statuses
-    perf["total_ms"] = round(sum(s["ms"] for s in perf["steps"]), 1)
-    lst = st.session_state.setdefault("perf_logs", [])
-    lst.append(perf)
-    # mantém só os últimos 60
-    if len(lst) > 60:
-        st.session_state["perf_logs"] = lst[-60:]
-
-def _render_latency_panel(max_rows: int = 12):
-    import pandas as pd
-    logs = st.session_state.get("perf_logs", [])[-max_rows:]
-    if not logs:
-        st.caption("Sem medições ainda.")
-        return
-
-    rows = []
-    for p in logs:
-        row = {
-            "Quando": p["ts"][-8:],     # HH:MM:SS
-            "Motivo": p["reason"],
-            "Total (ms)": p.get("total_ms", 0.0),
-        }
-        for s in p.get("steps", []):
-            row[s["label"] + " (ms)"] = s["ms"]
-        row["Status"] = " | ".join(p.get("statuses", []))
-        rows.append(row)
-
-    df = pd.DataFrame(rows)
-    df = df.iloc[::-1].reset_index(drop=True)  # mais recente primeiro
-
-    # Sempre renderizar via HTML para evitar import do pyarrow
-    try:
-        display_dataframe(df, height=220, use_container_width=True)
-    except Exception:
-        # Fallback 100% HTML (sem Arrow)
-        try:
-            html_table = df.to_html(index=False, escape=False)
-        except Exception:
-            html_table = "<em>Falha ao renderizar tabela.</em>"
-        st.markdown(
-            f"<div style='max-height:220px; overflow:auto'>{html_table}</div>",
-            unsafe_allow_html=True
-        )
-
-    # Médias (últimos 20)
-    tail = st.session_state.get("perf_logs", [])[-20:]
-    if not tail:
-        return
-    agg = {}
-    for p in tail:
-        for s in p.get("steps", []):
-            agg.setdefault(s["label"], []).append(s["ms"])
-    if agg:
-        meds = [f"{k}: {round(sum(v)/len(v),1)} ms" for k, v in agg.items()]
-        st.caption("Médias (últimos 20): " + " · ".join(meds))
-
-
-# =========================
-# Carrega config.ini 
-# =========================
-if _cfg_path.exists():
-    # Carrega config.ini (sem interpolation para não quebrar com % no JSON)
-    _cp = configparser.ConfigParser(interpolation=None)
-    _cp.read(_cfg_path, encoding="utf-8")
-    # atualiza todas as seções presentes, criando chaves conforme necessário
-    for sec in _cp.sections():
-        CONFIG.setdefault(sec, {}).update({k: v for k, v in _cp.items(sec)})
-# =========================
-# Config GOOGLE_DRIVE
-# =========================
-if _cfg_path.exists():
-    _cp = configparser.ConfigParser(interpolation=None); _cp.read(_cfg_path, encoding="utf-8")
-    for sec in ("online","backup","secrets","gcp"):
-        if _cp.has_section(sec):
-            CONFIG[sec].update({k: v for k,v in _cp.items(sec)})
-
-
-# >>> Fixos solicitados por você (podem ser sobrescritos por env/secrets se quiser no futuro)
-#GOOGLE_DRIVE_ROOT_FOLDER_URL = "https://drive.google.com/drive/folders/10PDkcUb4yGhrEmiNKwNo7mzZBGJIN_5r"
-#GOOGLE_SHEETS_SPREADSHEET_ID = "1V6lwFuWn94bhRcLg3yMZOa6Rs4q4U64q"
-# >>> Valores devem vir SOMENTE do config.ini
-GOOGLE_DRIVE_ROOT_FOLDER_URL   = CONFIG["backup"].get("drive_folder_url", "")
-GOOGLE_SHEETS_SPREADSHEET_ID   = CONFIG["online"].get("gsheet_id", "")
-BACKUP_DIRS = [BACKUP_DIR]  # mantém o comportamento local
-
-# Propaga para CONFIG (sem ENV/secrets; apenas reafirma o que veio do config.ini)
-CONFIG["online"]["webhook_url"]      = CONFIG["online"].get("webhook_url", "")
-CONFIG["online"]["gsheet_id"]        = CONFIG["online"].get("gsheet_id", "")
-CONFIG["backup"]["drive_folder_url"] = CONFIG["backup"].get("drive_folder_url", "")
-
-
-def _normalize_gsheet_id(raw: str) -> str:
-    s = (raw or "").strip()
-    if not s:
-        return ""
-    # Se vier a URL completa de Planilhas, extrai o ID
-    if "spreadsheets/d/" in s:
-        return s.split("spreadsheets/d/")[1].split("/")[0]
-    # Se vier uma pasta/Doc/Slide, invalida
-    if "/drive/folders/" in s or "/document/d/" in s or "/presentation/d/" in s:
-        return ""
-    # Caso contrário, assume que já é um ID
-    return s
-
-
-# Sidebar de conferência
-try:
-    st.sidebar.caption(
-        f"Config: webhook={'on' if CONFIG['online'].get('webhook_url') else 'off'} | "
-        f"gsheets_id={CONFIG['online'].get('gsheet_id','unset')[:8]}..."
-    )
-    if CONFIG["backup"].get("drive_folder_url"):
-        st.sidebar.caption(f"Drive folder URL: {CONFIG['backup']['drive_folder_url']}")
-except Exception:
-    pass
-
-def _get_gspread_client():
-    """
-    Retorna um cliente gspread autenticado, tentando nesta ordem:
-    A) st.secrets["gcp_service_account"]
-    B) GOOGLE_APPLICATION_CREDENTIALS (path para .json)
-    C) config.ini -> [gcp] credentials_mode=(path|inline)
-    """
-    try:
-        import gspread
-    except Exception:
-        return None
-
-    from google.oauth2.service_account import Credentials
-    scopes = [
-        "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive",
-    ]
-
-    # === A) st.secrets ===
-    try:
-        import json
-        if "gcp_service_account" in st.secrets:
-            sa_info = st.secrets["gcp_service_account"]
-            if isinstance(sa_info, str):
-                sa_info = json.loads(sa_info)
-            creds = Credentials.from_service_account_info(sa_info, scopes=scopes)
-            return gspread.authorize(creds)
-    except Exception as e:
-        try:
-            _logger.warning(f"gspread via st.secrets falhou: {e}")
-        except Exception:
-            pass
-
-        # === B) GOOGLE_APPLICATION_CREDENTIALS ===
-    try:
-        import os
-        cred_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "").strip()
-        if cred_path:
-            creds = Credentials.from_service_account_file(cred_path, scopes=scopes)
-            return gspread.authorize(creds)
-    except Exception as e:
-        _logger.warning(f"gspread via GOOGLE_APPLICATION_CREDENTIALS falhou: {e}")
-
-
-    # === C) config.ini ===
-    try:
-        gcp_cfg = CONFIG.get("gcp", {})
-        mode = (gcp_cfg.get("credentials_mode") or "").strip().lower()
-        if mode == "path":
-            cpath = (gcp_cfg.get("credentials_path") or "").strip()
-            if cpath:
-                creds = Credentials.from_service_account_file(cpath, scopes=scopes)
-                return gspread.authorize(creds)
-        elif mode == "inline":
-            import json
-            inline = gcp_cfg.get("inline_json")
-            if inline:
-                sa_info = json.loads(inline)
-                creds = Credentials.from_service_account_info(sa_info, scopes=scopes)
-                return gspread.authorize(creds)
-    except Exception as e:
-        try:
-            _logger.warning(f"gspread via config.ini falhou: {e}")
-        except Exception:
-            pass
-
-    return None
-
-
-def _persist_to_gsheets(frames, reason: str) -> str | None:
-    """
-    Sincroniza frames -> Google Sheets (uma aba por frame) usando gspread.
-    Respeita CONFIG['online']['gsheet_id'].
-    Se não houver gspread/credenciais, retorna string de erro (para log) e
-    o fluxo seguirá para o fallback (Webhook) no _persist_all.
-    """
-    raw_id = (CONFIG["online"].get("gsheet_id") or "").strip()
-    spreadsheet_id = _normalize_gsheet_id(raw_id)
-    if not spreadsheet_id:
-        return ("GSHEETS: erro — o gsheet_id aponta para um item que NÃO é uma planilha do Google Sheets "
-                "(pode ser Doc/Slide/Pasta/XLSX). Use o ID de uma planilha nativa: /spreadsheets/d/<ID>/edit")
-
-    # 1) Tenta cliente gspread
-    gc = _get_gspread_client()
-    if gc is None:
-        return "GSHEETS: erro (gspread/credenciais ausentes)"
-
-    try:
-        sh = gc.open_by_key(spreadsheet_id)
-    except Exception as e:
-        msg = str(e)
-        if "This operation is not supported for this document" in msg:
-            return ("GSHEETS: erro — o gsheet_id aponta para um item que NÃO é uma "
-                    "planilha do Google Sheets (pode ser Doc/Slide/Pasta/XLSX). "
-                    "Use o ID de uma planilha nativa: /spreadsheets/d/<ID>/edit")
-        return f"GSHEETS: erro ao abrir planilha ({e!s})"
-
-    # 2) Para cada frame (DataFrame), cria/limpa a worksheet e escreve tudo
-    try:
-        for tab_name, df in frames.items():
-            if not isinstance(df, _pd.DataFrame):
-                continue
-
-            # Normaliza nome de aba (Google Sheets tem limites de 100 chars e proíbe alguns caracteres)
-            ws_title = str(tab_name)[:95].replace("/", "_").replace("\\", "_").replace(":", " ")
-
-            # Tenta abrir a worksheet; se não existir, cria
-            try:
-                try:
-                    ws = sh.worksheet(ws_title)
-                except Exception:
-                    ws = sh.add_worksheet(title=ws_title, rows=max(1000, len(df) + 10), cols=max(26, len(df.columns) + 5))
-
-                # Limpa a worksheet (melhor para evitar sujeira de tamanhos diferentes)
-                ws.clear()
-
-                # Prepara valores: cabeçalho + dados
-                values = [list(map(str, df.columns.tolist()))]
-                if not df.empty:
-                    values += df.astype(object).where(_pd.notna(df), "").astype(str).values.tolist()
-
-                # Redimensiona a planilha (para evitar erro de range)
-                # Ajuste mínimo para evitar "exceeded grid limits"
-                rows_needed = max(100, len(values) + 5)
-                cols_needed = max(26, len(values[0]) if values else 1)
-                try:
-                    ws.resize(rows=rows_needed, cols=cols_needed)
-                except Exception:
-                    pass  # alguns ambientes não permitem resize frequente; segue com update
-
-                # Escreve a partir de A1
-                ws.update("A1", values, value_input_option="RAW")
-
-            except Exception as e:
-                return f"GSHEETS: erro na aba '{ws_title}' ({e!s})"
-
-        return f"GSHEETS: ok (reason={reason}) -> {spreadsheet_id}"
-
-    except Exception as e:
-        return f"GSHEETS: erro geral ({e!s})"
-
-# =========================
-# Logs
-# =========================
-def _uv2_log(msg):
-    print(f"[UV2] {msg}", flush=True)
-
-_logger = logging.getLogger("uv_persist")
-if not _logger.handlers:
-    _logger.setLevel(logging.INFO)
-    fh = logging.FileHandler(LOGS_DIR / "uv_saves.log", encoding="utf-8")
-    fmt = logging.Formatter("%(asctime)s | %(levelname)s | %(message)s")
-    fh.setFormatter(fmt)
-    _logger.addHandler(fh)
-
-with st.sidebar.expander("Debug de salvamento", expanded=False):
-    for item in st.session_state.get("dbg_prints", [])[-5:]:
-        st.write(f"• {item['ts']} — {item['reason']}")
-        for s in item["status"]:
-            st.caption(s)
-
-with st.sidebar.expander("⏱️ Latência de salvamento", expanded=False):
-    _render_latency_panel(max_rows=12)
-
-# =========================
-# CSS
-# =========================
-def load_css(filename: str = "univolei.css"):
-    for css_path in (BASE_DIR / filename, Path.cwd() / filename):
-        if css_path.exists():
-            st.markdown(f"<style>{css_path.read_text(encoding='utf-8')}</style>", unsafe_allow_html=True)
-            return str(css_path)  # caminho efetivamente usado
-    print(f"[load_css] CSS não encontrado: {filename} | BASE_DIR={BASE_DIR} | CWD={Path.cwd()}")
-    return None
-_css_path = load_css("univolei.css")
-
-
-# === UV2 GAME MODE INJECT (auto) — functional version ===
-def _flag_param_true(val):
-    if val is None:
-        return False
-    if isinstance(val, (list, tuple)) and val:
-        val = val[0]
-    return str(val).lower() in ("1","true","on","yes","y","sim","s")
-
-def _uv2_read_file(path: Path) -> str:
-    try:
-        return Path(path).read_text(encoding="utf-8")
-    except Exception:
-        return ""
-
-def _uv2_build_html() -> str:
-    # EMBEDDED layout: não lê mais uv2_game.html/css do disco
-    css_txt = """/* ===== Base 100% branco, sem “respiradores” entre componentes ===== */
-:root{
-  --pad:6px;       /* padding interno mínimo */
-  --gap:0px;       /* sem espaçamento entre blocos */
-  --pill-r:9999px;
-  --fg:#222;       /* texto neutro */
-  --bd:#dfe3ea;    /* borda leve */
-  --bg:#ffffff;    /* fundo branco absoluto */
-  --muted:#777;
-  --danger:#b91c1c;
-  --danger-soft:#fae3e3;
-}
-
-*{ box-sizing:border-box; }
-html,body{ height:100%; }
-body.uv2-body{
-  margin:0; color:var(--fg); background:#fff;            /* TUDO branco */
-  font:400 13px/1.18 "Inter", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-}
-
-/* App ocupa a viewport inteira (sem rolagem) */
-#uv2-app{
-  height:100svh;
-  display:grid;
-  grid-template-rows:
-    min-content   /* header */
-    min-content   /* controles (1 linha) */
-    min-content   /* jogadoras */
-    min-content   /* atalhos */
-    min-content   /* placar */
-    1fr;          /* quadra */
-  gap:var(--gap);                 /* **sem** espaço entre os cards */
-  padding:0;                      /* borda da tela colada */
-}
-
-/* Cartões brancos, super enxutos */
-.uv2-card{
-  background:var(--bg);
-  border:1px solid var(--bd);
-  border-radius:6px;
-  padding:var(--pad);
-}
-
-/* ===== Título / badge ===== */
-.badge{
-  display:inline-flex; align-items:center; gap:6px;
-  padding:2px 8px; border:1px solid var(--bd); border-radius:var(--pill-r);
-  background:#fff; font-weight:800; font-size:clamp(11px, 3.0vw, 16px);
-}
-.badge .x{ font-weight:900; }
-.badge .date{ font-weight:600; color:var(--muted); }
-
-/* Header: título + toggle (neutro) */
-#uv2-header{
-  display:flex; align-items:center; justify-content:space-between; gap:6px;
-  padding:4px var(--pad);
-}
-
-/* Toggle SEM verde (cinza quando ligado) */
-.uv2-toggle{ display:inline-flex; align-items:center; gap:6px; cursor:pointer; user-select:none; }
-.uv2-toggle input{ display:none; }
-.uv2-toggle .knob{
-  width:38px; height:22px; border-radius:9999px; position:relative;
-  background:#e6e8ec; border:1px solid #cfd6e0; display:inline-block;
-}
-.uv2-toggle .knob::after{
-  content:""; position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%;
-  background:#fff; border:1px solid #cfd6e0; transition:.16s;
-}
-.uv2-toggle input:checked + .knob{ background:#d9def2; border-color:#c6cbe0; } /* tom frio neutro */
-.uv2-toggle input:checked + .knob::after{ transform:translateX(16px); }
-.uv2-toggle .lbl{ color:#111; font-weight:800; }
-
-/* ===== Controles: 1 LINHA ===== */
-#uv2-controls{ padding:4px var(--pad); }
-/* CONTROLES: Resultado | Posição em 2 colunas (1 linha) */
-.uv2-ctrl-row{
-  display:grid !important;
-  grid-template-columns: 1fr 1fr !important; /* 2 colunas lado a lado */
-  align-items:center !important;
-  gap:6px !important;
-}
-.uv2-field{ display:flex; align-items:center; gap:8px; min-width:0; }
-.uv2-legend{ font-weight:800; margin:0; white-space:nowrap; }
-.uv2-radio{ display:flex; gap:10px; flex-wrap:nowrap; }
-.uv2-radio label span{ white-space:nowrap; }
-
-.uv2-radio input{ accent-color:#111; }
-
-/* ===== Jogadoras ===== */
-#uv2-players .uv2-legend{ margin-bottom:4px; }
-#uv2-players .uv2-grid{
-  display:grid; grid-template-columns:repeat(12,minmax(0,1fr));
-  gap:4px;
-}
-.pill{
-  display:inline-flex; align-items:center; justify-content:center;
-  height:24px; padding:0 8px; border-radius:var(--pill-r);
-  border:1px solid var(--bd); background:#fff; font-weight:700;
-}
-.pill.adv{ background:#efe8ff; border-color:#d6c8ff; }
-
-/* ===== Atalhos ===== */
-#uv2-shortcuts .uv2-legend{ margin-bottom:4px; }
-#uv2-shortcuts .uv2-row{ display:flex; flex-wrap:wrap; gap:4px; }
-#uv2-shortcuts .pill{ height:24px; padding:0 8px; }
-.pill.danger{ background:var(--danger); color:#fff; border-color:#7f1d1d; }
-.pill.danger.soft{ background:var(--danger-soft); color:#222; border-color:#e8b4b4; }
-
-/* ===== Placar ===== */
-#uv2-score{ padding:4px var(--pad); }
-#uv2-score .teams{
-  display:grid; grid-template-columns:1fr auto 1fr; align-items:end; gap:4px;
-}
-#uv2-score .team{ text-align:center; }
-#uv2-score .name{ font-size:clamp(11px,2.8vw,14px); font-weight:900; }
-#uv2-score .points{ font-size:clamp(26px,9vw,48px); font-weight:900; line-height:1; }
-#uv2-score .x{ font-size:clamp(14px,5.6vw,24px); font-weight:900; align-self:center; }
-#uv2-score .sets{ text-align:center; font-weight:800; margin-top:2px; font-size:clamp(10px,2.7vw,13px); }
-
-/* ===== Quadra (ocupa o restante) ===== */
-#uv2-court{ display:grid; grid-template-rows:min-content 1fr min-content; gap:2px; }
-.uv2-court-head,.uv2-court-foot{
-  text-align:center; font-weight:800; font-size:clamp(11px,2.9vw,14px);
-}
-.uv2-court-box{
-  position:relative; border:2px solid #111827; border-radius:6px;
-  background:#f3a23a;                /* laranja (sem verde) */
-  height:100%; min-height:160px;
-}
-.uv2-net{
-  position:absolute; left:6%; right:6%; top:50%; transform:translateY(-50%);
-  height:6px; background:
-    repeating-linear-gradient(90deg,#111827 0 8px, transparent 8px 14px),
-    linear-gradient(#111827,#111827);
-  background-size:auto, 100% 2px; background-position:0 50%, 0 50%;
-  background-repeat:repeat,no-repeat;
-}
-.uv2-dot{
-  position:absolute; left:26%; top:58%;
-  width:10px; height:10px; border-radius:50%; background:#1d4ed8; box-shadow:0 0 0 2px #0f172a40;
-}
-
-/* ===== Responsivo: manter 1 tela ===== */
-@media (max-width:480px){
-  .badge{ padding:2px 8px; }
-  #uv2-players .uv2-grid{ grid-template-columns:repeat(12,minmax(0,1fr)); }
-  #uv2-players .pill.adv{ grid-column:span 2; }
-}
-
-/* Larguras maiores centralizam sem criar espaços entre blocos */
-@media (min-width:481px){
-  #uv2-app{ max-width:520px; margin:0 auto; }
-}
-
-/* FORÇA Resultado | Posição em UMA linha (2 colunas) */
-#uv2-controls .uv2-ctrl-row{
-  display: grid !important;
-  grid-template-columns: minmax(0,1fr) minmax(0,1fr) !important;
-  column-gap: 6px !important;
-  row-gap: 0 !important;
-  align-items: center !important;
-  width: 100% !important;
-}
-#uv2-controls .uv2-ctrl-row > .uv2-field{ min-width: 0 !important; }
-
-#uv2-controls .uv2-legend{ white-space: nowrap !important; }
-#uv2-controls .uv2-radio{ display:flex !important; flex-wrap: nowrap !important; gap:10px !important; }
-#uv2-controls .uv2-radio label span{ white-space: nowrap !important; }
-"""
-    html_tpl = """<!doctype html><html><head><meta charset='utf-8'></head><body><div id='app'></div></body></html>"""
-    # Se o HTML original referenciava o css via <link>, injeta inline
-    html_tpl = html_tpl.replace('<link rel="stylesheet" href="uv2_game.css" />', '<style>$CSS</style>')
-    if '$CSS' not in html_tpl:
-        # garante css inline no <head>
-        if '</head>' in html_tpl:
-            html_tpl = html_tpl.replace('</head>', '<style>$CSS</style></head>')
-        else:
-            html_tpl = '<!doctype html><html><head><meta charset="utf-8"><style>$CSS</style></head>' + html_tpl
-    # --- valores dinâmicos ---
-    frames = st.session_state.get("frames", {})
-    def _n(v, d=""):
-        try: return str(v) if v is not None else d
-        except Exception: return d
-    try:
-        home_name = team_name_by_id(frames, 1)
-        away_name = team_name_by_id(frames, 2)
-    except Exception:
-        home_name = "Nós"; away_name = "Adversário"
-    try:
-        date_str = datetime.today().strftime("%d/%m/%Y")
-    except Exception:
-        date_str = ""
-    try:
-        mid = st.session_state.get("match_id")
-        sn  = int(st.session_state.get("set_number") or 1)
-        if mid is not None:
-            df_cur = current_set_df(frames, mid, sn)
-            hp, ap = set_score_from_df(df_cur)
-            hs, as_ = update_sets_score_and_match(frames, mid)
-        else:
-            hp = ap = 0; hs = as_ = 0; sn = 1
-    except Exception:
-        hp = ap = 0; hs = as_ = 0; sn = 1
-    from string import Template
-    tpl = Template(html_tpl)
-    html_doc = tpl.safe_substitute({
-        "CSS": css_txt,
-        "home": _n(home_name, "Nós"),
-        "away": _n(away_name, "Adversário"),
-        "date": _n(date_str, ""),
-        "home_pts": _n(hp, "0"),
-        "away_pts": _n(ap, "0"),
-        "home_sets": _n(hs, "0"),
-        "away_sets": _n(as_, "0"),
-        "set_atual": _n(sn, "1"),
-    })
-    if "</head>" in html_doc:
-        html_doc = html_doc.replace("</head>", "<script>console.log('[UV2] inline embutido');</script></head>")
-    return html_doc
-
-
+  }catch(e){}
+  // lógica anti scroll-jump
+  const KEY='uv_scroll_y';
+  window.addEventListener('load', ()=>{
+    try{
+      const y=sessionStorage.getItem(KEY);
+      if(y!==null){ window.scrollTo(0,parseInt(y)); }
+    }catch(e){}
+  });
+  window.addEventListener('beforeunload', ()=>{
+    try{
+      sessionStorage.setItem(KEY, String(window.scrollY||0));
+    }catch(e){}
+  });
+})();
+</script>
+""", height=0, scrolling=False)
+# --- PATCH: cores dos botões ADV e Rede ---
 def _paint_adv_rede_buttons():
     components.html("""
     <script>
@@ -700,7 +122,21 @@ def _paint_adv_rede_buttons():
     })();
     </script>
     """, height=0, scrolling=False)
+# =========================
+# CSS externo
+# =========================
+BASE_DIR = Path(__file__).parent.resolve()
+def load_css(filename: str = "univolei.css"):
+    for css_path in (BASE_DIR / filename, Path.cwd() / filename):
+        if css_path.exists():
+            st.markdown(f"<style>{css_path.read_text(encoding='utf-8')}</style>", unsafe_allow_html=True)
+            return str(css_path)  # caminho efetivamente usado
+    print(f"[load_css] CSS não encontrado: {filename} | BASE_DIR={BASE_DIR} | CWD={Path.cwd()}")
+    return None
+_css_path = load_css("univolei.css")
 
+
+import html as html_mod
 # ---- onde você lê o html da automação de espaçamento
 st.markdown("""
 <script>
@@ -718,35 +154,6 @@ st.markdown("""
     for(let i=0;i<30 && sib;i++){
       sib = sib.nextElementSibling;
       if(sib && sib.matches('div[data-testid="stHorizontalBlock"]')){
-        sib.classList.add(cls);
-        return true;
-      }
-    }
-    return false;
-  }
-  function addRowClassByAny(substr, cls){
-    substr = (substr || "").toLowerCase();
-
-    // 1) tenta como título markdown (reaproveita sua função)
-    if (addRowClassByTitle(substr, cls)) return true;
-
-    // 2) fallback: procura o texto em contêineres comuns do Streamlit
-    const nodes = [
-      ...document.querySelectorAll(
-        'div[data-testid="stMarkdownContainer"], ' +
-        'div[data-testid="stVerticalBlock"], ' +
-        'div[data-testid="stHorizontalBlock"]'
-      )
-    ];
-
-    const anchor = nodes.find(el => (el.innerText || '').toLowerCase().includes(substr));
-    if (!anchor) return false;
-
-    // 3) a partir desse elemento, acha a próxima “linha” horizontal e aplica a classe
-    let sib = anchor;
-    for (let i = 0; i < 30 && sib; i++){
-      sib = sib.nextElementSibling;
-      if (sib && sib.matches('div[data-testid="stHorizontalBlock"]')){
         sib.classList.add(cls);
         return true;
       }
@@ -798,32 +205,7 @@ st.markdown("""
   else document.addEventListener('DOMContentLoaded', run);
   new MutationObserver(run).observe(document.body, {childList:true, subtree:true});
 })();
-(function(){
-  if (window.__uvGridObs) return;       // <<< evita registrar de novo
-  window.__uvGridObs = true;
-  const N = 6;
-  /* resto do seu script... */
-  let t = null;
-  const run = () => { clearTimeout(t); t = setTimeout(apply, 60); };
-  if (document.readyState !== 'loading') run();
-  else document.addEventListener('DOMContentLoaded', run);
-  const mo = new MutationObserver(run);
-  mo.observe(document.body, {childList:true, subtree:true});
-  window.__uvGridMO = mo;               // opcional, guarda referência
-})();
-
-(function(){
-  if (window.__uvSquashObs) return;     // <<< evita múltiplas inscrições
-  window.__uvSquashObs = true;
-  function squash(id){ /* ... */ }
-  function run(){ ['div5','div6','div7'].forEach(squash); }
-  run();
-  const mo = new MutationObserver(run);
-  mo.observe(document.body,{childList:true,subtree:true});
-  window.__uvSquashMO = mo;             // opcional
-})();
 </script>
-
 """, unsafe_allow_html=True)
 # === CSS anti-gap para QUALQUER iframe de components.html ===
 st.markdown("""
@@ -903,34 +285,6 @@ def trim_ax(ax, xlabel="", ylabel="", legend=False, max_xticks=6, max_yticks=5):
     if not legend and ax.get_legend(): ax.get_legend().remove()
     ax.get_figure().tight_layout(pad=0.15)
     return ax.get_figure()
-def bar_chart_safe(obj, title=None, rotate_xticks=0):
-    """Bar chart sem Altair/Arrow/pyarrow. Aceita Series (1 série) ou DataFrame (agrupado)."""
-    import numpy as np
-    import pandas as pd
-
-    fig, ax = small_fig(3.6, 1.6)
-
-    if isinstance(obj, pd.Series):
-        s = obj.fillna(0)
-        x = np.arange(len(s))
-        ax.bar(x, s.values)
-        ax.set_xticks(x)
-        ax.set_xticklabels([str(i) for i in s.index], rotation=rotate_xticks, ha="right", fontsize=7)
-    else:  # DataFrame
-        df = obj.fillna(0)
-        idx = list(df.index)
-        cols = list(df.columns)
-        x = np.arange(len(idx))
-        n = max(1, len(cols))
-        width = min(0.8, 0.8 / n)
-        for i, c in enumerate(cols):
-            ax.bar(x + i*width, df[c].values, width=width, label=str(c))
-        ax.set_xticks(x + width*(n-1)/2)
-        ax.set_xticklabels([str(i) for i in idx], rotation=rotate_xticks, ha="right", fontsize=7)
-        ax.legend(loc="best", fontsize=7)
-
-    st.pyplot(trim_ax(ax, legend=True), use_container_width=True)
-
 # =========================
 # DataFrame HTML
 # =========================
@@ -939,25 +293,18 @@ def display_dataframe(df, height=None, use_container_width=False, extra_class: s
         st.write("_Sem dados._"); return
     classes = ('custom-table ' + extra_class).strip()
     html_table = df.to_html(classes=classes, index=False, escape=False)
-
-    height_css = f"{int(height)}px" if isinstance(height, (int, float)) else "auto"
-    width_css = "100%" if use_container_width else "auto"
-
     styled_html = f"""
-    <div style="overflow:auto; height:{height_css}; width:{width_css};">
+    <div style='overflow:auto; height:{height if height else "auto"}px; width: {"100%" if use_container_width else "auto"};'>
         {html_table}
     </div>
     """
     st.markdown(styled_html, unsafe_allow_html=True)
-
 # =========================
 # Estado/Base
 # =========================
 DEFAULT_DB = str(BASE_DIR / "volei_base_dados.xlsx")
 if "db_path" not in st.session_state: st.session_state.db_path = DEFAULT_DB
 if "frames" not in st.session_state: st.session_state.frames = init_or_load(Path(st.session_state.db_path))
-
-if "duck_path" not in st.session_state: st.session_state.duck_path = str(DEFAULT_DUCK)
 if "match_id" not in st.session_state: st.session_state.match_id = None
 if "set_number" not in st.session_state: st.session_state.set_number = None
 if "auto_close" not in st.session_state: st.session_state.auto_close = True
@@ -985,196 +332,11 @@ st.session_state.setdefault("btn_label_mode", "Número")
 st.session_state.setdefault("_do_rerun_after", False)
 # =========== Debug/prints (em memória) ===========
 st.session_state.setdefault("dbg_prints", [])
-
-
-# =========================
-# [2] Offline: Journal append-only (NDJSON) por lance
-# =========================
-
-def _journal_write(frames, reason: str):
-    """Escreve 1 linha NDJSON por lance: journal/YYYYMMDD_match_<match_id>.ndjson"""
-    try:
-        mid = st.session_state.get("match_id")
-        if not mid:
-            return
-        jdir = BASE_DIR / "journal"; jdir.mkdir(parents=True, exist_ok=True)
-        ts = _dt.datetime.now()
-        jpath = jdir / f"{ts.strftime('%Y%m%d')}_match_{mid}.ndjson"
-        rl = frames.get("rallies", _pd.DataFrame())
-        row = rl.iloc[-1].to_dict() if not rl.empty else {}
-        payload = {
-            "ts": _dt.datetime.now().isoformat(timespec="seconds"),
-            "reason": reason,
-            "match_id": mid,
-            "set_number": st.session_state.get("set_number"),
-            "rally": row,
-        }
-        with open(jpath, "a", encoding="utf-8") as f:
-            f.write(_json.dumps(payload, ensure_ascii=False) + "\n")
-    except Exception as e:
-        try:
-            _logger.warning(f"journal falhou: {e}")
-        except Exception:
-            pass
-
-# =========================
-# [3] Online: Webhook (Apps Script) a cada lance
-# =========================
-def _persist_to_webhook(frames, reason: str) -> str|None:
-    """POST no Web App (Apps Script). Precisa de CONFIG['online']['webhook_url']."""
-    try:
-        url = CONFIG["online"].get("webhook_url","").strip()
-        if not url:
-            return None
-        import requests, pandas as pd
-        rl = frames.get("rallies", pd.DataFrame())
-        if rl is None or rl.empty:
-            data_rows, cols = [], []
-        else:
-            cols = list(rl.columns)
-            data_rows = rl.astype(object).where(pd.notna(rl), "").values.tolist()
-        payload = {
-            "sheet": "rallies",
-            "columns": cols,
-            "rows": data_rows,
-            "reason": reason,
-            "match_id": st.session_state.get("match_id"),
-            "set_number": st.session_state.get("set_number"),
-        }
-        r = requests.post(url, json=payload, timeout=6)
-        return "WEBHOOK: ok" if r.ok else f"WEBHOOK: http {r.status_code}"
-    except Exception as e:
-        try:
-            _logger.warning(f"Webhook falhou: {e}")
-        except Exception:
-            pass
-        return None
-
-
-def _persist_all(frames, reason: str = "rally"):
-    """Salva Excel sempre; DuckDB e Google Sheets quando possível.
-       Backups timestampados apenas em 'set_close'/'match_close' (evita 1 arquivo por ponto)."""
-
-    statuses = []  # coleta mensagens para print/log
-    _perf = _perf_begin(reason)  # <<< inicia medição desse ciclo
-
-    # 1) Excel principal (sempre)
-    t = _time.perf_counter()
-    try:
-        save_all(_P(st.session_state.db_path), frames)
-        statuses.append(f"XLSX: ok -> {st.session_state.db_path}")
-    except Exception as e:
-        msg = f"XLSX: erro {e!s}"
-        statuses.append(msg)
-        _logger.exception(f"Excel principal falhou: {e}")
-    _perf_step(_perf, "XLSX", t)
-
-    # 2) Backup Excel (somente em set/match) — local ./backups
-    if reason in ("set_close","match_close"):
-        t = _time.perf_counter()
-        try:
-            ts = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
-            bkp_dir = BASE_DIR / "backups"
-            bkp_dir.mkdir(parents=True, exist_ok=True)
-            bkp = bkp_dir / f"volei_base_dados_{ts}.xlsx"
-            save_all(bkp, frames)
-            statuses.append(f"BACKUP local: ok -> {bkp}")
-        except Exception as e:
-            msg = f"BACKUP local: erro {e!s}"
-            statuses.append(msg)
-            _logger.warning(msg)
-        _perf_step(_perf, "BACKUP", t)
-
-    # 3) DuckDB (se disponível)
-    t = _time.perf_counter()
-    try:
-        try:
-            import duckdb as _duck
-            duck_path = st.session_state.get("duck_path", DEFAULT_DUCK)
-            con = _duck.connect(duck_path)
-            for tname, df in frames.items():
-                if isinstance(df, _pd.DataFrame):
-                    con.register("df_tmp", df)
-                    con.execute(f"CREATE OR REPLACE TABLE {tname} AS SELECT * FROM df_tmp")
-                    con.unregister("df_tmp")
-            con.execute("CHECKPOINT")
-            con.close()
-            statuses.append(f"DUCKDB: ok -> {duck_path}")
-        except Exception as e:
-            msg = f"DUCKDB: erro {e!s}"
-            statuses.append(msg)
-            _logger.error(msg)
-    except Exception as e:
-        msg = f"DUCK bloco: erro {e!s}"
-        statuses.append(msg)
-        _logger.error(msg)
-    _perf_step(_perf, "DUCKDB", t)
-
-    # 4) Google Sheets (se credenciais existirem)
-    t = _time.perf_counter()
-    ok_gs = False
-    try:
-        gs_status = _persist_to_gsheets(frames, reason)
-        if gs_status:
-            statuses.append(gs_status); _logger.info(gs_status)
-            ok_gs = str(gs_status).startswith("GSHEETS: ok")
-        else:
-            statuses.append("GSHEETS: skip (sem gsheet_id)")
-    except Exception as e:
-        statuses.append(f"GSHEETS: falhou {e!s}")
-        _logger.error(statuses[-1])
-    finally:
-        _perf_step(_perf, "GSHEETS", t)
-
-    # fallback para Webhook quando GS não persistiu
-    if not ok_gs:
-        t_wb = _time.perf_counter()
-        try:
-            wb = _persist_to_webhook(frames, reason)
-            if wb:
-                statuses.append(wb); _logger.info(wb)
-        except Exception as e2:
-            statuses.append(f"Webhook bloco falhou: {e2!s}")
-            _logger.warning(statuses[-1])
-        _perf_step(_perf, "WEBHOOK", t_wb)
-    else:
-        _perf_step(_perf, "GSHEETS", t)
-
-    # 5) Log final + prints na UI
-    try:
-        r = int(frames.get("rallies", _pd.DataFrame()).shape[0])
-        s = int(frames.get("sets", _pd.DataFrame()).shape[0])
-        m = int(frames.get("amistosos", _pd.DataFrame()).shape[0])
-    except Exception:
-        r = s = m = -1
-
-    duck_show = st.session_state.get("duck_path", "(sem duck_path)")
-    st.session_state['last_save_at'] = _dt.datetime.now().strftime("%H:%M:%S")
-
-    _logger.info(
-        f"SALVO | reason={reason} | xlsx={st.session_state.db_path} | dv={duck_show} "
-        f"| rows(r/s/m)={r}/{s}/{m} | {' | '.join(statuses)}"
-    )
-
-    st.session_state['dbg_prints'].append({
-        "ts": _dt.datetime.now().isoformat(timespec="seconds"),
-        "reason": reason,
-        "rows": {"rallies": r, "sets": s, "amistosos": m},
-        "status": statuses,
-    })
-
-    try:
-        st.write("💾 Persistência:", "; ".join(statuses))
-    except Exception:
-        pass
-
-    # <<< encerra medição e guarda
-    _perf_commit(_perf, statuses)
-
-    return
-
-
-
+def dbg_print(msg: str):
+    ts = time.strftime("%H:%M:%S")
+    line = f"[{ts}] {msg}"
+    st.session_state["dbg_prints"] = (st.session_state["dbg_prints"] + [line])[-200:]
+    print(line)
 # =========================
 # Captura de clique via query param
 # =========================
@@ -1188,7 +350,7 @@ def _uv_handle_court_click():
     try:
         xs, ys = payload.split(",")[:2]
         x = float(xs); y = float(ys)  # normalizado [0..1]
-        st.session_state["last_court_click"] = {"x": x, "y": y, "ts": int(_time.time())}
+        st.session_state["last_court_click"] = {"x": x, "y": y, "ts": int(time.time())}
         dbg_print(f"Clique capturado: x={x:.4f}, y={y:.4f} (0..1).")
         try:
             del st.query_params["uv_click"]
@@ -1291,41 +453,29 @@ def update_sets_score_and_match(fr: dict, match_id: int) -> tuple[int,int]:
     mt.loc[mt_mask, "home_sets"] = home_sets; mt.loc[mt_mask, "away_sets"] = away_sets
     fr["amistosos"] = mt
     return home_sets, away_sets
-
 def _apply_set_winner_and_proceed(home_pts: int, away_pts: int):
     frames = st.session_state.frames
     match_id = st.session_state.match_id
     set_number = st.session_state.set_number
     winner_id = 1 if home_pts > away_pts else 2
-
     stf = frames["sets"]
     mask = (stf["match_id"] == match_id) & (stf["set_number"] == set_number)
     stf.loc[mask, "winner_team_id"] = winner_id
     frames["sets"] = stf
-
     home_sets, away_sets = update_sets_score_and_match(frames, match_id)
     save_all(Path(st.session_state.db_path), frames)
-
-    # Journal por lance (append-only)
-    try:
-        _journal_write(frames, reason="set_close")
-    except Exception as e:
-        try:
-            _logger.warning(f"journal hook falhou: {e}")
-        except Exception:
-            pass
-
     if home_sets >= 3 or away_sets >= 3:
         try:
             finalize_match(frames, match_id)
         except Exception:
             pass
+        # marca is_closed na tabela amistosos (fallback para apps antigos)
         try:
             mt = frames.get("amistosos", pd.DataFrame())
             mt.loc[mt["match_id"] == match_id, "is_closed"] = True
             mt.loc[mt["match_id"] == match_id, "closed_at"] = datetime.now().isoformat(timespec="seconds")
             frames["amistosos"] = mt
-            _persist_all(frames, reason='match_close')
+            save_all(Path(st.session_state.db_path), frames)
         except Exception:
             pass
         st.success(f"Set {set_number} encerrado ({home_pts} x {away_pts}). Partida finalizada: {home_sets} x {away_sets} em sets.")
@@ -1333,10 +483,8 @@ def _apply_set_winner_and_proceed(home_pts: int, away_pts: int):
     else:
         st.session_state.set_number = int(set_number) + 1
         add_set(frames, match_id=match_id, set_number=st.session_state.set_number)
-        _persist_all(frames, reason='set_open')
+        save_all(Path(st.session_state.db_path), frames)
         st.success(f"Set {set_number} encerrado ({home_pts} x {away_pts}). Novo set: {st.session_state.set_number}")
-
-
 def auto_close_set_if_needed() -> None:
     if not st.session_state.auto_close: return
     frames = st.session_state.frames
@@ -1469,53 +617,30 @@ def _persist_fb_on_last_rally(fb_upper: str):
         dbg_print(f"Persistido Frente/Fundo='{fb_upper}' no rally_id={last_id}.")
     except Exception as e:
         dbg_print(f"Falha ao persistir Frente/Fundo: {e}")
-        
 def quick_register_line(raw_line: str):
     if not raw_line.strip():
         dbg_print("Linha vazia ignorada."); return
-
     row = parse_line(raw_line)
     row = _fix_who_scored_from_raw_and_row(raw_line, row)
     row = _normalize_action_in_row(row)
-
     fb = str(st.session_state.get("q_position","Frente")).strip().upper()
     row["position_zone"] = fb
-
     row = _fast_apply_scores_to_row(row)
-
     last_click = st.session_state.get("last_court_click")
     if last_click and isinstance(last_click, dict):
         row["court_x"] = float(last_click.get("x", 0.0))
         row["court_y"] = float(last_click.get("y", 0.0))
         st.session_state["last_court_click"] = None
-
-    append_rally(
-        st.session_state.frames,
-        match_id=st.session_state.match_id,
-        set_number=st.session_state.set_number,
-        row=row
-    )
-
+    append_rally(st.session_state.frames, match_id=st.session_state.match_id, set_number=st.session_state.set_number, row=row)
     _persist_fb_on_last_rally(fb)
-
-    # journal append-only por lance (segurança offline extra)
-    try:
-        _journal_write(st.session_state.frames, reason="rally")
-    except Exception:
-        pass
-
-    _persist_all(st.session_state.frames, reason='rally')
-
+    save_all(Path(st.session_state.db_path), st.session_state.frames)
     st.session_state.data_rev += 1
     auto_close_set_if_needed()
-
     dbg_print(
         f"REGISTRO: raw='{raw_line}' -> action='{row.get('action')}', result='{row.get('result')}', "
         f"who_scored='{row.get('who_scored')}', player={row.get('player_number')}, "
         f"pos={row.get('position_zone')}, placar={row.get('score_home')}-{row.get('score_away')}"
     )
-
-
 def quick_register_click(side: str, number: int | None, action: str, is_error: bool):
     prefix = "1" if side == "NOS" else "0"
     num = f"{number}" if number is not None else ""
@@ -1556,7 +681,7 @@ def register_current(number: int | None = None, action: str | None = None):
     num_val = number if number is not None else st.session_state.get("last_selected_player", None)
     if num_val is None:
         raw = st.session_state.get("line_input_text", "")
-        m = re.findall(r"\b(\d{1,2})\b", raw)
+        m = re.findall(r"\\b(\\d{1,2})\\b", raw)
         num_val = int(m[-1]) if m else None
     if str(act).lower() == "rede":
         is_err = True
@@ -2047,19 +1172,14 @@ if not st.session_state.game_mode:
         st.markdown('</div>', unsafe_allow_html=True)
     ########   
     # Finalizar partida direto
- # Finalizar partida direto
     def _finalizar_partida():
-        if st.session_state.match_id is None: 
-            return
-
+        if st.session_state.match_id is None: return
         mid = st.session_state.match_id
-
         try:
             finalize_match(st.session_state.frames, mid)
         except Exception:
             pass
-
-        # Força is_closed na tabela e salva local
+        # Força is_closed na tabela
         try:
             frames_local = st.session_state.frames
             mt = frames_local.get("amistosos", pd.DataFrame())
@@ -2068,13 +1188,8 @@ if not st.session_state.game_mode:
             frames_local["amistosos"] = mt
             save_all(Path(st.session_state.db_path), frames_local)
             st.session_state.frames = frames_local
-
-            # >>> NOVO: checkpoint de fim de partida (inclui GSheets conforme SYNC_CFG)
-            _persist_all(st.session_state.frames, reason='match_close')
-
         except Exception:
             pass
-
         st.success("Partida finalizada.")
         st.session_state.match_id = None
         st.session_state.set_number = None
@@ -2118,7 +1233,7 @@ if st.session_state.get("show_config_team", False):
             else:
                 new_team = pd.DataFrame({"team_id":[OUR_TEAM_ID], "team_name":[new_team_name]})
                 equipes = pd.concat([equipes, new_team], ignore_index=True)
-            frames["equipes"] = equipes; _persist_all(frames, reason='generic')
+            frames["equipes"] = equipes; save_all(Path(st.session_state.db_path), frames)
             st.session_state.show_config_team = False
     st.button("💾 Salvar Nome do Time", key="save_team_name_btn", on_click=_save_team_name)
     st.markdown("---"); st.subheader("👥 Jogadoras")
@@ -2136,7 +1251,7 @@ if st.session_state.get("show_config_team", False):
                 player_num = int(player_to_delete.split(" - ")[0])
                 jog_df = frames["jogadoras"]
                 jog_df = jog_df[~((jog_df["team_id"] == OUR_TEAM_ID) & (jog_df["player_number"] == player_num))]
-                frames["jogadoras"] = jog_df; _persist_all(frames, reason='generic')
+                frames["jogadoras"] = jog_df; save_all(Path(st.session_state.db_path), frames)
         st.button("🗑️ Excluir", key="delete_player_btn", on_click=_delete_player)
     st.markdown("---"); st.subheader("➕ Adicionar")
     c1, c2, c3 = st.columns(3)
@@ -2153,7 +1268,7 @@ if st.session_state.get("show_config_team", False):
                 frames["jogadoras"] = jog_df
             else:
                 frames["jogadoras"] = new_player
-            _persist_all(frames, reason='generic')
+            save_all(Path(st.session_state.db_path), frames)
         else:
             st.warning("Digite um nome.")
     st.button("➕ Adicionar Jogadora", key="add_player_btn", on_click=_add_player)
@@ -2532,7 +1647,7 @@ if st.session_state.game_mode:
     sc1, sc2, sc3, sc4 = st.columns([1.1, .8, 1.1, 2.2])
     with sc1:
         st.markdown(
-            f"<div class='score-box'><div class='score-team'>{html_mod.escape(home_name or 'Nós')}</div><div class='score-points'>{home_pts}</div></div>",
+            f"<div class='score-box'><div class='score-team'>Univolei</div><div class='score-points'>{home_pts}</div></div>",
             unsafe_allow_html=True
         )
     with sc2:
@@ -2870,55 +1985,6 @@ with st.container():
             display_dataframe(tbl_erros, height=160, use_container_width=True)
         # Histórico (sequência de rallies) - set atual inteiro (compacto)
         st.markdown("**🕒 Histórico (sequência de rallies)**")
-        # ---- KPIs adicionais e gráficos ----
-        st.markdown("---")
-        st.subheader("📊 KPIs e Análises do Set")
-        if df_set is not None and not df_set.empty:
-            dfA = df_set.copy()
-            if "result" in dfA.columns:
-                dfA["result"] = dfA["result"].astype(str).str.upper()
-            if "who_scored" in dfA.columns:
-                dfA["who_scored"] = dfA["who_scored"].astype(str).str.upper()
-
-            mask_pontos = (dfA["who_scored"] == "NOS") & (dfA["result"] == "PONTO")
-            mask_erros  = (dfA["who_scored"] == "ADV") & (dfA["result"] == "ERRO")
-
-            # Top jogadoras – Pontos (NOS)
-            if "player_number" in dfA.columns:
-                sc_p = (dfA[mask_pontos]
-                        .groupby("player_number").size().sort_values(ascending=False).head(10))
-                er_p = (dfA[mask_erros]
-                        .groupby("player_number").size().sort_values(ascending=False).head(10))
-                c1, c2 = st.columns(2)
-                with c1:
-                    st.markdown("**Top jogadoras – Pontos (NOS)**")
-                    bar_chart_safe(sc_p)
-                with c2:
-                    st.markdown("**Top jogadoras – Erros (NOS)**")
-                    bar_chart_safe(er_p)
-
-            # Fundamentos com mais acertos/erros (NOS e ADV)
-            if "action" in dfA.columns:
-                c3, c4 = st.columns(2)
-                with c3:
-                    st.markdown("**Fundamentos – Acertos (NOS vs ADV)**")
-                    f_ok = (dfA[ok_mask]
-                            .groupby(["action","who_scored"]).size()
-                            .unstack(fill_value=0))
-                    bar_chart_safe(f_ok, rotate_xticks=30)
-                with c4:
-                    st.markdown("**Fundamentos – Erros (NOS vs ADV)**")
-                    f_er = (dfA[~ok_mask]
-                            .groupby(["action","who_scored"]).size()
-                            .unstack(fill_value=0))
-                    bar_chart_safe(f_er, rotate_xticks=30)
-
-            # Mapa simples por posição/região (contagem)
-            if "position" in dfA.columns:
-                st.markdown("**Distribuição por região (conteúdo bruto)**")
-                pos_ct = dfA.groupby(["position","who_scored"]).size().unstack(fill_value=0)
-                bar_chart_safe(pos_ct, rotate_xticks=30)
-
         if df_set is not None and not df_set.empty:
             hist = df_set.copy()
             cols_hist = []
@@ -2932,26 +1998,8 @@ with st.container():
         if show_debug_ui() and st.session_state.get("dbg_prints"):
             st.markdown("---")
             st.markdown("**🧰 Debug (logs recentes)**")
-st.markdown(f"_arquivo: {LOGS_DIR / 'uv_saves.log'}_")
-st.code("\\n".join(st.session_state["dbg_prints"][-40:]), language="text")
-st.markdown('</div>', unsafe_allow_html=True)
-
-
-st.markdown(f"_arquivo: {LOGS_DIR / 'uv_saves.log'}_")
-try:
-    _items = st.session_state.get("dbg_prints", [])[-40:]
-    lines = []
-    for it in _items:
-        ts = it.get("ts", "-")
-        reason = it.get("reason", "-")
-        status = " | ".join(map(str, it.get("status", [])))
-        lines.append(f"{ts} — {reason} | {status}")
-    if lines:
-        st.code("\n".join(lines), language="text")
-except Exception:
-    pass
-
-
+            st.code("\\n".join(st.session_state["dbg_prints"][-40:]), language="text")
+    st.markdown('</div>', unsafe_allow_html=True)
 # =========================
 # Boot para Render
 # =========================
@@ -2961,14 +2009,3 @@ if __name__ == "__main__":
     if not st.session_state.get("_boot_rerun_done", False):
         st.session_state["_boot_rerun_done"] = True
         st.rerun()
-
-    # Google Sheets (opcional)
-    try:
-        if gsheets_sync.is_enabled():
-            status = gsheets_sync.sync_all(frames)
-            _logger.info(status)
-    except Exception as e:
-        try:
-            _logger.error(f"GSHEETS falhou: {e}")
-        except Exception:
-            pass
