@@ -1143,9 +1143,9 @@ SMALL_RC = {
 }
 mpl.rcParams.update(SMALL_RC)
 def small_fig(w=3.2, h=1.8):
-    # >>> CORREÇÃO: Garantir dimensões mínimas seguras
-    w = max(0.1, w)  # Mínimo de 0.1 em vez de 1.0
-    h = max(0.1, h)  # Mínimo de 0.1 em vez de 1.0
+    # Garantir que as dimensões sejam pelo menos 0.5 (não 0.1 que pode ser pequeno demais)
+    w = max(0.5, w)
+    h = max(0.5, h)
     
     fig, ax = plt.subplots(figsize=(w, h), dpi=110)
     ax.grid(True, alpha=0.15)
@@ -1163,18 +1163,37 @@ def trim_ax(ax, xlabel="", ylabel="", legend=False, max_xticks=6, max_yticks=5):
     if not legend and ax.get_legend(): ax.get_legend().remove()
     ax.get_figure().tight_layout(pad=0.15)
     return ax.get_figure()
+
 def bar_chart_safe(obj, title=None, rotate_xticks=0):
     """Bar chart sem Altair/Arrow/pyarrow. Aceita Series (1 série) ou DataFrame (agrupado)."""
+    
+    # >>> CORREÇÃO: Verificar se o objeto está vazio
+    if (isinstance(obj, pd.Series) and obj.empty) or (isinstance(obj, pd.DataFrame) and obj.empty):
+        st.write("_Sem dados para exibir._")
+        return
+    
     fig, ax = small_fig(4.0, 2.0)
 
     if isinstance(obj, pd.Series):
         s = obj.fillna(0)
+        # >>> CORREÇÃO: Verificar se há dados após fillna
+        if len(s) == 0 or s.sum() == 0:
+            st.write("_Sem dados válidos._")
+            plt.close(fig)  # Fechar figura para liberar memória
+            return
+            
         x = np.arange(len(s))
         ax.bar(x, s.values)
         ax.set_xticks(x)
         ax.set_xticklabels([str(i) for i in s.index], rotation=rotate_xticks, ha="right", fontsize=7)
     else:  # DataFrame
         df = obj.fillna(0)
+        # >>> CORREÇÃO: Verificar se há dados após fillna
+        if len(df) == 0 or df.sum().sum() == 0:
+            st.write("_Sem dados válidos._")
+            plt.close(fig)  # Fechar figura para liberar memória
+            return
+            
         idx = list(df.index)
         cols = list(df.columns)
         x = np.arange(len(idx))
@@ -1186,7 +1205,13 @@ def bar_chart_safe(obj, title=None, rotate_xticks=0):
         ax.set_xticklabels([str(i) for i in idx], rotation=rotate_xticks, ha="right", fontsize=7)
         ax.legend(loc="best", fontsize=7)
 
-    st.pyplot(trim_ax(ax, legend=True), width=True)
+    # >>> CORREÇÃO: Usar try/except para evitar erro no pyplot
+    try:
+        st.pyplot(trim_ax(ax, legend=True), width=True)
+    except Exception as e:
+        st.write(f"_Erro ao exibir gráfico: {e}_")
+    finally:
+        plt.close(fig)  # Sempre fechar a figura
 
 # =========================
 # DataFrame HTML
@@ -3128,56 +3153,75 @@ with st.container():
         # Histórico (sequência de rallies) - set atual inteiro (compacto)
         st.markdown("**🕒 Histórico (sequência de rallies)**")
         # ---- KPIs adicionais e gráficos ----
-        st.markdown("---")
-        st.subheader("📊 KPIs e Análises do Set")
-        if df_set is not None and not df_set.empty:
-            dfA = df_set.copy()
-            if "result" in dfA.columns:
-                dfA["result"] = dfA["result"].astype(str).str.upper()
-            if "who_scored" in dfA.columns:
-                dfA["who_scored"] = dfA["who_scored"].astype(str).str.upper()
+st.markdown("---")
+st.subheader("📊 KPIs e Análises do Set")
+if df_set is not None and not df_set.empty:
+    dfA = df_set.copy()
+    if "result" in dfA.columns:
+        dfA["result"] = dfA["result"].astype(str).str.upper()
+    if "who_scored" in dfA.columns:
+        dfA["who_scored"] = dfA["who_scored"].astype(str).str.upper()
 
-            mask_pontos = (dfA["who_scored"] == "NOS") & (dfA["result"] == "PONTO")
-            mask_erros  = (dfA["who_scored"] == "ADV") & (dfA["result"] == "ERRO")
+    mask_pontos = (dfA["who_scored"] == "NOS") & (dfA["result"] == "PONTO")
+    mask_erros  = (dfA["who_scored"] == "ADV") & (dfA["result"] == "ERRO")
 
-            # Top jogadoras – Pontos (NOS)
-            if "player_number" in dfA.columns:
-                sc_p = (dfA[mask_pontos]
-                        .groupby("player_number").size().sort_values(ascending=False).head(10))
-                er_p = (dfA[mask_erros]
-                        .groupby("player_number").size().sort_values(ascending=False).head(10))
-                c1, c2 = st.columns(2)
-                with c1:
-                    st.markdown("**Top jogadoras – Pontos (NOS)**")
-                    bar_chart_safe(sc_p)
-                with c2:
-                    st.markdown("**Top jogadoras – Erros (NOS)**")
-                    bar_chart_safe(er_p)
+    # Top jogadoras – Pontos (NOS) - COM VERIFICAÇÃO
+    if "player_number" in dfA.columns:
+        sc_p = (dfA[mask_pontos]
+                .groupby("player_number").size().sort_values(ascending=False).head(10))
+        er_p = (dfA[mask_erros]
+                .groupby("player_number").size().sort_values(ascending=False).head(10))
+        
+        c1, c2 = st.columns(2)
+        with c1:
+            st.markdown("**Top jogadoras – Pontos (NOS)**")
+            # >>> CORREÇÃO: Verificar se há dados antes de plotar
+            if not sc_p.empty and sc_p.sum() > 0:
+                bar_chart_safe(sc_p)
+            else:
+                st.write("_Sem dados_")
+        with c2:
+            st.markdown("**Top jogadoras – Erros (NOS)**")
+            # >>> CORREÇÃO: Verificar se há dados antes de plotar
+            if not er_p.empty and er_p.sum() > 0:
+                bar_chart_safe(er_p)
+            else:
+                st.write("_Sem dados_")
 
-            # Fundamentos com mais acertos/erros (NOS e ADV)
-            if "action" in dfA.columns:
-                c3, c4 = st.columns(2)
-                with c3:
-                    st.markdown("**Fundamentos – Acertos (NOS vs ADV)**")
-                    # Definir ok_mask para filtrar ações válidas
-                    ok_mask = dfA["action"].notna() & (dfA["action"] != "")
-                    f_ok = (dfA[ok_mask]
-                            .groupby(["action","who_scored"]).size()
-                            .unstack(fill_value=0))
-                    bar_chart_safe(f_ok, rotate_xticks=30)
-                with c4:
-                    st.markdown("**Fundamentos – Erros (NOS vs ADV)**")
-                    # Usar a mesma máscara já definida
-                    f_er = (dfA[ok_mask]
-                            .groupby(["action","who_scored"]).size()
-                            .unstack(fill_value=0))
-                    bar_chart_safe(f_er, rotate_xticks=30)
+    # Fundamentos com mais acertos/erros (NOS e ADV) - COM VERIFICAÇÃO
+    if "action" in dfA.columns:
+        c3, c4 = st.columns(2)
+        with c3:
+            st.markdown("**Fundamentos – Acertos (NOS vs ADV)**")
+            ok_mask = dfA["action"].notna() & (dfA["action"] != "")
+            f_ok = (dfA[ok_mask]
+                    .groupby(["action","who_scored"]).size()
+                    .unstack(fill_value=0))
+            # >>> CORREÇÃO: Verificar se há dados antes de plotar
+            if not f_ok.empty and f_ok.sum().sum() > 0:
+                bar_chart_safe(f_ok, rotate_xticks=30)
+            else:
+                st.write("_Sem dados_")
+        with c4:
+            st.markdown("**Fundamentos – Erros (NOS vs ADV)**")
+            f_er = (dfA[ok_mask]
+                    .groupby(["action","who_scored"]).size()
+                    .unstack(fill_value=0))
+            # >>> CORREÇÃO: Verificar se há dados antes de plotar
+            if not f_er.empty and f_er.sum().sum() > 0:
+                bar_chart_safe(f_er, rotate_xticks=30)
+            else:
+                st.write("_Sem dados_")
 
-            # Mapa simples por posição/região (contagem)
-            if "position" in dfA.columns:
-                st.markdown("**Distribuição por região (conteúdo bruto)**")
-                pos_ct = dfA.groupby(["position","who_scored"]).size().unstack(fill_value=0)
-                bar_chart_safe(pos_ct, rotate_xticks=30)
+    # Mapa simples por posição/região (contagem) - COM VERIFICAÇÃO
+    if "position" in dfA.columns:
+        st.markdown("**Distribuição por região (conteúdo bruto)**")
+        pos_ct = dfA.groupby(["position","who_scored"]).size().unstack(fill_value=0)
+        # >>> CORREÇÃO: Verificar se há dados antes de plotar
+        if not pos_ct.empty and pos_ct.sum().sum() > 0:
+            bar_chart_safe(pos_ct, rotate_xticks=30)
+        else:
+            st.write("_Sem dados_")
 
         if df_set is not None and not df_set.empty:
             hist = df_set.copy()
@@ -3192,6 +3236,7 @@ with st.container():
         if show_debug_ui() and st.session_state.get("dbg_prints"):
             st.markdown("---")
             st.markdown("**🧰 Debug (logs recentes)**")
+            
 st.markdown(f"_arquivo: {LOGS_DIR / 'uv_saves.log'}_")
 try:
     debug_items = st.session_state.get("dbg_prints", [])[-40:]
