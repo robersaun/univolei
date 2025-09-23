@@ -3,81 +3,38 @@ v2 -> com camera e movimento?
 ***************************************
 
 
+***************************************
+E rodar direto no celular (Android)?
+
+Dá, mas é bem mais trabalhoso (Termux/Python e compilar dependências). Na prática, é muito mais simples rodar no PC e acessar pelo celular via rede local.
+
+Se quiser, eu crio um pequeno “modo offline” no seu index.py (com a variável UV_OFFLINE) e troco automaticamente Google Sheets → XLSX/DuckDB quando estiver offline. Quer que eu aplique isso na sua versão atual?
+***************************************
+
 streamlit run index.py
 
 
-def resolve_our_roster_numbers(frames: dict) -> list[int]:
-    jg = frames.get("jogadoras", pd.DataFrame()).copy()
-    if jg.empty:
-        return []
-    for col in ["team_id", "player_number"]:
-        if col in jg.columns:
-            jg[col] = pd.to_numeric(jg[col], errors="coerce")
-    ours = jg[jg["team_id"] == OUR_TEAM_ID].dropna(subset=["player_number"]).sort_values("player_number")
-    return ours["player_number"].astype(int).unique().tolist()
 
 
-# Tutorial modal
-if st.session_state.get("show_tutorial", False):
-    try:
-        html_path = BASE_DIR / "tutorial_scout.html"
-        if html_path.exists():
-            html_content = html_path.read_text(encoding="utf-8")
-            components.html(
-                f"""
-                <div id='uv-modal' style='position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-                 width: 90vw; height: 85vh; background-color: white; z-index: 1000;
-                 border: 2px solid #ccc; border-radius: 10px; overflow: hidden;'>
-                    <button id='uv-close'
-                         style='position:absolute; top:10px; right:10px; z-index:1001; background:#ff4b4b; color:white;
-                                border:none; border-radius:50%; width:30px; height:30px; cursor:pointer; font-weight:bold;'>X</button>
-                    <iframe srcdoc='{html.escape(html_content)}'
-                             style='width:100%; height:100%; border:none; margin-top:40px;'></iframe>
-                </div>
-                <script>
-                  (function(){{
-                    const btn = document.getElementById('uv-close');
-                    btn.addEventListener('click', function(){{
-                      try {{
-                        const params = new URLSearchParams(window.parent.location.search || "");
-                        params.set('uv_tut','off');
-                        const newUrl = window.parent.location.pathname + '?' + params.toString() + window.parent.location.hash;
-                        window.parent.history.replaceState({{}}, '', newUrl);
-                        window.parent.location.reload();
-                      }} catch (e) {{
-                        const params = new URLSearchParams(window.location.search || "");
-                        params.set('uv_tut','off');
-                        const newUrl = window.location.pathname + '?' + params.toString() + window.location.hash;
-                        window.history.replaceState({{}}, '', newUrl);
-                        window.location.reload();
-                      }}
-                    }});
-                  }})();
-                </script>
-                """,
-                height=900, scrolling=True
-            )
-        else:
-            st.error("Arquivo de tutorial não encontrado.")
-    except Exception as e:
-        st.error(f"Não consegui abrir o tutorial: {e}")
-    st.button("❌ Fechar Tutorial", key="close_tutorial_btn",
-              on_click=lambda: st.session_state.__setitem__("show_tutorial", False))
 
-Nossos acertos", value=True, key="gm_show_succ")
-        with f2: show_errors_gm    = st.checkbox("Nossos erros",   value=True, key="gm_show_err")
-        with f3: show_adv_pts_gm   = st.checkbox("ADV acertos",    value=True, key="gm_show_adv_ok")
-        with f4: show_adv_errs_gm  = st.checkbox("ADV erros",      value=True, key="gm_show_adv_err")
-        with f5:
-            nums_all = resolve_our_roster_numbers(st.session_state.frames)
-            player_opts = ["Todas"] + nums_all
-            _picked = st.selectbox("Jogadora", options=player_opts, index=0, key="gm_players_filter")
-            _sel_players_gm = None if _picked == "Todas" else [_picked]
+-----------------------------
+para evitar de perder dados de novo, 
 
-        st.session_state.show_heat_numbers = st.checkbox(
-            "Mostrar número/ADV nas bolinhas",
-            value
+o mais seguro seria salvar o db a cada lance ou a cada fim de set e a cada fim de partida? quero ter garantia que nao vou mais perder dados. 
+implemente isso em meu codigo sem erros e sem retirar nada, consegue? quero a opcao segura do .dv mas tb salvar o excel, o que acha? só me confirme se é melhor a cada lance ou fim de set e de partidas
+se for conseguir alterar, me envie o codigo final para dowload e sem erros, completinho, sem retirar nenhuma linha ou funcionalidade, apenas salvar os dados em db e tb me diga como eu abro eles depois
 
+e 
+
+no meu codigo de historico, nao retire nada mas melhore as informacoes. me indique quais seriam outros kpis importantes e insira graficos, vou dar alguns exemplos que podem ser analisados: jogadoras que mais pontuaram e erraram, e em que fundamento e regiao. quais os fundamentos do nosso time e tb das adversarias com mais acertos e erros e outros que vc pode me sugerir. faça algo funcional e bonito, com cores no layout dos graficos. me envie tb daí o historico novo para download
+
+-----------------------------
+
+Consegue ver como foi feuito para esconder as tabelas e graficos por exemplo e seguir da mesma forma? fazendo os ajustes que pedi?? vou até mandar de novo pq vc é muito ruim!!! 
+
+A linha 1 e 2 vc pode retirar TODOS os componentes (linha 1 inicia no botao time, linha 2 em opcoes do set e da partida) Na linha 3 só vai deixar o titulo do jogo e o botao modo jogo, apenas isso (O RESTO DESSA LINHA É PRA ESCONDER NO MODO JOGO) Na linha 3 vai retirar "ação" e seu combobox de escolha da ação .
+o placar irá tentar fazer em uma linha só no modo mobile (ela está grande no modo mobile, mas tome cuidado para nao diminuir demais) .
+Componentes que tiverm depois da quadra pode esconder tudo tb (jogadora, mostar numero de bolinhas, nossos acertos, etc)
 
 -----------------------------
 muitos erros, melhor reverter para a minha versao estável e vc tentar novamente fazer apenas esses ajustes, sem cometer os erros que já pedi para nao fazer:

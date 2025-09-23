@@ -1142,10 +1142,10 @@ SMALL_RC = {
     "legend.fontsize": 7,
 }
 mpl.rcParams.update(SMALL_RC)
-def small_fig(w=3.2, h=1.8):  # Aumentei as dimensões mínimas
-    # Garantir que as dimensões sejam pelo menos 1.0
-    w = max(1.0, w)
-    h = max(1.0, h)
+def small_fig(w=3.2, h=1.8):
+    # >>> CORREÇÃO: Garantir dimensões mínimas seguras
+    w = max(0.1, w)  # Mínimo de 0.1 em vez de 1.0
+    h = max(0.1, h)  # Mínimo de 0.1 em vez de 1.0
     
     fig, ax = plt.subplots(figsize=(w, h), dpi=110)
     ax.grid(True, alpha=0.15)
