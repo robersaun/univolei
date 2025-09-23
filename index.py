@@ -256,6 +256,54 @@ try:
 except Exception:
     pass
 
+def _get_spreadsheet_id():
+    """
+    Obtém o ID da planilha - PRIORIZA a variável fixa
+    """
+    # PRIMEIRO tenta a variável fixa
+    fixed_id = GOOGLE_SHEETS_SPREADSHEET_ID
+    if fixed_id and len(fixed_id) >= 10:
+        normalized = _normalize_gsheet_id(fixed_id)
+        if normalized:
+            print(f"🔍 [GET_ID] Usando ID FIXO: {normalized}")
+            return normalized
+    
+    # DEPOIS tenta outras fontes (fallback)
+    try:
+        # Streamlit secrets
+        if hasattr(st, 'secrets'):
+            if 'gsheet_id' in st.secrets:
+                id_from_secrets = _normalize_gsheet_id(st.secrets['gsheet_id'])
+                if id_from_secrets:
+                    print(f"🔍 [GET_ID] Usando Secrets: {id_from_secrets}")
+                    return id_from_secrets
+            if 'online' in st.secrets and 'gsheet_id' in st.secrets['online']:
+                id_from_secrets = _normalize_gsheet_id(st.secrets['online']['gsheet_id'])
+                if id_from_secrets:
+                    print(f"🔍 [GET_ID] Usando Secrets online: {id_from_secrets}")
+                    return id_from_secrets
+        
+        # config.ini
+        from pathlib import Path
+        import configparser
+        
+        config_path = Path(__file__).parent / "config.ini"
+        if config_path.exists():
+            config = configparser.ConfigParser()
+            config.read(config_path)
+            if config.has_section('online'):
+                gsheet_id = config.get('online', 'gsheet_id', fallback='').strip()
+                id_from_config = _normalize_gsheet_id(gsheet_id)
+                if id_from_config:
+                    print(f"🔍 [GET_ID] Usando config.ini: {id_from_config}")
+                    return id_from_config
+                
+    except Exception as e:
+        print(f"🔍 [GET_ID] Erro ao obter ID de outras fontes: {e}")
+    
+    print("🔍 [GET_ID] Nenhum ID válido encontrado")
+    return None
+
 def debug_gsheet_validation():
     """
     Função temporária para debug
