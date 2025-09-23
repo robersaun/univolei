@@ -1,7 +1,6 @@
 # gsheets_sync.py - Sincronização com Google Sheets
 import pandas as pd
 import streamlit as st
-from typing import Dict, Optional, Tuple
 import logging
 from datetime import datetime
 import json
@@ -9,7 +8,7 @@ import json
 # Configurar logger
 _logger = logging.getLogger("gsheets_sync")
 
-def is_enabled() -> bool:
+def is_enabled():
     """
     Verifica se a sincronização com Google Sheets está habilitada.
     """
@@ -107,7 +106,7 @@ def _get_gspread_client():
         _logger.error(f"Erro ao obter cliente gspread: {e}")
         return None
 
-def _normalize_gsheet_id(raw_id: str) -> str:
+def _normalize_gsheet_id(raw_id):
     """
     Normaliza ID da planilha (código do index.py).
     """
@@ -125,7 +124,7 @@ def _normalize_gsheet_id(raw_id: str) -> str:
     
     return s
 
-def _get_spreadsheet_id() -> Optional[str]:
+def _get_spreadsheet_id():
     """
     Obtém o ID da planilha das configurações.
     """
@@ -155,7 +154,7 @@ def _get_spreadsheet_id() -> Optional[str]:
         _logger.error(f"Erro ao obter spreadsheet ID: {e}")
         return None
 
-def _prepare_dataframe_for_sheets(df: pd.DataFrame) -> list:
+def _prepare_dataframe_for_sheets(df):
     """
     Prepara DataFrame para envio ao Google Sheets.
     """
@@ -171,7 +170,7 @@ def _prepare_dataframe_for_sheets(df: pd.DataFrame) -> list:
     
     return values
 
-def sync_all(frames: Dict[str, pd.DataFrame]) -> str:
+def sync_all(frames):
     """
     Sincroniza todos os frames com Google Sheets.
     Retorna string de status.
@@ -252,7 +251,7 @@ def sync_all(frames: Dict[str, pd.DataFrame]) -> str:
         _logger.error(error_msg)
         return error_msg
 
-def sync_table(df: pd.DataFrame, table_name: str, spreadsheet_id: str = None) -> str:
+def sync_table(df, table_name, spreadsheet_id=None):
     """
     Sincroniza uma tabela específica com Google Sheets.
     """
@@ -294,7 +293,7 @@ def sync_table(df: pd.DataFrame, table_name: str, spreadsheet_id: str = None) ->
         _logger.error(error_msg)
         return error_msg
 
-def get_sheet_url() -> Optional[str]:
+def get_sheet_url():
     """
     Retorna a URL da planilha se configurada.
     """
@@ -303,7 +302,7 @@ def get_sheet_url() -> Optional[str]:
         return f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}/edit"
     return None
 
-def test_connection() -> Tuple[bool, str]:
+def test_connection():
     """
     Testa a conexão com Google Sheets.
     Retorna (sucesso, mensagem).
@@ -336,7 +335,7 @@ def test_connection() -> Tuple[bool, str]:
             return False, f"Erro na conexão: {error_msg}"
 
 # Função de compatibilidade com código existente
-def sync_to_gsheets(frames: Dict[str, pd.DataFrame], reason: str = "manual") -> str:
+def sync_to_gsheets(frames, reason="manual"):
     """
     Função compatível com o código do index.py.
     """

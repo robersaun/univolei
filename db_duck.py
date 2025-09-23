@@ -3,12 +3,12 @@ import pandas as pd
 import duckdb
 from pathlib import Path
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Union
 
 # Configurar logger
 _logger = logging.getLogger("db_duck")
 
-def ensure_db(db_path: str | Path) -> bool:
+def ensure_db(db_path):  # Removido type hint problemático
     """
     Garante que o banco DuckDB existe e tem as tabelas necessárias.
     Retorna True se bem-sucedido.
@@ -93,7 +93,7 @@ def ensure_db(db_path: str | Path) -> bool:
         _logger.error(f"Erro ao inicializar DuckDB: {e}")
         return False
 
-def replace_all(db_path: str | Path, frames: Dict[str, pd.DataFrame]) -> bool:
+def replace_all(db_path, frames):  # Removido type hint problemático
     """
     Substitui todas as tabelas no DuckDB pelos DataFrames fornecidos.
     """
@@ -128,7 +128,7 @@ def replace_all(db_path: str | Path, frames: Dict[str, pd.DataFrame]) -> bool:
         _logger.error(f"Erro ao atualizar DuckDB: {e}")
         return False
 
-def load_all(db_path: str | Path) -> Dict[str, pd.DataFrame]:
+def load_all(db_path):  # Removido type hint problemático
     """
     Carrega todas as tabelas do DuckDB para DataFrames.
     """
@@ -161,7 +161,7 @@ def load_all(db_path: str | Path) -> Dict[str, pd.DataFrame]:
     
     return frames
 
-def backup_db(source_path: str | Path, backup_dir: str | Path = None) -> bool:
+def backup_db(source_path, backup_dir=None):  # Removido type hint problemático
     """
     Cria backup do banco DuckDB.
     """
@@ -173,7 +173,7 @@ def backup_db(source_path: str | Path, backup_dir: str | Path = None) -> bool:
             
         if backup_dir is None:
             backup_dir = source_path.parent / "backups"
-        backup_dir = Path(backup_dir)
+        backup_dir = Path(back_dir)
         backup_dir.mkdir(parents=True, exist_ok=True)
         
         from datetime import datetime
@@ -193,7 +193,7 @@ def backup_db(source_path: str | Path, backup_dir: str | Path = None) -> bool:
         return False
 
 # Funções auxiliares para compatibilidade com o código existente
-def sync_frames_to_duck(frames: Dict[str, pd.DataFrame], duck_path: str | Path) -> str:
+def sync_frames_to_duck(frames, duck_path):  # Removido type hint problemático
     """
     Sincroniza frames para DuckDB (usada no sistema de persistência).
     Retorna string de status.
@@ -207,7 +207,7 @@ def sync_frames_to_duck(frames: Dict[str, pd.DataFrame], duck_path: str | Path) 
     except Exception as e:
         return f"DUCKDB: erro {str(e)}"
 
-def get_db_stats(db_path: str | Path) -> Dict[str, Any]:
+def get_db_stats(db_path):  # Removido type hint problemático
     """
     Retorna estatísticas do banco DuckDB.
     """
