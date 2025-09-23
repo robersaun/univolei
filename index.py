@@ -1182,7 +1182,7 @@ def bar_chart_safe(obj, title=None, rotate_xticks=0):
         ax.set_xticklabels([str(i) for i in idx], rotation=rotate_xticks, ha="right", fontsize=7)
         ax.legend(loc="best", fontsize=7)
 
-    st.pyplot(trim_ax(ax, legend=True), width='stretch')
+    st.pyplot(trim_ax(ax, legend=True), use_container_width=True)
 
 # =========================
 # DataFrame HTML
@@ -3096,7 +3096,7 @@ with st.container():
             ax3.plot(df_set["rally_no"], df_set["score_away"], marker="o", markersize=2.6, linewidth=1.0, label=away_name or "Adv")
             ax3.set_xlabel("Rally"); ax3.set_ylabel("Pontos")
             ax3.legend(loc="best", fontsize=7)
-            st.pyplot(trim_ax(ax3, legend=True), width='stretch')
+            st.pyplot(trim_ax(ax3, legend=True))
         # Pontos (Nossos)
         st.markdown("**🏅 Pontos (Nossos)**")
         if df_set is not None and not df_set.empty:
@@ -3189,23 +3189,29 @@ with st.container():
             st.markdown("---")
             st.markdown("**🧰 Debug (logs recentes)**")
 st.markdown(f"_arquivo: {LOGS_DIR / 'uv_saves.log'}_")
-st.code("\\n".join(st.session_state["dbg_prints"][-40:]), language="text")
-st.markdown('</div>', unsafe_allow_html=True)
-
-
-st.markdown(f"_arquivo: {LOGS_DIR / 'uv_saves.log'}_")
 try:
-    _items = st.session_state.get("dbg_prints", [])[-40:]
-    lines = []
-    for it in _items:
-        ts = it.get("ts", "-")
-        reason = it.get("reason", "-")
-        status = " | ".join(map(str, it.get("status", [])))
-        lines.append(f"{ts} — {reason} | {status}")
-    if lines:
-        st.code("\n".join(lines), language="text")
-except Exception:
-    pass
+    debug_items = st.session_state.get("dbg_prints", [])[-40:]
+    if debug_items:
+        # Converter cada item para string
+        debug_lines = []
+        for item in debug_items:
+            if isinstance(item, dict):
+                # Formatar dicionário de debug
+                ts = item.get("ts", "-")
+                reason = item.get("reason", "-")
+                status = " | ".join(str(s) for s in item.get("status", []))
+                debug_lines.append(f"{ts} — {reason} | {status}")
+            else:
+                debug_lines.append(str(item))
+        
+        if debug_lines:
+            st.code("\n".join(debug_lines), language="text")
+        else:
+            st.write("_Sem logs de debug_")
+    else:
+        st.write("_Sem logs de debug_")
+except Exception as e:
+    st.error(f"Erro ao exibir logs: {e}")
 
 
 # =========================
