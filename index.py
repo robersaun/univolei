@@ -214,6 +214,7 @@ CONFIG["online"]["gsheet_id"]        = GOOGLE_SHEETS_SPREADSHEET_ID#CONFIG["onli
 CONFIG["backup"]["drive_folder_url"] = GOOGLE_DRIVE_ROOT_FOLDER_URL#CONFIG["backup"].get("drive_folder_url", "")
 
 
+
 def _normalize_gsheet_id(raw_id):
     """
     Normaliza ID da planilha - versão corrigida e mais permissiva
@@ -444,73 +445,112 @@ def sync_all(frames):
     
 def _get_gspread_client():
     """
-    Retorna um cliente gspread autenticado, tentando nesta ordem:
-    A) st.secrets["gcp_service_account"]
-    B) GOOGLE_APPLICATION_CREDENTIALS (path para .json)
-    C) config.ini -> [gcp] credentials_mode=(path|inline)
+    Retorna um cliente gspread autenticado, priorizando Streamlit Secrets.
     """
     try:
         import gspread
-    except Exception:
+        from google.oauth2.service_account import Credentials
+    except ImportError:
         return None
 
-    from google.oauth2.service_account import Credentials
     scopes = [
         "https://www.googleapis.com/auth/spreadsheets",
         "https://www.googleapis.com/auth/drive",
     ]
 
-    # === A) st.secrets ===
+    # PRIMEIRO: Tenta Streamlit Secrets (RECOMENDADO)
     try:
-        import json
-        if "gcp_service_account" in st.secrets:
-            sa_info = st.secrets["gcp_service_account"]
+        if hasattr(st, 'secrets') and 'gcp_service_account' in st.secrets:
+            sa_info = st.secrets['gcp_service_account']
+            
+            # Se for string, converte para dict
             if isinstance(sa_info, str):
+                import json
                 sa_info = json.loads(sa_info)
+            
             creds = Credentials.from_service_account_info(sa_info, scopes=scopes)
-            return gspread.authorize(creds)
+            client = gspread.authorize(creds)
+            print("✅ Autenticado via Streamlit Secrets")
+            return client
     except Exception as e:
-        try:
-            _logger.warning(f"gspread via st.secrets falhou: {e}")
-        except Exception:
-            pass
+        print(f"❌ Erro com Streamlit Secrets: {e}")
 
-        # === B) GOOGLE_APPLICATION_CREDENTIALS ===
-    try:
-        
-        cred_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "").strip()
-        if cred_path:
-            creds = Credentials.from_service_account_file(cred_path, scopes=scopes)
-            return gspread.authorize(creds)
-    except Exception as e:
-        _logger.warning(f"gspread via GOOGLE_APPLICATION_CREDENTIALS falhou: {e}")
-
-
-    # === C) config.ini ===
+    # SEGUNDO: Tenta config.ini (apenas se não tiver private_key)
     try:
         gcp_cfg = CONFIG.get("gcp", {})
-        mode = (gcp_cfg.get("credentials_mode") or "").strip().lower()
-        if mode == "path":
-            cpath = (gcp_cfg.get("credentials_path") or "").strip()
-            if cpath:
-                creds = Credentials.from_service_account_file(cpath, scopes=scopes)
-                return gspread.authorize(creds)
-        elif mode == "inline":
+        mode = gcp_cfg.get("credentials_mode", "").strip().lower()
+        
+        if mode == "inline":
             import json
-            inline = gcp_cfg.get("inline_json")
-            if inline:
-                sa_info = json.loads(inline)
+            inline_json = gcp_cfg.get("inline_json", "").strip()
+            if inline_json:
+                sa_info = json.loads(inline_json)
+                # VERIFICA se não contém private_key real (apenas placeholder)
+                if "PRIVATE_KEY_PLACEHOLDER" in sa_info.get("private_key", ""):
+                    print("⚠️  Credencial no config.ini é apenas placeholder")
+                    return None
                 creds = Credentials.from_service_account_info(sa_info, scopes=scopes)
-                return gspread.authorize(creds)
+                client = gspread.authorize(creds)
+                print("✅ Autenticado via config.ini")
+                return client
     except Exception as e:
-        try:
-            _logger.warning(f"gspread via config.ini falhou: {e}")
-        except Exception:
-            pass
+        print(f"❌ Erro com config.ini: {e}")
 
+    # TERCEIRO: Variável de ambiente
+    try:
+        import os
+        cred_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "").strip()
+        if cred_path and os.path.exists(cred_path):
+            creds = Credentials.from_service_account_file(cred_path, scopes=scopes)
+            client = gspread.authorize(creds)
+            print("✅ Autenticado via variável de ambiente")
+            return client
+    except Exception as e:
+        print(f"❌ Erro com variável de ambiente: {e}")
+
+    print("❌ Nenhum método de autenticação funcionou")
     return None
 
+def debug_google_auth():
+    """Função temporária para debug da autenticação"""
+    try:
+        print("🔍 Iniciando debug da autenticação Google...")
+        
+        # Verifica se secrets existe
+        if hasattr(st, 'secrets'):
+            print("✅ Streamlit Secrets está disponível")
+            if 'gcp_service_account' in st.secrets:
+                sa = st.secrets['gcp_service_account']
+                if isinstance(sa, dict) and 'client_email' in sa:
+                    print(f"✅ Service Account encontrado: {sa['client_email']}")
+                else:
+                    print("❌ Service Account não encontrado nos secrets")
+            else:
+                print("❌ gcp_service_account não encontrado nos secrets")
+        else:
+            print("❌ Streamlit Secrets não disponível")
+        
+        # Testa a autenticação
+        client = _get_gspread_client()
+        if client:
+            print("✅ Autenticação Google Sheets: SUCESSO")
+            return True
+        else:
+            print("❌ Autenticação Google Sheets: FALHOU")
+            return False
+            
+    except Exception as e:
+        print(f"❌ Erro no debug: {e}")
+        return False
 
+# Chame esta função em algum lugar para testar
+debug_google_auth()
+if st.sidebar.button("🔧 Testar Google Sheets"):
+    if debug_google_auth():
+        st.success("✅ Google Sheets configurado corretamente!")
+    else:
+        st.error("❌ Problema na configuração do Google Sheets")
+    
 def _persist_to_gsheets(frames, reason: str) -> str | None:
     """
     Sincroniza frames -> Google Sheets (uma aba por frame) usando gspread.
