@@ -65,6 +65,15 @@ SYNC_CFG = {
 SAVE_TO_GOOGLE = True  # ou False para desativar
 QTD_PONTOS_SALVAR_GOOGLE = 5  # a cada N pontos (rallies) salva no Google; 0 desativa
 
+# =========================# =========================# =========================
+#SALVAMENTOS ATUAIS -> NA _persist_all
+# 1) Salva Excel sempre; DuckDB e Google Sheets quando possível.
+    # 2) Backup Excel (**** somente em set/match **** ) — local ./backups
+    # 3) DuckDB (se disponível)
+    # 4) Google Sheets (condicional por flag e intervalo de pontos)
+    # 5) Log final + prints na UI Log final + prints na UI
+#VER ESSE # [2] Offline: Journal append-only (NDJSON) por lance
+# =========================
 
 # =========================
 # Config + Estilos
@@ -1317,9 +1326,7 @@ def _persist_to_webhook(frames, reason: str) -> str|None:
 
 
 def _persist_all(frames, reason: str = "rally"):
-    """Salva Excel sempre; DuckDB e Google Sheets quando possível.
-       Backups timestampados apenas em 'set_close'/'match_close' (evita 1 arquivo por ponto)."""
-
+    # 1) Salva Excel sempre; DuckDB e Google Sheets quando possível.
     statuses = []  # coleta mensagens para print/log
     _perf = _perf_begin(reason)  # <<< inicia medição desse ciclo
 
@@ -1334,7 +1341,7 @@ def _persist_all(frames, reason: str = "rally"):
         _logger.exception(f"Excel principal falhou: {e}")
     _perf_step(_perf, "XLSX", t)
 
-    # 2) Backup Excel (somente em set/match) — local ./backups
+    # 2) Backup Excel (**** somente em set/match **** ) — local ./backups
     if reason in ("set_close","match_close"):
         t = _time.perf_counter()
         try:
