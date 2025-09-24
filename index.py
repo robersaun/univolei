@@ -62,6 +62,9 @@ SYNC_CFG = {
     # online (lento): só checkpoints (ou manual)
     "gsheets": {"set_open", "set_close", "match_close", "manual"},
 }
+SAVE_TO_GOOGLE = True  # ou False para desativar
+QTD_PONTOS_SALVAR_GOOGLE = 5  # a cada N pontos (rallies) salva no Google; 0 desativa
+
 
 # =========================
 # Config + Estilos
@@ -121,14 +124,20 @@ def _perf_step(perf: dict, label: str, t0: float):
     ms = (_time.perf_counter() - t0) * 1000.0
     perf["steps"].append({"label": label, "ms": round(ms, 1)})
 
-def _perf_commit(perf: dict, statuses: list[str]):
-    perf["statuses"] = statuses
-    perf["total_ms"] = round(sum(s["ms"] for s in perf["steps"]), 1)
-    lst = st.session_state.setdefault("perf_logs", [])
+def _perf_commit(perf, statuses):
+    perf["statuses"] = list(statuses)
+    perf["ts"] = _dt.datetime.now().strftime("%H:%M:%S")
+
+    lst = st.session_state.get("perf_logs", [])
     lst.append(perf)
-    # mantém só os últimos 60
     if len(lst) > 60:
-        st.session_state["perf_logs"] = lst[-60:]
+        lst = lst[-60:]
+    st.session_state["perf_logs"] = lst
+
+st.session_state.setdefault("QTD_PONTOS_SALVAR_GOOGLE", QTD_PONTOS_SALVAR_GOOGLE)
+st.session_state.setdefault("gs_last_rally_count", 0)  # <<< novo: base para delta
+
+
 
 def _render_latency_panel(max_rows: int = 12):
     import pandas as pd
@@ -1367,37 +1376,56 @@ def _persist_all(frames, reason: str = "rally"):
         _logger.error(msg)
     _perf_step(_perf, "DUCKDB", t)
 
-    # 4) Google Sheets (se credenciais existirem)
-    t = _time.perf_counter()
-    ok_gs = False
-    try:
-        gs_status = _persist_to_gsheets(frames, reason)
-        if gs_status:
-            statuses.append(gs_status); _logger.info(gs_status)
-            ok_gs = str(gs_status).startswith("GSHEETS: ok")
-        else:
-            statuses.append("GSHEETS: skip (sem gsheet_id)")
-    except Exception as e:
-        statuses.append(f"GSHEETS: falhou {e!s}")
-        _logger.error(statuses[-1])
-    finally:
-        _perf_step(_perf, "GSHEETS", t)
+    # 4) Google Sheets (condicional por flag e intervalo de pontos)
+    if SAVE_TO_GOOGLE:
+        should_gs = False
 
-    # fallback para Webhook quando GS não persistiu
-    if not ok_gs:
-        t_wb = _time.perf_counter()
+        # total de rallies do dataset
         try:
-            wb = _persist_to_webhook(frames, reason)
-            if wb:
-                statuses.append(wb); _logger.info(wb)
-        except Exception as e2:
-            statuses.append(f"Webhook bloco falhou: {e2!s}")
-            _logger.warning(statuses[-1])
-        _perf_step(_perf, "WEBHOOK", t_wb)
-    else:
-        _perf_step(_perf, "GSHEETS", t)
+            rcount_total = int(frames.get("rallies", _pd.DataFrame()).shape[0])
+        except Exception:
+            rcount_total = 0
 
-    # 5) Log final + prints na UI
+        # intervalo configurado
+        N = int(st.session_state.get("QTD_PONTOS_SALVAR_GOOGLE", QTD_PONTOS_SALVAR_GOOGLE))
+
+        # delta desde o último save bem-sucedido (ou checkpoint)
+        last = int(st.session_state.get("gs_last_rally_count", 0))
+        delta = max(0, rcount_total - last)
+
+        # Decide se salva agora
+        if reason in ("set_open", "set_close", "match_close", "manual"):
+            should_gs = True
+        elif reason == "rally":
+            if N > 0 and delta > 0 and (delta % N == 0):
+                should_gs = True
+
+        if should_gs:
+            # chama salva_google (compatível com 4 args)
+            salva_google(frames, reason, statuses, _perf)
+
+            # se salvou (ou tentou salvar em checkpoint), atualiza o "last"
+            # Obs: atualizamos mesmo em checkpoints para reiniciar o delta.
+            st.session_state["gs_last_rally_count"] = rcount_total
+
+            # anexa info amigável
+            if statuses and statuses[-1].startswith("GSHEETS:"):
+                # exibe delta consumido e N (se N>0)
+                part = f"{delta}/{N}" if N > 0 else "-"
+                statuses[-1] = f"{statuses[-1]} | pontos_desde_ultimo={part}"
+        else:
+            # faltam X para o próximo save (se N>0)
+            if N > 0:
+                faltam = (N - (delta % N)) % N
+                statuses.append(
+                    f"GSHEETS: skip (aguardando intervalo de pontos) | pontos_desde_ultimo={delta}/{N} (faltam {faltam})"
+                )
+            else:
+                statuses.append("GSHEETS: skip (aguardando intervalo de pontos) | pontos_desde_ultimo=-")
+    else:
+        statuses.append("GSHEETS: skip (desativado por flag)")
+
+    # 5) Log final + prints na UI Log final + prints na UI
     try:
         r = int(frames.get("rallies", _pd.DataFrame()).shape[0])
         s = int(frames.get("sets", _pd.DataFrame()).shape[0])
@@ -1430,6 +1458,54 @@ def _persist_all(frames, reason: str = "rally"):
 
     return
 
+def salva_google(frames=None, reason="manual", statuses=None, _perf=None):
+    """
+    Compatível com chamadas antigas (sem args) e novas (com frames, reason, statuses, _perf).
+    - Se frames/statuses/_perf vierem None, a função cuida de obter/criar o necessário.
+    - Registra métricas no _perf e faz fallback para webhook se GS falhar.
+    """
+    # Defaults para compatibilidade
+    if frames is None:
+        frames = st.session_state.get("frames", {})
+    created_perf = False
+    if _perf is None:
+        _perf = _perf_begin(f"gs:{reason}")
+        created_perf = True
+    if statuses is None:
+        statuses = []
+
+    t = _time.perf_counter()
+    ok_gs = False
+    try:
+        gs_status = _persist_to_gsheets(frames, reason)
+        if gs_status:
+            statuses.append(gs_status)
+            _logger.info(gs_status)
+            ok_gs = str(gs_status).startswith("GSHEETS: ok")
+        else:
+            statuses.append("GSHEETS: skip (sem gsheet_id)")
+    except Exception as e:
+        statuses.append(f"GSHEETS: falhou {e!s}")
+        _logger.error(statuses[-1])
+    finally:
+        _perf_step(_perf, "GSHEETS", t)
+
+        # Fallback: webhook se Google não persistiu
+        if not ok_gs:
+            t_wb = _time.perf_counter()
+            try:
+                wb = _persist_to_webhook(frames, reason)
+                if wb:
+                    statuses.append(wb)
+                    _logger.info(wb)
+            except Exception as e2:
+                statuses.append(f"Webhook bloco falhou: {e2!s}")
+                _logger.warning(statuses[-1])
+            _perf_step(_perf, "WEBHOOK", t_wb)
+
+        # Se criamos o _perf aqui (call antiga), também finalizamos aqui
+        if created_perf:
+            _perf_commit(_perf, statuses)
 
 
 # =========================
@@ -1459,6 +1535,7 @@ def _uv_handle_court_click():
             pass
 _uv_handle_court_click()
 # Fechar tutorial via query-param
+
 def _handle_tutorial_qp():
     try:
         uv = st.query_params.get("uv_tut", None)
@@ -3238,3 +3315,38 @@ if __name__ == "__main__":
             _logger.error(f"GSHEETS falhou: {e}")
         except Exception:
             pass
+
+
+def salva_google(frames, reason, statuses, _perf):
+    """
+    Salva em Google Sheets (e Webhook como fallback), registrando métricas no _perf.
+    - frames: dict de DataFrames
+    - reason: razão do salvamento (rally, set_open, set_close, match_close, manual)
+    - statuses: list[str] mutável para acumular mensagens
+    - _perf: dicionário de métricas criado por _perf_begin
+    """
+    t = _time.perf_counter()
+    ok_gs = False
+    try:
+        gs_status = _persist_to_gsheets(frames, reason)
+        if gs_status:
+            statuses.append(gs_status); _logger.info(gs_status)
+            ok_gs = str(gs_status).startswith("GSHEETS: ok")
+        else:
+            statuses.append("GSHEETS: skip (sem gsheet_id)")
+    except Exception as e:
+        statuses.append(f"GSHEETS: falhou {e!s}")
+        _logger.error(statuses[-1])
+    finally:
+        _perf_step(_perf, "GSHEETS", t)
+        # fallback para Webhook quando GS não persistiu
+        if not ok_gs:
+            t_wb = _time.perf_counter()
+            try:
+                wb = _persist_to_webhook(frames, reason)
+                if wb:
+                    statuses.append(wb); _logger.info(wb)
+            except Exception as e2:
+                statuses.append(f"Webhook bloco falhou: {e2!s}")
+                _logger.warning(statuses[-1])
+            _perf_step(_perf, "WEBHOOK", t_wb)
