@@ -134,9 +134,8 @@ def _perf_commit(perf, statuses):
         lst = lst[-60:]
     st.session_state["perf_logs"] = lst
 
+    
 st.session_state.setdefault("QTD_PONTOS_SALVAR_GOOGLE", QTD_PONTOS_SALVAR_GOOGLE)
-st.session_state.setdefault("gs_last_rally_count", 0)  # <<< novo: base para delta
-
 
 
 def _render_latency_panel(max_rows: int = 12):
@@ -1379,49 +1378,28 @@ def _persist_all(frames, reason: str = "rally"):
     # 4) Google Sheets (condicional por flag e intervalo de pontos)
     if SAVE_TO_GOOGLE:
         should_gs = False
-
-        # total de rallies do dataset
+        # calcula rcount e N uma vez
         try:
-            rcount_total = int(frames.get("rallies", _pd.DataFrame()).shape[0])
+            rcount = int(frames.get("rallies", _pd.DataFrame()).shape[0])
         except Exception:
-            rcount_total = 0
-
-        # intervalo configurado
+            rcount = 0
         N = int(st.session_state.get("QTD_PONTOS_SALVAR_GOOGLE", QTD_PONTOS_SALVAR_GOOGLE))
 
-        # delta desde o último save bem-sucedido (ou checkpoint)
-        last = int(st.session_state.get("gs_last_rally_count", 0))
-        delta = max(0, rcount_total - last)
-
-        # Decide se salva agora
         if reason in ("set_open", "set_close", "match_close", "manual"):
             should_gs = True
         elif reason == "rally":
-            if N > 0 and delta > 0 and (delta % N == 0):
+            if N > 0 and rcount > 0 and (rcount % N == 0):
                 should_gs = True
 
         if should_gs:
-            # chama salva_google (compatível com 4 args)
+            # chama e depois ANEXA o contador ao último status do GS
             salva_google(frames, reason, statuses, _perf)
-
-            # se salvou (ou tentou salvar em checkpoint), atualiza o "last"
-            # Obs: atualizamos mesmo em checkpoints para reiniciar o delta.
-            st.session_state["gs_last_rally_count"] = rcount_total
-
-            # anexa info amigável
             if statuses and statuses[-1].startswith("GSHEETS:"):
-                # exibe delta consumido e N (se N>0)
-                part = f"{delta}/{N}" if N > 0 else "-"
-                statuses[-1] = f"{statuses[-1]} | pontos_desde_ultimo={part}"
+                statuses[-1] = f"{statuses[-1]} | pontos={rcount}/{N if N>0 else '-'}"
         else:
-            # faltam X para o próximo save (se N>0)
-            if N > 0:
-                faltam = (N - (delta % N)) % N
-                statuses.append(
-                    f"GSHEETS: skip (aguardando intervalo de pontos) | pontos_desde_ultimo={delta}/{N} (faltam {faltam})"
-                )
-            else:
-                statuses.append("GSHEETS: skip (aguardando intervalo de pontos) | pontos_desde_ultimo=-")
+            statuses.append(
+                f"GSHEETS: skip (aguardando intervalo de pontos) | pontos={rcount}/{N if N>0 else '-'}"
+            )
     else:
         statuses.append("GSHEETS: skip (desativado por flag)")
 
@@ -1632,23 +1610,26 @@ def _apply_set_winner_and_proceed(home_pts: int, away_pts: int):
     set_number = st.session_state.set_number
     winner_id = 1 if home_pts > away_pts else 2
 
+    # Marca vencedor do set atual
     stf = frames["sets"]
     mask = (stf["match_id"] == match_id) & (stf["set_number"] == set_number)
     stf.loc[mask, "winner_team_id"] = winner_id
     frames["sets"] = stf
 
+    # Atualiza sets da partida e persiste fechamento
     home_sets, away_sets = update_sets_score_and_match(frames, match_id)
     save_all(Path(st.session_state.db_path), frames)
 
-    # Journal por lance (append-only)
+    # (melhor esforço) journal
     try:
         _journal_write(frames, reason="set_close")
-    except Exception as e:
+    except Exception:
         try:
-            _logger.warning(f"journal hook falhou: {e}")
+            _logger.warning("journal hook falhou em set_close")
         except Exception:
             pass
 
+    # Se partida acabou (melhor de 5)
     if home_sets >= 3 or away_sets >= 3:
         try:
             finalize_match(frames, match_id)
@@ -1663,12 +1644,40 @@ def _apply_set_winner_and_proceed(home_pts: int, away_pts: int):
         except Exception:
             pass
         st.success(f"Set {set_number} encerrado ({home_pts} x {away_pts}). Partida finalizada: {home_sets} x {away_sets} em sets.")
-        st.session_state.match_id = None; st.session_state.set_number = None
-    else:
-        st.session_state.set_number = int(set_number) + 1
-        add_set(frames, match_id=match_id, set_number=st.session_state.set_number)
-        _persist_all(frames, reason='set_open')
-        st.success(f"Set {set_number} encerrado ({home_pts} x {away_pts}). Novo set: {st.session_state.set_number}")
+        st.session_state.match_id = None
+        st.session_state.set_number = None
+        return
+
+    # Caso contrário, abre o PRÓXIMO set
+    next_set = int(set_number) + 1
+    st.session_state.set_number = next_set
+    add_set(frames, match_id=match_id, set_number=next_set)  # cria linha do novo set (sem rallies)  :contentReference[oaicite:3]{index=3}
+
+    # ⚠️ Garantia extra: zera pontos do novo set e remove qualquer rally residual do novo set.
+    try:
+        stf = frames["sets"]
+        nmask = (stf["match_id"] == match_id) & (stf["set_number"] == next_set)
+        if nmask.any():
+            # Se existirem colunas de pontos no DF de sets, zera
+            for col in ("home_points", "away_points"):
+                if col in stf.columns:
+                    stf.loc[nmask, col] = 0
+            frames["sets"] = stf
+
+        # Remove rallies do novo set (se houver algo indevido)
+        rl = frames["rallies"]
+        if not rl.empty:
+            rl = rl[~((rl["match_id"] == match_id) & (rl["set_number"] == next_set))]
+            frames["rallies"] = rl
+    except Exception:
+        pass
+
+    # Persiste abertura do set e força rerender
+    _persist_all(frames, reason='set_open')
+    st.session_state.frames = frames
+    st.session_state.data_rev = st.session_state.get("data_rev", 0) + 1
+
+    st.success(f"Set {set_number} encerrado ({home_pts} x {away_pts}). Novo set: {next_set}")
 
 
 def auto_close_set_if_needed() -> None:
@@ -2294,22 +2303,19 @@ if st.session_state._do_rerun_after:
 # =========================
 # Topo (Time, Jogo, Tutorial, Histórico)
 # =========================
-top1, top2, top3, top4 = st.columns([2.5, 1, 1, 1])
-with top1:
-    if not st.session_state.game_mode:
+if not st.session_state.game_mode:
+    top1, top2, top3, top4 = st.columns([2.5, 1, 1, 1])
+    with top1:
         st.button("⚙️ Time", width='stretch', key="top_config_team_btn",
                 on_click=lambda: st.session_state.__setitem__("show_config_team", True))
-with top2:
-    if not st.session_state.game_mode:
+    with top2:
         st.button("🆕 Jogo", width='stretch', key="top_new_game_btn",
             on_click=lambda: st.session_state.__setitem__("show_cadastro", True))
-with top3:
-    if not st.session_state.game_mode:
+    with top3:
         st.button("📘 Tutorial", width='stretch', key="top_tutorial_btn",
             on_click=lambda: st.session_state.__setitem__("show_tutorial", True))
-with top4:
-    # Abrir Histórico (link direto — evita issues com switch_page)
-    if not st.session_state.game_mode:
+    with top4:
+        # Abrir Histórico (link direto — evita issues com switch_page)
         st.markdown(
             '<a href="/historico" target="_self" style="display:block;text-align:center;padding:.4rem .6rem;border:1px solid rgba(49,51,63,.2);border-radius:.5rem;font-weight:600;">🗂️ Histórico</a>',
             unsafe_allow_html=True
@@ -2318,6 +2324,101 @@ with top4:
 # =========================
 # Sets
 # =========================
+        
+def _reopen_set():
+    frames_local = st.session_state.frames
+    stf = frames_local["sets"]
+    rl = frames_local["rallies"]
+    mid = st.session_state.match_id
+    sn = int(set_picked)
+
+    # Limpa vencedor do set e ZERA placar do set
+    mask_set = (stf["match_id"] == mid) & (stf["set_number"] == sn)
+    if mask_set.any():
+        stf.loc[mask_set, "winner_team_id"] = np.nan
+        stf.loc[mask_set, "home_points"] = 0
+        stf.loc[mask_set, "away_points"] = 0
+        frames_local["sets"] = stf
+
+    # Remove todos os rallies do set reaberto (placar volta a 0 x 0)
+    try:
+        rl = rl[~((rl["match_id"] == mid) & (rl["set_number"] == sn))]
+        frames_local["rallies"] = rl
+    except Exception:
+        pass
+
+    # Persiste e atualiza estado
+    save_all(Path(st.session_state.db_path), frames_local)
+    st.session_state.set_number = sn
+    st.session_state.frames = frames_local
+    st.session_state.data_rev += 1
+    st.success(f"Set {sn} reaberto e placar zerado.")
+
+
+def _close_set():
+    frames_local = st.session_state.frames
+    df_cur = current_set_df(frames_local, st.session_state.match_id, int(set_picked))
+    if df_cur.empty: 
+        st.warning("Sem rallies neste set.")
+        return
+    hp, ap = set_score_from_df(df_cur)
+    if hp == ap: 
+        st.warning("Empate — defina o set antes.")
+        return
+    st.session_state.set_number = int(set_picked)
+    _apply_set_winner_and_proceed(hp, ap)
+    st.session_state.data_rev += 1
+
+def _remove_empty_set():
+    frames_local = st.session_state.frames
+    stf = frames_local["sets"]; rl = frames_local["rallies"]; mid = st.session_state.match_id
+    sets_m = stf[stf["match_id"]==mid]
+    if sets_m.empty: 
+        st.warning("Sem sets cadastrados.")
+        return
+    max_set = int(sets_m["set_number"].max())
+    sub = rl[(rl["match_id"]==mid) & (rl["set_number"]==max_set)]
+    if not sub.empty: 
+        st.warning(f"O Set {max_set} tem rallies e não será removido.")
+        return
+    stf = stf[~((stf["match_id"]==mid) & (stf["set_number"]==max_set))]; frames_local["sets"] = stf
+    save_all(Path(st.session_state.db_path), frames_local)
+    st.success(f"Set {max_set} removido.")
+    st.session_state.frames = frames_local
+    st.session_state.data_rev += 1
+    st.markdown('<div class="btn-xxs">', unsafe_allow_html=True)
+
+# Finalizar partida direto
+def _finalizar_partida():
+    if st.session_state.match_id is None: 
+        return
+
+    mid = st.session_state.match_id
+    try:
+        finalize_match(st.session_state.frames, mid)
+    except Exception:
+        pass
+
+    # Força is_closed na tabela e salva local
+    try:
+        frames_local = st.session_state.frames
+        mt = frames_local.get("amistosos", pd.DataFrame())
+        mt.loc[mt["match_id"] == mid, "is_closed"] = True
+        mt.loc[mt["match_id"] == mid, "closed_at"] = datetime.now().isoformat(timespec="seconds")
+        frames_local["amistosos"] = mt
+        save_all(Path(st.session_state.db_path), frames_local)
+        st.session_state.frames = frames_local
+
+        # >>> NOVO: checkpoint de fim de partida (inclui GSheets conforme SYNC_CFG)
+        _persist_all(st.session_state.frames, reason='match_close')
+
+    except Exception:
+        pass
+    st.success("Partida finalizada.")
+    st.session_state.match_id = None
+    st.session_state.set_number = None
+    st.session_state._do_rerun_after = True
+        
 if not st.session_state.game_mode:
     top5, top6, top7, top8, top9, top10 = st.columns([0.5, 1, 1, 1, 1, 1])
     sets_df = frames.get("sets", pd.DataFrame())
@@ -2327,31 +2428,6 @@ if not st.session_state.game_mode:
         st.markdown("<div class='uv-inline-label'>Opções do Set e da Partida:</div>", unsafe_allow_html=True)
     with top6:
         set_picked = st.selectbox("Set:", sel_vals, label_visibility="collapsed", key="set_select")
-    def _reopen_set():
-        frames_local = st.session_state.frames
-        stf = frames_local["sets"]
-        mask = (stf["match_id"]==st.session_state.match_id) & (stf["set_number"]==int(set_picked))
-        if mask.any():
-            stf.loc[mask, "winner_team_id"] = np.nan
-            frames_local["sets"] = stf
-            save_all(Path(st.session_state.db_path), frames_local)
-        st.session_state.set_number = int(set_picked)
-        st.session_state.frames = frames_local
-        st.session_state.data_rev += 1
-        st.success(f"Set {set_picked} reaberto.")
-    def _close_set():
-        frames_local = st.session_state.frames
-        df_cur = current_set_df(frames_local, st.session_state.match_id, int(set_picked))
-        if df_cur.empty: 
-            st.warning("Sem rallies neste set.")
-            return
-        hp, ap = set_score_from_df(df_cur)
-        if hp == ap: 
-            st.warning("Empate — defina o set antes.")
-            return
-        st.session_state.set_number = int(set_picked)
-        _apply_set_winner_and_proceed(hp, ap)
-        st.session_state.data_rev += 1
     with top7:
         st.button("🔓 Reabrir Set", width='stretch', key="reopen_btn", on_click=_reopen_set)
         st.markdown('</div>', unsafe_allow_html=True)
@@ -2359,60 +2435,9 @@ if not st.session_state.game_mode:
         st.button("✅ Fechar Set", width='stretch', key="close_set_btn", on_click=_close_set)
         st.markdown('</div>', unsafe_allow_html=True)
     with top9:
-        def _remove_empty_set():
-                frames_local = st.session_state.frames
-                stf = frames_local["sets"]; rl = frames_local["rallies"]; mid = st.session_state.match_id
-                sets_m = stf[stf["match_id"]==mid]
-                if sets_m.empty: 
-                    st.warning("Sem sets cadastrados.")
-                    return
-                max_set = int(sets_m["set_number"].max())
-                sub = rl[(rl["match_id"]==mid) & (rl["set_number"]==max_set)]
-                if not sub.empty: 
-                    st.warning(f"O Set {max_set} tem rallies e não será removido.")
-                    return
-                stf = stf[~((stf["match_id"]==mid) & (stf["set_number"]==max_set))]; frames_local["sets"] = stf
-                save_all(Path(st.session_state.db_path), frames_local)
-                st.success(f"Set {max_set} removido.")
-                st.session_state.frames = frames_local
-                st.session_state.data_rev += 1
-                st.markdown('<div class="btn-xxs">', unsafe_allow_html=True)
         st.button("🗑️ Remover Set Vazio", width='stretch', key="remove_empty_set_btn", on_click=_remove_empty_set)
         st.markdown('</div>', unsafe_allow_html=True)
     ########   
-    # Finalizar partida direto
- # Finalizar partida direto
-    def _finalizar_partida():
-        if st.session_state.match_id is None: 
-            return
-
-        mid = st.session_state.match_id
-
-        try:
-            finalize_match(st.session_state.frames, mid)
-        except Exception:
-            pass
-
-        # Força is_closed na tabela e salva local
-        try:
-            frames_local = st.session_state.frames
-            mt = frames_local.get("amistosos", pd.DataFrame())
-            mt.loc[mt["match_id"] == mid, "is_closed"] = True
-            mt.loc[mt["match_id"] == mid, "closed_at"] = datetime.now().isoformat(timespec="seconds")
-            frames_local["amistosos"] = mt
-            save_all(Path(st.session_state.db_path), frames_local)
-            st.session_state.frames = frames_local
-
-            # >>> NOVO: checkpoint de fim de partida (inclui GSheets conforme SYNC_CFG)
-            _persist_all(st.session_state.frames, reason='match_close')
-
-        except Exception:
-            pass
-
-        st.success("Partida finalizada.")
-        st.session_state.match_id = None
-        st.session_state.set_number = None
-        st.session_state._do_rerun_after = True
     with top10:
         st.button("🏁 Finalizar Partida", width='stretch', on_click=_finalizar_partida)
         
@@ -2816,7 +2841,6 @@ if st.session_state.game_mode:
         # ===== Encerramento da UI do Modo Jogo para esconder o restante =====
         
         # --- Quadra (Modo Jogo) exibida logo antes do encerramento ---
-    # --- LINHA DO PLACAR + QUADRA + FILTROS (MODO JOGO) — ULTRA COMPACT (sem :has) ---
     # --- LINHA DO PLACAR + QUADRA + FILTROS (MODO JOGO) — ULTRA COMPACT (sem :has) ---
     try:
         # --- Linha do placar (texto auxiliar acima do placar) ---
@@ -3350,3 +3374,5 @@ def salva_google(frames, reason, statuses, _perf):
                 statuses.append(f"Webhook bloco falhou: {e2!s}")
                 _logger.warning(statuses[-1])
             _perf_step(_perf, "WEBHOOK", t_wb)
+
+
