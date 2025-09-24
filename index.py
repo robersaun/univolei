@@ -2295,10 +2295,10 @@ with st.container():
                 unsafe_allow_html=True
             )
     with bar2:
-        st.session_state.game_mode = st.toggle("🎮 Modo Jogo", value=st.session_state.game_mode, key="game_mode_toggle")        
-    with bar3:
         if not st.session_state.game_mode:
-            st.session_state.auto_close = st.toggle("Auto 25/15+2", value=st.session_state.auto_close, key="auto_close_toggle")
+            st.session_state.auto_close = st.toggle("Auto 25/15+2", value=st.session_state.auto_close, key="auto_close_toggle")      
+    with bar3:
+        st.session_state.game_mode = st.toggle("🎮 Modo Jogo", value=st.session_state.game_mode, key="game_mode_toggle") 
     st.markdown('</div>', unsafe_allow_html=True)
 # rerun pós-callbacks
 if st.session_state._do_rerun_after:
