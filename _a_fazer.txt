@@ -1,6 +1,31 @@
 ﻿***************************************
 v2 -> com camera e movimento?
 ***************************************
+streamlit run index.py
+***************************************
+
+
+confirmação e salvar arq temporário a cada fim de set/ jogo?
+VALIDAR finalizacao dos jogos e salvamentos (25x20, 27x25, outros)
+
+Estatísticas do set
+
+Fazer side out ? Quem inicia no set e pontu
+
+Cadastro de tipo de jogo amistoso e campeonato. se for campeonato posso cadastrar o nome dele e se é um jogo classificatório , semi-final ou final
+
+
+
+
+
+***************************************
+OK
+1. Remover clique qualquer clique na quadra
+
+2.  Boao Refazer rally se estiver 0x0 e tiver um set fechado, deve reabrir set sempre 
+3. nos momentos de fechar set, finalizar partida e envio de salvamento ao google (tela branca), coloque um aviso ou preloader de Salvando dados... ou fechando set, finalizando partida... esse tipo de informacao de aviso importante
+4. Faça com que os botoes de posição, jogadoras e atalhos principalmente, ao serem clicados fiquem com destaque, seja em uma cor diferente no fundo ou na borda deles, algo bonito
+5. 1 clique botão verde acerto, 2 cliques vermelho erro
 
 
 ***************************************
@@ -11,10 +36,80 @@ Dá, mas é bem mais trabalhoso (Termux/Python e compilar dependências). Na pr�
 Se quiser, eu crio um pequeno “modo offline” no seu index.py (com a variável UV_OFFLINE) e troco automaticamente Google Sheets → XLSX/DuckDB quando estiver offline. Quer que eu aplique isso na sua versão atual?
 ***************************************
 
-streamlit run index.py
 
 
 
+***************************************
+com muito cuidado, sem erros e sem retirar nada do que nao pedi:
+1	retirar 📈 Placar (evolução no set) e  📊 KPIs e Análises do Set e tudo abaixo dele do modo normal e colocar no codigo histórico (os gráficos que já tiverem lá de forma repetida, vc pode regirar os que ja tem no histórico, que acho que estao mais pobres visivelmente
+2	veja que comecei a fazer uma organizacao no meu codigo, de comentario organizado em cima do que ele faz, de uma sequencia logica, etc... entao mantenha o que fiz e se quiser continue essa revisao, mas bem pontualmente, siga a mesma logica
+gere o codigo novo corrigido, completo sem erros
+3. vc deve verificar meu codigo antigo e aplicar novamente o "mostrar jogadoras por nome"
+
+
+
+
+---------------------
+meu code inicial está em anexo, comecei a revisar es estruturar meu codigo de uma maneira profissional que gostaria que vc indicasse e seguisse mas vc nao fez. Verifique o que fiz, que foi separar blocos de chamadas de funcoes e uma estrutura lógica para iniciar elas e os componentes, mas que isso nao precise e nao ocorra a cada reload de página, por exemplo (essa criacao acredito que só precisa ser uma vez). Revise, siga a logica e se quiser em cada funcao, pode colocar até uma print inicial com m nome da funcao e uma numeracao, para irmos acompanhando o andamento do código.
+Outra coisa, corrija esses erros que apareceram que vou enviar abaixo e revise tb os botoes mais usados (ex: jogadoras, atalhos e modo jogo, para que nao fiquem dando reload desnecessário na página... a nova estrutura deve corrigir isso, mas identifique os motivos e quando ocorre isso
+
+streamlit.errors.StreamlitDuplicateElementKey: There are multiple elements with the same key='line_input_text'. To fix this, please make sure that the key argument is unique for each element you create.
+
+Traceback:
+File "C:\Users\roberson.souza\Documents\MYCODES\univolei\index.py", line 3345, in <module>
+    barraEFiltros()
+File "C:\Users\roberson.souza\Documents\MYCODES\univolei\index.py", line 2602, in barraEFiltros
+    st.text_input(
+File "C:\Python\Lib\site-packages\streamlit\runtime\metrics_util.py", line 443, in wrapped_func
+    result = non_optional_func(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "C:\Python\Lib\site-packages\streamlit\elements\widgets\text_widgets.py", line 276, in text_input
+    return self._text_input(
+           ^^^^^^^^^^^^^^^^^
+File "C:\Python\Lib\site-packages\streamlit\elements\widgets\text_widgets.py", line 328, in _text_input
+    element_id = compute_and_register_element_id(
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "C:\Python\Lib\site-packages\streamlit\elements\lib\utils.py", line 274, in compute_and_register_element_id
+    _register_element_id(ctx, element_type_for_error, element_id)
+File "C:\Python\Lib\site-packages\streamlit\elements\lib\utils.py", line 143, in _register_element_id
+    raise StreamlitDuplicateElementKey(user_key)
+
+
+---------------------
+
+
+
+---------------------
+tive que revisar e retirar várias funcoes da ultima vez que vc me enviou o codigo. revise se tem alguma mais duplicada e nao faça mais isso, tome muito cuidado. só edite o que eu pedir.
+os botoes Modo jogo e Mostrar botões por principalmente estao com bug, eles fazem um recarregamento de toda a tela ao serem clicados e o botão número vem setado por default, se clico no botao nome funciona, mas se clico no botao número de novo ele nao faz o que tem que fazer, apenas uma segunda vez que clico nele que funciona. corrija isso
+
+Revise tb os Botoes erro acerto as vezes oscilando (o que quero dizer: as vezes clico no acerto e ele muda para o erro ou nao é setado o que foi clicado, entendeu?
+Verifique o botão de Modo jogo para que fique "mais verdadeiro", que a variável fique como persistente e apenas seja false se eu clicar no botao de novo de novo.
+Tire qualquer Relload a cada botao
+ ou em qualquer botao, na verdade (exceto os poucos que realmente precisam, ex: reabrir e fechar set e partida)
+Estamos com muitos recarregamentos, revise e evite ao máximo qualquer deles. Me indique qual ou quais funcoes sao chamadas para reload e em quantas vezes vc irá conseguir retirar?
+esse codigo que vou enviar é o meu correto e atual, tome muito cuidado com ele, nao erre ou retire nada do que nao pedi, muito menos acrescente de forma duplicada!
+
+
+
+def _render_persist_status():
+    # Mostra um indicador leve de gravação no topo da página
+    try:
+        status = st.session_state.get('bg_status')
+        if status == 'running':
+            st.info("⏳ Gravando dados em background...")
+        elif status == 'done':
+            st.success("✅ Gravação concluída.")
+            # limpa após mostrar
+            st.session_state['bg_status'] = None
+        elif status == 'error':
+            st.error(f"❌ Erro na gravação: {st.session_state.get('bg_error')}")
+            st.session_state['bg_status'] = None
+    except Exception:
+        pass
+
+# Renderiza status a cada rerun (no início da UI principal)
+_render_persist_status()
 
 
 -----------------------------
@@ -29,6 +124,19 @@ e
 no meu codigo de historico, nao retire nada mas melhore as informacoes. me indique quais seriam outros kpis importantes e insira graficos, vou dar alguns exemplos que podem ser analisados: jogadoras que mais pontuaram e erraram, e em que fundamento e regiao. quais os fundamentos do nosso time e tb das adversarias com mais acertos e erros e outros que vc pode me sugerir. faça algo funcional e bonito, com cores no layout dos graficos. me envie tb daí o historico novo para download
 
 -----------------------------
+***************************************
+        nums = resolve_our_roster_numbers(st.session_state.frames)
+        selected_players = st.multiselect("Jogadoras:", options=nums, default=nums, placeholder="Todas")
+
+def resolve_our_roster_numbers(frames: dict) -> list[int]:
+    jg = frames.get("jogadoras", pd.DataFrame()).copy()
+    if jg.empty: return []
+    for col in ["team_id","player_number"]:
+        if col in jg.columns: jg[col] = pd.to_numeric(jg[col], errors="coerce")
+    ours = jg[jg["team_id"] == OUR_TEAM_ID].dropna(subset=["player_number"]).sort_values("player_number")
+    return ours["player_number"].astype(int).unique().tolist()
+
+***************************************
 
 Consegue ver como foi feuito para esconder as tabelas e graficos por exemplo e seguir da mesma forma? fazendo os ajustes que pedi?? vou até mandar de novo pq vc é muito ruim!!! 
 

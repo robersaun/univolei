@@ -1,5 +1,6 @@
 ﻿o que é o gráfico de “Eficiência por Jogadora (ataque)”?
 
+
 Ele mede, por jogadora, o quão produtiva foi a participação dela nas ações de ataque (Diagonal, Paralela, Meio, Pipe, Segunda, Largada):
 
 Efici
@@ -28,3 +29,30 @@ Erros = desses, quantos foram erro (ex.: para fora, rede etc.).
 
 O valor vai de -1 a +1; quanto maior, melhor (positivo indica mais pontos que erros).
 Se preferir, posso trocar por %Ponto por jogadora ou quebrar por tipo de ataque.
+
+INICIAÇ
+habilitaPaineis
+
+
+
+Nesse meu codigo, nao retire nenhuma funcionalidade ou nao faca algo que nao pedi.. vou te enviar meu index e o css e vcso vai implementar nos botoes jogadoras e adv um clique irá ficar o botao verde e significa acerto e dois cliques irá ficar vemelho e significa erro (verá que já possui botoes acerto e erro e ao clicar nos botoes jogadoras com essas novas funcionalidades e cores, o comportamento deve ser exatamente igual à marcacao de ponto se tiver selecionado acerto ou erro já existentes, ok?
+sem erros... faça com cuidado .. me envie os codigos 100% completos para download
+
+
+---------------------
+Estatísticas do set
+
+Fazer side out ? Quem inicia no set e pontu
+1 clique botão verde acerto, 2 cliques vermelho erro
+Cadastro de tipo de jogo amistoso, campeonato, classificatório , semi ou final
+
+2.  Boao Refazer rally se estiver 0x0 e tiver um set fechado, deve reabrir set sempre 
+3. nos momentos de fechar set, finalizar partida e envio de salvamento ao google (tela branca), coloque um aviso ou preloader de Salvando dados... ou fechando set, finalizando partida... esse tipo de informacao de aviso importante
+4. Faça com que os botoes de posição, jogadoras e atalhos principalmente, ao serem clicados fiquem com destaque, seja em uma cor diferente no fundo ou na borda deles, algo bonito
+5. 
+
+---------------------
+
+OK
+1. Remover clique qualquer clique na quadra
+

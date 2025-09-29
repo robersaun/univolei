@@ -1,0 +1,1009 @@
+﻿FN resolve_our_roster_numbers
+FN roster_for_ui
+FN resolve_our_roster_numbers
+FN  build_heat_points
+FN  render_court_html
+FN@@@ _cadastroTime
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.match_id =  8
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN habilitaPaineis acao  3_Somente 1 Jogo existente
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN sets
+FN barraInicial
+@@@ FN _painelPrincipal()
+FN resolve_our_roster_numbers
+FN roster_for_ui
+FN resolve_our_roster_numbers
+FN  build_heat_points
+FN  render_court_html
+FN@@@ _cadastroTime
+FN  register_current
+FN quick_register_click
+FN quick_register_line
+FN _fix_who_scored_from_raw_and_row
+FN _normalize_action_in_row
+FN _fast_apply_scores_to_row
+FN _persist_fb_on_last_rally
+🔍 [NORMALIZE DEBUG] Input: '1FLBTjIMAgQjGM76XbNZT3U_lIDGUsWQbea2QCmdXbYI'
+🔍 [NORMALIZE DEBUG] ID limpo: '1FLBTjIMAgQjGM76XbNZT3U_lIDGUsWQbea2QCmdXbYI'
+🔍 [AUTH] Erro com Streamlit Secrets: No secrets found. Valid paths for a secrets.toml file or secret directories are: C:\Users\roberson.souza\.streamlit\secrets.toml, C:\Users\roberson.souza\Documents\MYCODES\univolei\.streamlit\secrets.toml
+🔍 [AUTH] Usando config.ini inline JSON
+ver qtd pontos N  5
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.match_id =  8
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN habilitaPaineis acao  3_Somente 1 Jogo existente
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN sets
+FN barraInicial
+@@@ FN _painelPrincipal()
+FN resolve_our_roster_numbers
+FN roster_for_ui
+FN resolve_our_roster_numbers
+FN  build_heat_points
+FN  render_court_html
+FN@@@ _cadastroTime
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.match_id =  8
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN habilitaPaineis acao  3_Somente 1 Jogo existente
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN sets
+FN barraInicial
+@@@ FN _painelPrincipal()
+FN resolve_our_roster_numbers
+FN roster_for_ui
+FN resolve_our_roster_numbers
+FN  build_heat_points
+FN  render_court_html
+FN@@@ _cadastroTime
+FN  register_current
+FN quick_register_click
+FN quick_register_line
+FN _fix_who_scored_from_raw_and_row
+FN _normalize_action_in_row
+FN _fast_apply_scores_to_row
+FN _persist_fb_on_last_rally
+else ver qtd pontos N  5
+PS C:\Users\roberson.souza\Documents\MYCODES\univolei> streamlit run index.py
+
+  You can now view your Streamlit app in your browser.
+
+  Local URL: http://localhost:8501
+  Network URL: http://10.1.1.142:8501
+
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.match_id =  None
+@@@ FN _habilitaCarregamentoJogos  3
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.match_id =  None
+@@@ FN _habilitaCarregamentoJogos  3
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.match_id =  8
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN habilitaPaineis acao  3_Somente 1 Jogo existente
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN sets
+FN barraInicial
+@@@ FN _painelPrincipal()
+FN resolve_our_roster_numbers
+FN roster_for_ui
+FN resolve_our_roster_numbers
+FN  build_heat_points
+FN  render_court_html
+FN@@@ _cadastroTime
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.match_id =  8
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.match_id =  None
+@@@ FN _habilitaCarregamentoJogos  3
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.match_id =  None
+@@@ FN _habilitaCarregamentoJogos  3
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.match_id =  8
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN habilitaPaineis acao  3_Somente 1 Jogo existente
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN sets
+FN barraInicial
+@@@ FN _painelPrincipal()
+FN resolve_our_roster_numbers
+PS C:\Users\roberson.souza\Documents\MYCODES\univolei> streamlit run index.py
+
+PS C:\Users\roberson.souza\Documents\MYCODES\univolei> streamlit run index.py
+
+  You can now view your Streamlit app in your browser.
+
+  Local URL: http://localhost:8501
+  Network URL: http://10.1.1.142:8501
+
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.match_id =  None
+@@@ FN _habilitaCarregamentoJogos  3
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.match_id =  None
+@@@ FN _habilitaCarregamentoJogos  3
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.match_id =  None
+@@@ FN _habilitaCarregamentoJogos  3 st.session_state.get(match_id)  =  None
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.match_id =  None
+@@@ FN _habilitaCarregamentoJogos  3 st.session_state.get(match_id)  =  None
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.match_id =  None
+@@@ FN _habilitaCarregamentoJogos  3 st.session_state.get(match_id)  =  None
+pasando reto
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.match_id =  None
+@@@ FN _habilitaCarregamentoJogos  3 st.session_state.get(match_id)  =  None
+EEERA PRA ENTRAR AQUI
+@@@ FN habilitaPaineis acao  carregar_jogo
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.match_id =  None
+@@@ FN _habilitaCarregamentoJogos  3
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.match_id =  None
+@@@ FN _habilitaCarregamentoJogos  3
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.match_id =  8
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN habilitaPaineis acao  3_Somente 1 Jogo existente
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN sets
+FN barraInicial
+@@@ FN _painelPrincipal()
+FN resolve_our_roster_numbers
+FN roster_for_ui
+FN resolve_our_roster_numbers
+FN  build_heat_points
+FN  render_court_html
+FN@@@ _cadastroTime
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.match_id =  8
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN habilitaPaineis acao  3_Somente 1 Jogo existente
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN sets
+FN barraInicial
+@@@ FN _painelPrincipal()
+FN resolve_our_roster_numbers
+FN roster_for_ui
+FN resolve_our_roster_numbers
+FN  build_heat_points
+FN  render_court_html
+FN@@@ _cadastroTime
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.match_id =  8
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN habilitaPaineis acao  3_Somente 1 Jogo existente
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN sets
+FN barraInicial
+@@@ FN _painelPrincipal()
+FN resolve_our_roster_numbers
+FN roster_for_ui
+FN resolve_our_roster_numbers
+FN  build_heat_points
+FN  render_court_html
+FN@@@ _cadastroTime
+FN  register_current
+FN quick_register_click
+FN quick_register_line
+FN _fix_who_scored_from_raw_and_row
+FN _normalize_action_in_row
+FN _fast_apply_scores_to_row
+FN _persist_fb_on_last_rally
+else ver qtd pontos N  5
+🔍 [NORMALIZE DEBUG] Input: '1FLBTjIMAgQjGM76XbNZT3U_lIDGUsWQbea2QCmdXbYI'
+🔍 [NORMALIZE DEBUG] ID limpo: '1FLBTjIMAgQjGM76XbNZT3U_lIDGUsWQbea2QCmdXbYI'
+🔍 [AUTH] Erro com Streamlit Secrets: No secrets found. Valid paths for a secrets.toml file or secret directories are: C:\Users\roberson.souza\.streamlit\secrets.toml, C:\Users\roberson.souza\Documents\MYCODES\univolei\.streamlit\secrets.toml
+🔍 [AUTH] Usando config.ini inline JSON
+ver qtd pontos N  5
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.match_id =  8
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN habilitaPaineis acao  3_Somente 1 Jogo existente
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN sets
+FN barraInicial
+@@@ FN _painelPrincipal()
+FN resolve_our_roster_numbers
+FN roster_for_ui
+FN resolve_our_roster_numbers
+FN  build_heat_points
+FN  render_court_html
+FN@@@ _cadastroTime
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.match_id =  8
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN habilitaPaineis acao  3_Somente 1 Jogo existente
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN sets
+FN barraInicial
+@@@ FN _painelPrincipal()
+FN resolve_our_roster_numbers
+FN roster_for_ui
+FN resolve_our_roster_numbers
+FN  build_heat_points
+FN  render_court_html
+FN@@@ _cadastroTime
+FN  register_current
+FN quick_register_click
+FN quick_register_line
+FN _fix_who_scored_from_raw_and_row
+FN _normalize_action_in_row
+FN _fast_apply_scores_to_row
+FN _persist_fb_on_last_rally
+else ver qtd pontos N  5
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.match_id =  8
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN habilitaPaineis acao  3_Somente 1 Jogo existente
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN sets
+FN barraInicial
+@@@ FN _painelPrincipal()
+FN resolve_our_roster_numbers
+FN roster_for_ui
+FN resolve_our_roster_numbers
+FN  build_heat_points
+FN  render_court_html
+FN@@@ _cadastroTime
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.match_id =  None
+@@@ FN _habilitaCarregamentoJogos  3
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.match_id =  None
+@@@ FN _habilitaCarregamentoJogos  3
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.match_id =  8
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN habilitaPaineis acao  3_Somente 1 Jogo existente
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN sets
+FN barraInicial
+@@@ FN _painelPrincipal()
+FN resolve_our_roster_numbers
+FN roster_for_ui
+FN resolve_our_roster_numbers
+FN  build_heat_points
+FN  render_court_html
+FN@@@ _cadastroTime
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.match_id =  8
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+  Stopping...
+PS C:\Users\roberson.souza\Documents\MYCODES\univolei> streamlit run index.py
+
+  You can now view your Streamlit app in your browser.
+
+  Local URL: http://localhost:8501
+  Network URL: http://10.1.1.142:8501
+
+  Stopping...
+  Stopping...
+PS C:\Users\roberson.souza\Documents\MYCODES\univolei> streamlit run index.py
+
+  You can now view your Streamlit app in your browser.
+
+  Local URL: http://localhost:8501
+  Network URL: http://10.1.1.142:8501
+
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.match_id =  None
+@@@ FN _habilitaCarregamentoJogos  3
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.match_id =  None
+PS C:\Users\roberson.souza\Documents\MYCODES\univolei> streamlit run index.py
+
+  You can now view your Streamlit app in your browser.
+
+  Local URL: http://localhost:8501
+  Network URL: http://10.1.1.142:8501
+
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.match_id =  None
+@@@ FN _habilitaCarregamentoJogos  3
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.match_id =  None
+@@@ FN _habilitaCarregamentoJogos  3
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.match_id =  8
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN habilitaPaineis acao  3_Somente 1 Jogo existente
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN sets
+FN barraInicial
+@@@ FN _painelPrincipal()
+FN resolve_our_roster_numbers
+FN roster_for_ui
+FN resolve_our_roster_numbers
+FN  build_heat_points
+FN  render_court_html
+FN@@@ _cadastroTime
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.match_id =  8
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN habilitaPaineis acao  3_Somente 1 Jogo existente
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN sets
+FN barraInicial
+@@@ FN _painelPrincipal()
+FN resolve_our_roster_numbers
+FN roster_for_ui
+FN resolve_our_roster_numbers
+FN  build_heat_points
+FN  render_court_html
+FN@@@ _cadastroTime
+🔍 [NORMALIZE DEBUG] Input: '1FLBTjIMAgQjGM76XbNZT3U_lIDGUsWQbea2QCmdXbYI'
+🔍 [NORMALIZE DEBUG] ID limpo: '1FLBTjIMAgQjGM76XbNZT3U_lIDGUsWQbea2QCmdXbYI'
+🔍 [AUTH] Erro com Streamlit Secrets: No secrets found. Valid paths for a secrets.toml file or secret directories are: C:\Users\roberson.souza\.streamlit\secrets.toml, C:\Users\roberson.souza\Documents\MYCODES\univolei\.streamlit\secrets.toml
+🔍 [AUTH] Usando config.ini inline JSON
+ver qtd pontos N  5
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.match_id =  8
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN habilitaPaineis acao  3_Somente 1 Jogo existente
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN sets
+FN barraInicial
+@@@ FN _painelPrincipal()
+FN resolve_our_roster_numbers
+FN roster_for_ui
+FN resolve_our_roster_numbers
+FN  build_heat_points
+FN  render_court_html
+FN@@@ _cadastroTime
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.match_id =  8
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN habilitaPaineis acao  3_Somente 1 Jogo existente
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN sets
+FN barraInicial
+@@@ FN _painelPrincipal()
+FN resolve_our_roster_numbers
+FN roster_for_ui
+FN resolve_our_roster_numbers
+FN  build_heat_points
+FN  render_court_html
+FN@@@ _cadastroTime
+FN  register_current
+FN quick_register_click
+FN quick_register_line
+FN _fix_who_scored_from_raw_and_row
+FN _normalize_action_in_row
+FN _fast_apply_scores_to_row
+FN _persist_fb_on_last_rally
+else ver qtd pontos N  5
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.match_id =  8
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN habilitaPaineis acao  3_Somente 1 Jogo existente
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN sets
+FN barraInicial
+@@@ FN _painelPrincipal()
+FN resolve_our_roster_numbers
+FN roster_for_ui
+FN resolve_our_roster_numbers
+FN  build_heat_points
+FN  render_court_html
+FN@@@ _cadastroTime
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.match_id =  8
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN habilitaPaineis acao  3_Somente 1 Jogo existente
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN sets
+FN barraInicial
+@@@ FN _painelPrincipal()
+FN resolve_our_roster_numbers
+FN roster_for_ui
+FN resolve_our_roster_numbers
+FN  build_heat_points
+FN  render_court_html
+FN@@@ _cadastroTime
+FN  register_current
+FN quick_register_click
+FN quick_register_line
+FN _fix_who_scored_from_raw_and_row
+FN _normalize_action_in_row
+FN _fast_apply_scores_to_row
+FN _persist_fb_on_last_rally
+🔍 [NORMALIZE DEBUG] Input: '1FLBTjIMAgQjGM76XbNZT3U_lIDGUsWQbea2QCmdXbYI'
+🔍 [NORMALIZE DEBUG] ID limpo: '1FLBTjIMAgQjGM76XbNZT3U_lIDGUsWQbea2QCmdXbYI'
+🔍 [AUTH] Erro com Streamlit Secrets: No secrets found. Valid paths for a secrets.toml file or secret directories are: C:\Users\roberson.souza\.streamlit\secrets.toml, C:\Users\roberson.souza\Documents\MYCODES\univolei\.streamlit\secrets.toml
+🔍 [AUTH] Usando config.ini inline JSON
+ver qtd pontos N  5
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.match_id =  8
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN habilitaPaineis acao  3_Somente 1 Jogo existente
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN sets
+FN barraInicial
+@@@ FN _painelPrincipal()
+FN resolve_our_roster_numbers
+FN roster_for_ui
+FN resolve_our_roster_numbers
+FN  build_heat_points
+FN  render_court_html
+FN@@@ _cadastroTime
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.match_id =  8
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN habilitaPaineis acao  3_Somente 1 Jogo existente
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN sets
+FN barraInicial
+@@@ FN _painelPrincipal()
+FN resolve_our_roster_numbers
+FN roster_for_ui
+FN resolve_our_roster_numbers
+FN  build_heat_points
+FN  render_court_html
+FN@@@ _cadastroTime
+FN  register_current
+FN quick_register_click
+FN quick_register_line
+FN _fix_who_scored_from_raw_and_row
+FN _normalize_action_in_row
+FN _fast_apply_scores_to_row
+FN _persist_fb_on_last_rally
+else ver qtd pontos N  5
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.match_id =  8
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN habilitaPaineis acao  3_Somente 1 Jogo existente
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN sets
+FN barraInicial
+@@@ FN _painelPrincipal()
+FN resolve_our_roster_numbers
+FN roster_for_ui
+FN resolve_our_roster_numbers
+FN  build_heat_points
+FN  render_court_html
+FN@@@ _cadastroTime
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.set_number =  None
+@@@ FN _habilitaCarregamentoJogos  3
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.set_number =  None
+@@@ FN _habilitaCarregamentoJogos  3
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.set_number =  1
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.set_number =  None
+@@@ FN _habilitaCarregamentoJogos  3
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.set_number =  None
+@@@ FN _habilitaCarregamentoJogos  3
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.set_number =  1
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN habilitaPaineis acao  3_Somente 1 Jogo existente
+PS C:\Users\roberson.souza\Documents\MYCODES\univolei> streamlit run index.py
+
+  You can now view your Streamlit app in your browser.
+
+  Local URL: http://localhost:8501
+  Network URL: http://10.1.1.142:8501
+
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.set_number =  None
+@@@ FN _habilitaCarregamentoJogos  3
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.set_number =  None
+@@@ FN _habilitaCarregamentoJogos  3
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.set_number =  1
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN habilitaPaineis acao  3_Somente 1 Jogo existente
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN sets
+FN barraInicial
+@@@ FN _painelPrincipal()
+FN resolve_our_roster_numbers
+FN roster_for_ui
+FN resolve_our_roster_numbers
+FN  build_heat_points
+FN  render_court_html
+FN@@@ _cadastroTime
+@@@ _inicialVerificaJogoAbertoOuNovo: boot concluído.
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.set_number =  1
+@@@ _inicialVerificaJogoAbertoOuNovo: já inicializado -> return
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.set_number =  None
+@@@ FN _habilitaCarregamentoJogos  3
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.set_number =  None
+@@@ FN _habilitaCarregamentoJogos  3
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.set_number =  1
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN habilitaPaineis acao  3_Somente 1 Jogo existente
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN sets
+FN barraInicial
+@@@ FN _painelPrincipal()
+FN resolve_our_roster_numbers
+FN roster_for_ui
+FN resolve_our_roster_numbers
+FN  build_heat_points
+FN  render_court_html
+FN@@@ _cadastroTime
+@@@ _inicialVerificaJogoAbertoOuNovo: boot concluído.
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.set_number =  1
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN habilitaPaineis acao  3_Somente 1 Jogo existente
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN sets
+FN barraInicial
+@@@ FN _painelPrincipal()
+FN resolve_our_roster_numbers
+FN roster_for_ui
+FN resolve_our_roster_numbers
+FN  build_heat_points
+FN  render_court_html
+FN@@@ _cadastroTime
+@@@ _inicialVerificaJogoAbertoOuNovo: boot concluído.
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.set_number =  1
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN habilitaPaineis acao  3_Somente 1 Jogo existente
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN sets
+FN barraInicial
+@@@ FN _painelPrincipal()
+FN resolve_our_roster_numbers
+FN roster_for_ui
+FN resolve_our_roster_numbers
+FN  build_heat_points
+FN  render_court_html
+FN@@@ _cadastroTime
+@@@ _inicialVerificaJogoAbertoOuNovo: boot concluído.
+FN  register_current
+FN quick_register_click
+FN quick_register_line
+FN _fix_who_scored_from_raw_and_row
+FN _normalize_action_in_row
+FN _fast_apply_scores_to_row
+FN _persist_fb_on_last_rally
+else ver qtd pontos N  5
+🔍 [NORMALIZE DEBUG] Input: '1FLBTjIMAgQjGM76XbNZT3U_lIDGUsWQbea2QCmdXbYI'
+🔍 [NORMALIZE DEBUG] ID limpo: '1FLBTjIMAgQjGM76XbNZT3U_lIDGUsWQbea2QCmdXbYI'
+🔍 [AUTH] Erro com Streamlit Secrets: No secrets found. Valid paths for a secrets.toml file or secret directories are: C:\Users\roberson.souza\.streamlit\secrets.toml, C:\Users\roberson.souza\Documents\MYCODES\univolei\.streamlit\secrets.toml
+🔍 [AUTH] Usando config.ini inline JSON
+ver qtd pontos N  5
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.set_number =  2
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN habilitaPaineis acao  3_Somente 1 Jogo existente
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN sets
+FN barraInicial
+@@@ FN _painelPrincipal()
+FN resolve_our_roster_numbers
+FN roster_for_ui
+FN resolve_our_roster_numbers
+FN  build_heat_points
+FN  render_court_html
+FN@@@ _cadastroTime
+@@@ _inicialVerificaJogoAbertoOuNovo: boot concluído.
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.set_number =  2
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN habilitaPaineis acao  3_Somente 1 Jogo existente
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN sets
+FN barraInicial
+@@@ FN _painelPrincipal()
+FN resolve_our_roster_numbers
+FN roster_for_ui
+FN resolve_our_roster_numbers
+FN  build_heat_points
+FN  render_court_html
+FN@@@ _cadastroTime
+@@@ _inicialVerificaJogoAbertoOuNovo: boot concluído.
+FN  register_current
+FN quick_register_click
+FN quick_register_line
+FN _fix_who_scored_from_raw_and_row
+FN _normalize_action_in_row
+FN _fast_apply_scores_to_row
+FN _persist_fb_on_last_rally
+else ver qtd pontos N  5
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.set_number =  2
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN habilitaPaineis acao  3_Somente 1 Jogo existente
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN sets
+FN barraInicial
+@@@ FN _painelPrincipal()
+FN resolve_our_roster_numbers
+FN roster_for_ui
+FN resolve_our_roster_numbers
+FN  build_heat_points
+FN  render_court_html
+FN@@@ _cadastroTime
+@@@ _inicialVerificaJogoAbertoOuNovo: boot concluído.
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.set_number =  2
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN habilitaPaineis acao  3_Somente 1 Jogo existente
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN sets
+FN barraInicial
+@@@ FN _painelPrincipal()
+FN resolve_our_roster_numbers
+FN roster_for_ui
+FN resolve_our_roster_numbers
+FN  build_heat_points
+FN  render_court_html
+FN@@@ _cadastroTime
+@@@ _inicialVerificaJogoAbertoOuNovo: boot concluído.
+FN  register_current
+FN quick_register_click
+FN quick_register_line
+FN _fix_who_scored_from_raw_and_row
+FN _normalize_action_in_row
+FN _fast_apply_scores_to_row
+FN _persist_fb_on_last_rally
+else ver qtd pontos N  5
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.set_number =  2
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN habilitaPaineis acao  3_Somente 1 Jogo existente
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN sets
+FN barraInicial
+@@@ FN _painelPrincipal()
+FN resolve_our_roster_numbers
+FN roster_for_ui
+FN resolve_our_roster_numbers
+FN  build_heat_points
+FN  render_court_html
+FN@@@ _cadastroTime
+@@@ _inicialVerificaJogoAbertoOuNovo: boot concluído.
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.set_number =  2
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN habilitaPaineis acao  3_Somente 1 Jogo existente
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN sets
+FN barraInicial
+@@@ FN _painelPrincipal()
+FN resolve_our_roster_numbers
+FN roster_for_ui
+FN resolve_our_roster_numbers
+FN  build_heat_points
+FN  render_court_html
+FN@@@ _cadastroTime
+@@@ _inicialVerificaJogoAbertoOuNovo: boot concluído.
+FN  register_current
+FN quick_register_click
+FN quick_register_line
+FN _fix_who_scored_from_raw_and_row
+FN _normalize_action_in_row
+FN _fast_apply_scores_to_row
+FN _persist_fb_on_last_rally
+🔍 [NORMALIZE DEBUG] Input: '1FLBTjIMAgQjGM76XbNZT3U_lIDGUsWQbea2QCmdXbYI'
+🔍 [NORMALIZE DEBUG] ID limpo: '1FLBTjIMAgQjGM76XbNZT3U_lIDGUsWQbea2QCmdXbYI'
+🔍 [AUTH] Erro com Streamlit Secrets: No secrets found. Valid paths for a secrets.toml file or secret directories are: C:\Users\roberson.souza\.streamlit\secrets.toml, C:\Users\roberson.souza\Documents\MYCODES\univolei\.streamlit\secrets.toml
+🔍 [AUTH] Usando config.ini inline JSON
+ver qtd pontos N  5
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.set_number =  2
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN habilitaPaineis acao  3_Somente 1 Jogo existente
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN sets
+FN barraInicial
+@@@ FN _painelPrincipal()
+FN resolve_our_roster_numbers
+FN roster_for_ui
+FN resolve_our_roster_numbers
+FN  build_heat_points
+FN  render_court_html
+FN@@@ _cadastroTime
+@@@ _inicialVerificaJogoAbertoOuNovo: boot concluído.
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.set_number =  2
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN habilitaPaineis acao  3_Somente 1 Jogo existente
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN sets
+FN barraInicial
+@@@ FN _painelPrincipal()
+FN resolve_our_roster_numbers
+FN roster_for_ui
+FN resolve_our_roster_numbers
+FN  build_heat_points
+FN  render_court_html
+FN@@@ _cadastroTime
+@@@ _inicialVerificaJogoAbertoOuNovo: boot concluído.
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.set_number =  2
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN habilitaPaineis acao  3_Somente 1 Jogo existente
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN sets
+FN barraInicial
+@@@ FN _painelPrincipal()
+FN resolve_our_roster_numbers
+FN roster_for_ui
+FN resolve_our_roster_numbers
+FN  build_heat_points
+FN  render_court_html
+FN@@@ _cadastroTime
+@@@ _inicialVerificaJogoAbertoOuNovo: boot concluído.
+FN  register_current
+FN quick_register_click
+FN quick_register_line
+FN _fix_who_scored_from_raw_and_row
+FN _normalize_action_in_row
+FN _fast_apply_scores_to_row
+FN _persist_fb_on_last_rally
+else ver qtd pontos N  5
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.set_number =  2
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN habilitaPaineis acao  3_Somente 1 Jogo existente
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN sets
+FN barraInicial
+@@@ FN _painelPrincipal()
+FN resolve_our_roster_numbers
+FN roster_for_ui
+FN resolve_our_roster_numbers
+FN  build_heat_points
+FN  render_court_html
+FN@@@ _cadastroTime
+@@@ _inicialVerificaJogoAbertoOuNovo: boot concluído.
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.set_number =  2
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN habilitaPaineis acao  3_Somente 1 Jogo existente
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN sets
+FN barraInicial
+@@@ FN _painelPrincipal()
+FN resolve_our_roster_numbers
+FN roster_for_ui
+FN resolve_our_roster_numbers
+FN  build_heat_points
+FN  render_court_html
+FN@@@ _cadastroTime
+@@@ _inicialVerificaJogoAbertoOuNovo: boot concluído.
+FN  register_current
+FN quick_register_click
+FN quick_register_line
+FN _fix_who_scored_from_raw_and_row
+FN _normalize_action_in_row
+FN _fast_apply_scores_to_row
+FN _persist_fb_on_last_rally
+else ver qtd pontos N  5
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.set_number =  2
+PS C:\Users\roberson.souza\Documents\MYCODES\univolei> streamlit run index.py
+
+  You can now view your Streamlit app in your browser.
+
+  Local URL: http://localhost:8501
+  Network URL: http://10.1.1.142:8501
+
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.set_number =  None
+@@@ FN _habilitaCarregamentoJogos  3
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.set_number =  None
+@@@ FN _habilitaCarregamentoJogos  3
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.set_number =  1
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN habilitaPaineis acao  3_Somente 1 Jogo existente
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN sets
+FN barraInicial
+@@@ FN _painelPrincipal()
+FN resolve_our_roster_numbers
+FN roster_for_ui
+FN resolve_our_roster_numbers
+FN  build_heat_points
+FN  render_court_html
+FN@@@ _cadastroTime
+@@@ _inicialVerificaJogoAbertoOuNovo: boot concluído.
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.set_number =  1
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN habilitaPaineis acao  3_Somente 1 Jogo existente
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN sets
+FN barraInicial
+@@@ FN _painelPrincipal()
+FN resolve_our_roster_numbers
+FN roster_for_ui
+FN resolve_our_roster_numbers
+FN  build_heat_points
+FN  render_court_html
+FN@@@ _cadastroTime
+@@@ _inicialVerificaJogoAbertoOuNovo: boot concluído.
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.set_number =  1
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN habilitaPaineis acao  3_Somente 1 Jogo existente
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN sets
+FN barraInicial
+@@@ FN _painelPrincipal()
+FN resolve_our_roster_numbers
+FN roster_for_ui
+FN resolve_our_roster_numbers
+FN  build_heat_points
+FN  render_court_html
+FN@@@ _cadastroTime
+@@@ _inicialVerificaJogoAbertoOuNovo: boot concluído.
+FN  register_current
+FN quick_register_click
+FN quick_register_line
+FN _fix_who_scored_from_raw_and_row
+FN _normalize_action_in_row
+FN _fast_apply_scores_to_row
+FN _persist_fb_on_last_rally
+else ver qtd pontos N  5
+🔍 [NORMALIZE DEBUG] Input: '1FLBTjIMAgQjGM76XbNZT3U_lIDGUsWQbea2QCmdXbYI'
+🔍 [NORMALIZE DEBUG] ID limpo: '1FLBTjIMAgQjGM76XbNZT3U_lIDGUsWQbea2QCmdXbYI'
+🔍 [AUTH] Erro com Streamlit Secrets: No secrets found. Valid paths for a secrets.toml file or secret directories are: C:\Users\roberson.souza\.streamlit\secrets.toml, C:\Users\roberson.souza\Documents\MYCODES\univolei\.streamlit\secrets.toml
+🔍 [AUTH] Usando config.ini inline JSON
+ver qtd pontos N  5
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.set_number =  2
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN habilitaPaineis acao  3_Somente 1 Jogo existente
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN sets
+FN barraInicial
+@@@ FN _painelPrincipal()
+FN resolve_our_roster_numbers
+FN roster_for_ui
+FN resolve_our_roster_numbers
+FN  build_heat_points
+FN  render_court_html
+FN@@@ _cadastroTime
+@@@ _inicialVerificaJogoAbertoOuNovo: boot concluído.
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.set_number =  2
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN habilitaPaineis acao  3_Somente 1 Jogo existente
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN sets
+FN barraInicial
+@@@ FN _painelPrincipal()
+FN resolve_our_roster_numbers
+FN roster_for_ui
+FN resolve_our_roster_numbers
+FN  build_heat_points
+FN  render_court_html
+FN@@@ _cadastroTime
+@@@ _inicialVerificaJogoAbertoOuNovo: boot concluído.
+FN  register_current
+FN quick_register_click
+FN quick_register_line
+FN _fix_who_scored_from_raw_and_row
+FN _normalize_action_in_row
+FN _fast_apply_scores_to_row
+FN _persist_fb_on_last_rally
+else ver qtd pontos N  5
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.set_number =  2
+ELSE ERA PARA CARREGAR ! len(open_list)  3
+@@@ FN habilitaPaineis acao  3_Somente 1 Jogo existente
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN sets
+FN barraInicial
+@@@ FN _painelPrincipal()
+FN resolve_our_roster_numbers
+FN roster_for_ui
+FN resolve_our_roster_numbers
+FN  build_heat_points
+FN  render_court_html
+FN@@@ _cadastroTime
+@@@ _inicialVerificaJogoAbertoOuNovo: boot concluído.
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.set_number =  None
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.set_number =  None
+@@@ _inicialVerificaJogoAbertoOuNovo: já feito ou em progresso -> return
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.set_number =  None
+@@@ _inicialVerificaJogoAbertoOuNovo: já feito ou em progresso -> return
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.set_number =  None
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.set_number =  None
+@@@ _inicialVerificaJogoAbertoOuNovo: já feito ou em progresso -> return
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.set_number =  None
+@@@ _inicialVerificaJogoAbertoOuNovo: já feito ou em progresso -> return
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.set_number =  None
+PS C:\Users\roberson.souza\Documents\MYCODES\univolei> streamlit run index.py
+
+  You can now view your Streamlit app in your browser.
+
+  Local URL: http://localhost:8501
+  Network URL: http://10.1.1.142:8501
+
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.set_number =  None
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.set_number =  None
+@@@ _inicialVerificaJogoAbertoOuNovo: já feito ou em progresso -> return
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.set_number =  None
+@@@ _inicialVerificaJogoAbertoOuNovo: já feito ou em progresso -> return
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.set_number =  None
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.set_number =  None
+@@@ _inicialVerificaJogoAbertoOuNovo: já feito ou em progresso -> return
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.set_number =  None
+@@@ _inicialVerificaJogoAbertoOuNovo: já feito ou em progresso -> return
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.set_number =  None
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.set_number =  None
+@@@ BOTAO: jogo escolhido -> defer painéis no próximo rerun
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.set_number =  2
+@@@ _inicialVerificaJogoAbertoOuNovo: defer acionado -> montar painéis
+@@@ FN habilitaPaineis acao  carregar_jogo
+PS C:\Users\roberson.souza\Documents\MYCODES\univolei> streamlit run index.py
+
+  You can now view your Streamlit app in your browser.
+
+  Local URL: http://localhost:8501
+  Network URL: http://10.1.1.142:8501
+
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.set_number =  None
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.set_number =  None
+@@@ BOTAO: jogo escolhido -> defer painéis no próximo rerun
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.set_number =  2
+@@@ _inicialVerificaJogoAbertoOuNovo: defer acionado -> montar painéis
+PS C:\Users\roberson.souza\Documents\MYCODES\univolei> streamlit run index.py
+
+  You can now view your Streamlit app in your browser.
+
+  Local URL: http://localhost:8501
+  Network URL: http://10.1.1.142:8501
+
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.set_number =  None
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.set_number =  None
+@@@ BOTAO: jogo escolhido -> defer painéis no próximo rerun
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.set_number =  2
+@@@ _inicialVerificaJogoAbertoOuNovo: defer acionado -> montar painéis
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.set_number =  None
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  None  st.session_state.set_number =  None
+@@@ BOTAO: jogo escolhido -> defer painéis no próximo rerun
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.set_number =  2
+@@@ _inicialVerificaJogoAbertoOuNovo: defer acionado -> montar painéis
+@@@ FN _habilitaPaineis acao  carregar_jogo
+FN _titulo_e_CSS
+FN load_css
+@@@ FN barraInicialTime
+@@@ FN sets
+FN barraInicial
+@@@ FN _painelPrincipal()
+FN resolve_our_roster_numbers
+FN roster_for_ui
+FN resolve_our_roster_numbers
+FN  build_heat_points
+FN  render_court_html
+FN@@@ _cadastroTime
+@@@ FN _inicialVerificaJogoAbertoOuNovo st.session_state.match_id =  8  st.session_state.set_number =  2
+@@@ _inicialVerificaJogoAbertoOuNovo: já finalizado -> return

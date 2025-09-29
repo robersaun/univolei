@@ -1,4 +1,3 @@
-
 # pages/02_historico.py — Histórico de jogos (UI melhorada)
 from __future__ import annotations
 
@@ -226,7 +225,7 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # =========================
-# Seleção de jogo (query param ou último)
+# Seleção de jogo (query param ou último) - REMOVIDO O SELECTBOX
 # =========================
 ids = games_list["match_id"].dropna().astype(int).tolist()
 id_to_title = {
@@ -238,15 +237,11 @@ default_id = ids[0] if ids else None
 if sel_qp and str(sel_qp).isdigit():
     default_id = int(sel_qp)
 
-col_sel, _ = st.columns([3,1])
-with col_sel:
-    if default_id in ids:
-        default_idx = ids.index(default_id)
-    else:
-        default_idx = len(ids)-1 if ids else 0
-    sel_id = st.selectbox("Selecione o jogo:", ids, index=default_idx, format_func=lambda x: id_to_title.get(int(x), str(x)))
+# Determinar qual jogo está selecionado
+sel_id = default_id
 
 if sel_id is None:
+    st.info("Selecione um jogo na tabela acima para ver os detalhes.")
     st.stop()
 
 # =========================
@@ -300,6 +295,144 @@ else:
         "result":"Resultado","action":"Ação","player_number":"Jog.", "score_home":"Home","score_away":"Away"
     })
     display_dataframe(df_view, height=320, use_container_width=True)
+
+# ========= ACRESCIDO: VISÕES DO SET (rallies recentes, resumos e gráficos) =========
+try:
+    import matplotlib.pyplot as plt
+    from matplotlib.ticker import MaxNLocator
+    matplotlib_available = True
+except Exception as _e:
+    print(f"[historico] aviso: matplotlib indisponível para gráficos: {_e}", flush=True)
+    matplotlib_available = False
+
+# Definição segura do df_set (apenas quando um set específico estiver selecionado)
+df_set = None
+try:
+    if isinstance(set_sel, str) and set_sel == "Todos":
+        df_set = None
+    else:
+        # quando usuário escolhe set específico
+        _setnum = int(set_sel) if not isinstance(set_sel, str) else None
+        if _setnum is not None:
+            df_set = current_set_df(frames, sel_id, _setnum)
+except Exception as _e:
+    print(f"[historico] warn df_set: {_e}", flush=True)
+
+st.markdown("**📜 Últimos rallies (set atual)**")
+if df_set is not None and not df_set.empty:
+    cols_show = []
+    for c in ["rally_no","player_number","action","result","who_scored","score_home","score_away"]:
+        if c in df_set.columns:
+            cols_show.append(c)
+    preview = df_set.sort_values("rally_no").tail(15)[cols_show].copy()
+    preview.rename(columns={
+        "rally_no":"#",
+        "player_number":"Jog",
+        "action":"Ação",
+        "result":"Resultado",
+        "who_scored":"Quem",
+        "score_home":"H",
+        "score_away":"A",
+    }, inplace=True)
+    display_dataframe(preview, height=260, use_container_width=True)
+else:
+    st.caption("_Selecione um set para ver os últimos rallies._")
+
+# Resumo rápido por ação (nossos pontos/erros) — com proteção total ao 'Ação'
+def _norm_cols_for_summary(df):
+    d = df.copy()
+    for col in ["action","result","who_scored"]:
+        if col in d.columns:
+            d[col] = d[col].astype(str).str.strip().str.upper()
+    return d
+
+if df_set is not None and not df_set.empty:
+    dfx = _norm_cols_for_summary(df_set)
+    mask_pts = (dfx.get("who_scored","").eq("NOS")) & (dfx.get("result","").eq("PONTO"))
+    mask_err = (dfx.get("who_scored","").eq("ADV")) & (dfx.get("result","").eq("ERRO"))
+    counts_pts = dfx.loc[mask_pts, "action"].value_counts().rename("Pontos") if "action" in dfx.columns else pd.Series(dtype="int64")
+    counts_err = dfx.loc[mask_err, "action"].value_counts().rename("Erros") if "action" in dfx.columns else pd.Series(dtype="int64")
+    by_action = pd.concat([counts_pts, counts_err], axis=1).fillna(0).astype(int).reset_index()
+    if "index" in by_action.columns:
+        by_action = by_action.rename(columns={"index": "Ação"})
+    if "Ação" in by_action.columns and not by_action.empty:
+        by_action = by_action.sort_values(by="Ação", kind="stable")
+    cols_disp = [c for c in ["Ação","Pontos","Erros"] if c in by_action.columns]
+    display_dataframe(by_action[cols_disp] if cols_disp else by_action, height=200, use_container_width=True)
+
+# ========= GRÁFICOS E TABELAS RÁPIDAS DO SET =========
+st.markdown("---")
+st.markdown("**📈 Placar (evolução no set)**")
+if df_set is not None and not df_set.empty and matplotlib_available:
+    try:
+        fig3, ax3 = plt.subplots(figsize=(6.2, 2.6))
+        ax3.xaxis.set_major_locator(MaxNLocator(integer=True))
+        ax3.yaxis.set_major_locator(MaxNLocator(integer=True))
+        if all(k in df_set.columns for k in ["rally_no","score_home","score_away"]):
+            ax3.plot(df_set["rally_no"], df_set["score_home"], marker="o", markersize=2.6, linewidth=1.0, label=home_name)
+            ax3.plot(df_set["rally_no"], df_set["score_away"], marker="o", markersize=2.6, linewidth=1.0, label=away_name)
+        ax3.set_xlabel("Rally"); ax3.set_ylabel("Pontos")
+        ax3.legend(loc="best", fontsize=7)
+        ax3.grid(True, linestyle='--', alpha=0.7)
+        st.pyplot(fig3, use_container_width=True)
+        plt.close(fig3)  # Fechar a figura para liberar memória
+    except Exception as _e:
+        st.caption(f"_Não foi possível montar o gráfico de placar: {_e}_")
+elif df_set is not None and not df_set.empty and not matplotlib_available:
+    st.caption("_Matplotlib não disponível para gerar gráficos_")
+else:
+    st.caption("_Selecione um set específico para ver o gráfico_")
+
+# Pontos (Nossos)
+st.markdown("**🏅 Pontos (Nossos)**")
+if df_set is not None and not df_set.empty:
+    dfx = _norm_cols_for_summary(df_set)
+    try:
+        mask_pts = (dfx.get("who_scored","").eq("NOS")) & (dfx.get("result","").eq("PONTO"))
+        tbl_pontos = (
+            dfx.loc[mask_pts]
+               .assign(Jog=lambda x: pd.to_numeric(x.get("player_number", pd.Series([])), errors="coerce").astype("Int64"))
+               .groupby("Jog", dropna=False).size().rename("Pontos").reset_index()
+               .sort_values(["Pontos","Jog"], ascending=[False, True])
+        )
+        display_dataframe(tbl_pontos, height=160, use_container_width=True)
+    except Exception as _e:
+        st.caption(f"_Sem dados de pontos: {_e}_")
+
+# Erros (Nossos)
+st.markdown("**⚠️ Erros (Nossos)**")
+if df_set is not None and not df_set.empty:
+    dfx = _norm_cols_for_summary(df_set)
+    try:
+        mask_err = (dfx.get("who_scored","").eq("ADV")) & (dfx.get("result","").eq("ERRO"))
+        tbl_erros = (
+            dfx.loc[mask_err]
+               .assign(Jog=lambda x: pd.to_numeric(x.get("player_number", pd.Series([])), errors="coerce").astype("Int64"))
+               .groupby("Jog", dropna=False).size().rename("Erros").reset_index()
+               .sort_values(["Erros","Jog"], ascending=[False, True])
+        )
+        display_dataframe(tbl_erros, height=160, use_container_width=True)
+    except Exception as _e:
+        st.caption(f"_Sem dados de erros: {_e}_")
+
+# Histórico (sequência de rallies) - set atual inteiro (compacto)
+st.markdown("**🕒 Histórico (sequência de rallies)**")
+if df_set is not None and not df_set.empty:
+    try:
+        hist = df_set.copy()
+        cols_hist = []
+        for c in ["rally_no","player_number","action","result","who_scored","score_home","score_away"]:
+            if c in hist.columns: cols_hist.append(c)
+        hist = hist[cols_hist].rename(columns={
+            "rally_no":"#","player_number":"Jog","action":"Ação",
+            "result":"Resultado","who_scored":"Quem","score_home":"H","score_away":"A"
+        })
+        display_dataframe(hist, height=220, use_container_width=True)
+    except Exception as _e:
+        st.caption(f"_Sem histórico do set: {_e}_")
+else:
+    st.caption("_Selecione um set específico para ver os detalhes acima._")
+# ====== FIM DO BLOCO ACRESCIDO ======
 
 # =========================
 # KPIs por jogadora (partida)
