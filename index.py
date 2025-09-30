@@ -2482,6 +2482,23 @@ def _go_hist():
 # Barra do sistema
 # =========================
 with st.container():
+    # --- Espaçamento no topo (responsivo) ---
+    st.markdown(
+        """
+        <div id="uv-top-spacer"></div>
+        <style>
+        /* desktop */
+        #uv-top-spacer { height: 50px; }
+        /* mobile */
+        @media (max-width: 900px) {
+            #uv-top-spacer { height: 40px; }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+
     bar1, bar2 = st.columns([1.6, 2.5])
     with bar1:
         if home_name and away_name:
@@ -3616,41 +3633,99 @@ def _ensure_uv_state() -> None:
 with st.container():
     frames = st.session_state.frames
     df_set = current_set_df(frames, st.session_state.match_id, st.session_state.set_number)
-    #left, right = st.columns([1.25, 1.0])
 
-    # -------- ESQUERDA --------
-    #with left:
-    bar5,bar4= st.columns([0.5, 1])
+    # wrapper p/ CSS responsivo
+    st.markdown('<div id="hm-wrap">', unsafe_allow_html=True)
+
+    # 2 colunas: mapa (bar5) e controles (bar4)
+    # DICA: no desktop a esquerda fica o mapa; no mobile elas empilham (via CSS abaixo)
+    bar5, bar4 = st.columns([1.0, 0.35])
+
     with bar4:
         st.session_state.player_label_mode = st.radio(
             "Mostrar botões por:", options=["Número", "Nome"], horizontal=True,
             index=["Número", "Nome"].index(st.session_state.player_label_mode),
             key="player_label_mode_main"
         )
+
     with bar5:
         st.markdown("**🗺️ Mapa de Calor (clique para mostrar ou retirar informações)**")
+
+        # linha dos filtros — wrapper para CSS responsivo
+        st.markdown('<div id="hm-filter-row">', unsafe_allow_html=True)
+
         # Filtros do mapa de calor
         f1, f2, f3, f4, f5, f6 = st.columns([1.0, 1.0, 1.0, 1.2, 1.2, 1.2])
+
         with f1:
             nums_all = resolve_our_roster_numbers(st.session_state.frames)
             player_opts = ["Todas"] + nums_all
             c1, c2 = st.columns([0.40, 0.60])
-        with c1:
-            st.markdown("<div class='uv-inline-label'>Jogadora</div>", unsafe_allow_html=True)
-        with c2:
-            picked = st.selectbox("", options=player_opts, index=0, key="hm_players_filter_main", label_visibility="collapsed")
-        sel_players = None if picked == "Todas" else [picked]
+            with c1:
+                st.markdown("<div class='uv-inline-label'>Jogadora</div>", unsafe_allow_html=True)
+            with c2:
+                picked = st.selectbox("", options=player_opts, index=0,
+                                      key="hm_players_filter_main", label_visibility="collapsed")
+            sel_players = None if picked == "Todas" else [picked]
 
-        with f2: show_success   = st.checkbox("Nossos acertos", value=True, key="hm_show_succ_main")
-        with f3: show_errors    = st.checkbox("Nossos erros",   value=True, key="hm_show_err_main")
-        with f4: show_adv_pts   = st.checkbox("ADV acertos",    value=True, key="hm_show_adv_ok_main")
-        with f5: show_adv_err   = st.checkbox("ADV erros",      value=True, key="hm_show_adv_err_main")
+        with f2:
+            show_success = st.checkbox("Nossos acertos", value=True, key="hm_show_succ_main")
+        with f3:
+            show_errors  = st.checkbox("Nossos erros",   value=True, key="hm_show_err_main")
+        with f4:
+            show_adv_pts = st.checkbox("ADV acertos",    value=True, key="hm_show_adv_ok_main")
+        with f5:
+            show_adv_err = st.checkbox("ADV erros",      value=True, key="hm_show_adv_err_main")
         with f6:
             st.session_state.show_heat_numbers = st.checkbox(
                 "Mostrar número/ADV nas bolinhas",
                 value=st.session_state.show_heat_numbers, key="hm_show_numbers_main"
             )
 
+        st.markdown('</div>', unsafe_allow_html=True)  # fecha #hm-filter-row
+
+    st.markdown('</div>', unsafe_allow_html=True)  # fecha #hm-wrap
+
+    # --- CSS RESPONSIVO (não mexe no seu CSS existente; só acrescenta) ---
+    st.markdown(
+        """
+        <style>
+        /* Espaçamento sutil entre colunas horizontais */
+        #hm-wrap [data-testid="stHorizontalBlock"] { gap: 10px !important; }
+
+        /* Em telas médias, encolhe a coluna de controles */
+        @media (max-width: 1100px) {
+          #hm-wrap [data-testid="column"] { min-width: 0 !important; }
+        }
+
+        /* Breakpoint principal: abaixo de 900px empilha as 2 colunas (mapa e controles) */
+        @media (max-width: 900px) {
+          #hm-wrap [data-testid="column"] {
+            width: 100% !important;
+            flex: 1 1 100% !important;
+          }
+        }
+
+        /* Empilha também os 6 filtros do mapa em 1 coluna no mobile */
+        @media (max-width: 900px) {
+          #hm-filter-row [data-testid="column"] {
+            width: 100% !important;
+            flex: 1 1 100% !important;
+            padding-bottom: 6px !important;
+          }
+        }
+
+        /* Ajuste de tipografia dos filtros no mobile para evitar “estouro” */
+        @media (max-width: 600px) {
+          #hm-filter-row label, #hm-filter-row [data-baseweb="select"] * {
+            font-size: 0.92rem !important;
+          }
+          #hm-filter-row .stMarkdown p { margin-bottom: 4px !important; }
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
 
     # ================= Jogadoras (Número/Nome) — cores no próprio botão; sem textos =================
     #st.caption("**Jogadoras:**")
