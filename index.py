@@ -95,9 +95,6 @@ def _uv_badge(state: str) -> str:
     return ("<span style='display:inline-block;padding:2px 8px;border-radius:9999px;"
             "border:1px solid #d1d5db;background:#e5e7eb;color:#111827;line-height:1'>-</span>")
 
-
-os.environ["STREAMLIT_SERVER_FILE_WATCHER"] = "false"
-
 # =========================
 # [1] CONFIGURAÇÃO INICIAL (dinâmica e segura)
 # =========================
@@ -127,7 +124,7 @@ SYNC_CFG = {
 }
 SAVE_TO_GOOGLE = True  # ou False para desativar
 QTD_PONTOS_SALVAR_GOOGLE = 5  # a cada N pontos (rallies) salva no Google; 0 desativa
-
+os.environ["STREAMLIT_SERVER_FILE_WATCHER"] = "false"
 # =========================# =========================# =========================
 #SALVAMENTOS ATUAIS -> NA _persist_all
 # 1) Salva Excel sempre; DuckDB e Google Sheets quando possível.
@@ -139,50 +136,90 @@ QTD_PONTOS_SALVAR_GOOGLE = 5  # a cada N pontos (rallies) salva no Google; 0 des
 # =========================
 
 # =========================
-# Config + Estilos
-# =========================
-st.set_page_config(page_title="Vôlei Scout – UniVolei", layout="wide", initial_sidebar_state="collapsed")
-
-# =========================
 # DEBUG: console + UI
 # =========================
 DEBUG_PRINTS = False  # se False, somem os blocos de debug da UI também
+_logger = logging.getLogger("uv_persist")
+_logger.addHandler(logging.NullHandler())  # não emite nada por padrão, apenas se DEBUG_PRINTS for True
+
 def debug_print(*args, **kwargs):
     if DEBUG_PRINTS:
         print("[UV-DEBUG]", *args, **kwargs, flush=True)
+        _logger = logging.getLogger("uv_persist")    
+        st.session_state.setdefault("QTD_PONTOS_SALVAR_GOOGLE", QTD_PONTOS_SALVAR_GOOGLE)
+
+    # Adicione temporariamente no sidebar para testar
+    if st.sidebar.button("Testar Autenticação Google"):
+        debug_google_auth()
+        
+    # Chame esta função em algum lugar para testar
+    debug_google_auth()
+    if st.sidebar.button("🔧 Testar Google Sheets"):
+        if debug_google_auth():
+            st.success("✅ Google Sheets configurado corretamente!")
+        else:
+            st.error("❌ Problema na configuração do Google Sheets")
+
+        # Sidebar de conferência
+        try:
+            st.sidebar.caption(
+                f"Config: webhook={'on' if CONFIG['online'].get('webhook_url') else 'off'} | "
+                f"gsheets_id={CONFIG['online'].get('gsheet_id','unset')[:8]}..."
+            )
+            if CONFIG["backup"].get("drive_folder_url"):
+                st.sidebar.caption(f"Drive folder URL: {CONFIG['backup']['drive_folder_url']}")
+        except Exception:
+            pass
+        
+        st.sidebar.caption(f"Excel: {st.session_state.get('db_path','(definir)')}")
+        st.sidebar.caption(f"DuckDB: {st.session_state.get('duck_path','(definir)')}")
+        st.sidebar.caption(f"Último salvamento: {st.session_state.get('last_save_at','-')}")
+        try:
+            st.sidebar.caption(f"Webhook: {'on' if CONFIG['online'].get('webhook_url') else 'off'}")
+        except Exception:
+            pass
+
 def show_debug_ui() -> bool:
     return bool(DEBUG_PRINTS)
-
 # =========================
 # --- Debug helper (safe) ---
 # =========================
 def dbg_print(*args, **kwargs):
     """Prints to Streamlit only if st.session_state.get('debug', False) is True; logs always if _logger exists."""
-    try:
-        if 'debug' in st.session_state and st.session_state.get('debug'):
+    if DEBUG_PRINTS:
+        if not _logger.handlers:
+            _logger.setLevel(logging.INFO)
+            fh = logging.FileHandler(LOGS_DIR / "uv_saves.log", encoding="utf-8")
+            fmt = logging.Formatter("%(asctime)s | %(levelname)s | %(message)s")
+            fh.setFormatter(fmt)
+            _logger.addHandler(fh)
+
+        with st.sidebar.expander("Debug de salvamento", expanded=False):
+            for item in st.session_state.get("dbg_prints", [])[-5:]:
+                st.write(f"• {item['ts']} — {item['reason']}")
+                for s in item["status"]:
+                    st.caption(s)
+
+        with st.sidebar.expander("⏱️ Latência de salvamento", expanded=False):
+            _render_latency_panel(max_rows=12)
+
+        try:
+            if 'debug' in st.session_state and st.session_state.get('debug'):
+                try:
+                    st.write(*args, **kwargs)
+                except Exception:
+                    pass
             try:
-                st.write(*args, **kwargs)
+                _logger  # type: ignore
+                _logger.debug(" ".join(str(a) for a in args))
             except Exception:
                 pass
-        try:
-            _logger  # type: ignore
-            _logger.debug(" ".join(str(a) for a in args))
         except Exception:
             pass
-    except Exception:
-        pass
-st.sidebar.caption(f"Excel: {st.session_state.get('db_path','(definir)')}")
-st.sidebar.caption(f"DuckDB: {st.session_state.get('duck_path','(definir)')}")
-st.sidebar.caption(f"Último salvamento: {st.session_state.get('last_save_at','-')}")
-try:
-    st.sidebar.caption(f"Webhook: {'on' if CONFIG['online'].get('webhook_url') else 'off'}")
-except Exception:
-    pass
 
 # =========================
 # ===== Mini painel de latência =====
 # =========================
-
 def _perf_begin(reason: str):
     return {
         "ts": _dt.datetime.now().isoformat(timespec="seconds"),
@@ -206,12 +243,7 @@ def _perf_commit(perf, statuses):
         lst = lst[-60:]
     st.session_state["perf_logs"] = lst
 
-    
-st.session_state.setdefault("QTD_PONTOS_SALVAR_GOOGLE", QTD_PONTOS_SALVAR_GOOGLE)
-
-
 def _render_latency_panel(max_rows: int = 12):
-    import pandas as pd
     logs = st.session_state.get("perf_logs", [])[-max_rows:]
     if not logs:
         st.caption("Sem medições ainda.")
@@ -258,6 +290,11 @@ def _render_latency_panel(max_rows: int = 12):
         meds = [f"{k}: {round(sum(v)/len(v),1)} ms" for k, v in agg.items()]
         st.caption("Médias (últimos 20): " + " · ".join(meds))
 
+# =========================
+# Logs
+# =========================
+def _uv2_log(msg):
+    print(f"[UV2] {msg}", flush=True)
 
 # =========================
 # Carrega config.ini 
@@ -272,13 +309,6 @@ if _cfg_path.exists():
 # =========================
 # Config GOOGLE_DRIVE
 # =========================
-if _cfg_path.exists():
-    _cp = configparser.ConfigParser(interpolation=None); _cp.read(_cfg_path, encoding="utf-8")
-    for sec in ("online","backup","secrets","gcp"):
-        if _cp.has_section(sec):
-            CONFIG[sec].update({k: v for k,v in _cp.items(sec)})
-
-
 # >>> Fixos solicitados por você (podem ser sobrescritos por env/secrets se quiser no futuro)
 GOOGLE_DRIVE_ROOT_FOLDER_URL = "https://drive.google.com/drive/folders/10PDkcUb4yGhrEmiNKwNo7mzZBGJIN_5r"
 GOOGLE_SHEETS_SPREADSHEET_ID = "1FLBTjIMAgQjGM76XbNZT3U_lIDGUsWQbea2QCmdXbYI"
@@ -289,14 +319,37 @@ GOOGLE_WEBHOOK_URL = ""
 #GOOGLE_DRIVE_ROOT_FOLDER_URL   = CONFIG["backup"].get("drive_folder_url", "")
 #GOOGLE_SHEETS_SPREADSHEET_ID   = CONFIG["online"].get("gsheet_id", "")
 
-
 # Propaga para CONFIG (sem ENV/secrets; apenas reafirma o que veio do config.ini)
 CONFIG["online"]["webhook_url"]      = GOOGLE_WEBHOOK_URL#CONFIG["online"].get("webhook_url", "")
 CONFIG["online"]["gsheet_id"]        = GOOGLE_SHEETS_SPREADSHEET_ID#CONFIG["online"].get("gsheet_id", "")
 CONFIG["backup"]["drive_folder_url"] = GOOGLE_DRIVE_ROOT_FOLDER_URL#CONFIG["backup"].get("drive_folder_url", "")
 
+if _cfg_path.exists():
+    _cp = configparser.ConfigParser(interpolation=None); _cp.read(_cfg_path, encoding="utf-8")
+    for sec in ("online","backup","secrets","gcp"):
+        if _cp.has_section(sec):
+            CONFIG[sec].update({k: v for k,v in _cp.items(sec)})
 
+# =========================
+# Config + Estilos
+# =========================
+st.set_page_config(page_title="Vôlei Scout – UniVolei", layout="wide", initial_sidebar_state="collapsed")
 
+# =========================
+# CSS
+# =========================
+def load_css(filename: str = "univolei.css"):
+    for css_path in (BASE_DIR / filename, Path.cwd() / filename):
+        if css_path.exists():
+            st.markdown(f"<style>{css_path.read_text(encoding='utf-8')}</style>", unsafe_allow_html=True)
+            return str(css_path)  # caminho efetivamente usado
+    print(f"[load_css] CSS não encontrado: {filename} | BASE_DIR={BASE_DIR} | CWD={Path.cwd()}")
+    return None
+_css_path = load_css("univolei.css")
+
+# =========================
+# Chamadas GOOGLE_DRIVE
+# =========================
 def _normalize_gsheet_id(raw_id):
     """
     Normaliza ID da planilha - versão corrigida e mais permissiva
@@ -328,17 +381,6 @@ def _normalize_gsheet_id(raw_id):
     
     print(f"🔍 [NORMALIZE DEBUG] ID inválido, retornando vazio")
     return ""
-
-# Sidebar de conferência
-try:
-    st.sidebar.caption(
-        f"Config: webhook={'on' if CONFIG['online'].get('webhook_url') else 'off'} | "
-        f"gsheets_id={CONFIG['online'].get('gsheet_id','unset')[:8]}..."
-    )
-    if CONFIG["backup"].get("drive_folder_url"):
-        st.sidebar.caption(f"Drive folder URL: {CONFIG['backup']['drive_folder_url']}")
-except Exception:
-    pass
 
 def _get_spreadsheet_id():
     """
@@ -627,18 +669,6 @@ def debug_google_auth():
     except Exception as e:
         st.sidebar.error(f"❌ Erro no debug: {e}")
         return False
-
-# Adicione temporariamente no sidebar para testar
-if st.sidebar.button("Testar Autenticação Google"):
-    debug_google_auth()
-    
-# Chame esta função em algum lugar para testar
-debug_google_auth()
-if st.sidebar.button("🔧 Testar Google Sheets"):
-    if debug_google_auth():
-        st.success("✅ Google Sheets configurado corretamente!")
-    else:
-        st.error("❌ Problema na configuração do Google Sheets")
     
 def _persist_to_gsheets(frames, reason: str) -> str | None:
     """
@@ -711,42 +741,6 @@ def _persist_to_gsheets(frames, reason: str) -> str | None:
 
     except Exception as e:
         return f"GSHEETS: erro geral ({e!s})"
-
-# =========================
-# Logs
-# =========================
-def _uv2_log(msg):
-    print(f"[UV2] {msg}", flush=True)
-
-_logger = logging.getLogger("uv_persist")
-if not _logger.handlers:
-    _logger.setLevel(logging.INFO)
-    fh = logging.FileHandler(LOGS_DIR / "uv_saves.log", encoding="utf-8")
-    fmt = logging.Formatter("%(asctime)s | %(levelname)s | %(message)s")
-    fh.setFormatter(fmt)
-    _logger.addHandler(fh)
-
-with st.sidebar.expander("Debug de salvamento", expanded=False):
-    for item in st.session_state.get("dbg_prints", [])[-5:]:
-        st.write(f"• {item['ts']} — {item['reason']}")
-        for s in item["status"]:
-            st.caption(s)
-
-with st.sidebar.expander("⏱️ Latência de salvamento", expanded=False):
-    _render_latency_panel(max_rows=12)
-
-# =========================
-# CSS
-# =========================
-def load_css(filename: str = "univolei.css"):
-    for css_path in (BASE_DIR / filename, Path.cwd() / filename):
-        if css_path.exists():
-            st.markdown(f"<style>{css_path.read_text(encoding='utf-8')}</style>", unsafe_allow_html=True)
-            return str(css_path)  # caminho efetivamente usado
-    print(f"[load_css] CSS não encontrado: {filename} | BASE_DIR={BASE_DIR} | CWD={Path.cwd()}")
-    return None
-_css_path = load_css("univolei.css")
-
 
 # === UV2 GAME MODE INJECT (auto) — functional version ===
 def _flag_param_true(val):
@@ -985,7 +979,9 @@ body.uv2-body{
         html_doc = html_doc.replace("</head>", "<script>console.log('[UV2] inline embutido');</script></head>")
     return html_doc
 
-
+# =========================
+# Quadra
+# =========================
 def _paint_adv_rede_buttons():
     components.html("""
     <script>
@@ -1323,8 +1319,6 @@ st.session_state.setdefault("_do_rerun_after", False)
 # =========== Debug/prints (em memória) ===========
 st.session_state.setdefault("dbg_prints", [])
 
-
-
 # === garante estado de jogadoras/ADV antes de renderizar UI ===
 uv_init_state()
 # =========================
@@ -1391,6 +1385,9 @@ def _persist_to_webhook(frames, reason: str) -> str|None:
         return None
 
 
+# =========================
+# Pre-Loader
+# =========================
 # === Preloader overlay central (texto no meio da tela) ===
 class _UvOverlayPreloader:
     """Mostra um overlay central com o texto enquanto a ação ocorre."""
@@ -1483,7 +1480,6 @@ class _UvOverlayPreloader:
             self._ph.empty()
         return False
 
-
 def uv_preloader(kind: str = "gs") -> _UvOverlayPreloader:
     print("@@@ FN uv_preloader kind ", kind)
 
@@ -1506,7 +1502,6 @@ def uv_preloader(kind: str = "gs") -> _UvOverlayPreloader:
     else:
         msg = "Processando..."
     return _UvOverlayPreloader(msg)
-
 
 def _persist_all(frames, reason: str = "rally"):
     # 1) Salva Excel sempre; DuckDB e Google Sheets quando possível.
@@ -1688,7 +1683,6 @@ def salva_google(frames=None, reason="manual", statuses=None, _perf=None):
         if created_perf:
             _perf_commit(_perf, statuses)
 
-
 def _handle_tutorial_qp():
     try:
         uv = st.query_params.get("uv_tut", None)
@@ -1701,13 +1695,13 @@ def _handle_tutorial_qp():
         except Exception:
             pass
 _handle_tutorial_qp()
+
 frames = st.session_state.frames
 # — garante inicialização de chaves de estado usadas pelos botões
 try:
     _ensure_uv_state()
 except Exception:
     pass
-
 
 # =========================
 # Normalização jogadoras
@@ -1763,19 +1757,23 @@ ACTION_SYNONYM_TO_NAME = {
     "rede":"REDE"
 }
 ATTACK_ACTIONS = ["DIAGONAL","LINHA","PIPE","SEGUNDA","LOB","MEIO"]
+
 def team_name_by_id(fr: dict, team_id: int | None) -> str:
     eq = fr.get("equipes", pd.DataFrame())
     if eq.empty or team_id is None: return "Equipe"
     eq = eq.copy(); eq["team_id"] = pd.to_numeric(eq["team_id"], errors="coerce")
     row = eq.loc[eq["team_id"] == int(team_id)]
     return str(row.iloc[0]["team_name"]) if not row.empty else f"Equipe {int(team_id)}"
+
 def current_set_df(fr: dict, match_id: int, set_number: int) -> pd.DataFrame:
     rl = fr["rallies"]
     return rl[(rl["match_id"] == match_id) & (rl["set_number"] == set_number)].copy().sort_values("rally_no")
+
 def set_score_from_df(df: pd.DataFrame) -> tuple[int, int]:
     if df.empty: return 0, 0
     last = df.iloc[-1]
     return int(last["score_home"]), int(last["score_away"])
+
 def update_sets_score_and_match(fr: dict, match_id: int) -> tuple[int,int]:
     sets_df = fr["sets"]; mt = fr["amistosos"]
     sets_m = sets_df[sets_df["match_id"] == match_id]
@@ -1789,16 +1787,19 @@ def update_sets_score_and_match(fr: dict, match_id: int) -> tuple[int,int]:
 def _apply_set_winner_and_proceed(home_pts: int, away_pts: int):
     frames = st.session_state.frames
     match_id = st.session_state.match_id
-    set_number = st.session_state.set_number
+    set_number = int(st.session_state.set_number)
     winner_id = 1 if home_pts > away_pts else 2
 
-    # Marca vencedor do set atual
+    # Marca vencedor do set atual (e garante os pontos finais registrados na linha do set)
     stf = frames["sets"]
     mask = (stf["match_id"] == match_id) & (stf["set_number"] == set_number)
     stf.loc[mask, "winner_team_id"] = winner_id
+    if "home_points" in stf.columns and "away_points" in stf.columns:
+        stf.loc[mask, "home_points"] = int(home_pts)
+        stf.loc[mask, "away_points"] = int(away_pts)
     frames["sets"] = stf
 
-    # Atualiza sets da partida e persiste fechamento
+    # Atualiza sets da partida e persiste fechamento do set atual
     home_sets, away_sets = update_sets_score_and_match(frames, match_id)
     save_all(Path(st.session_state.db_path), frames)
 
@@ -1813,7 +1814,7 @@ def _apply_set_winner_and_proceed(home_pts: int, away_pts: int):
 
     # Se a partida encerrou em sets (ex.: 3x0, 3x1, 3x2)
     if home_sets >= 3 or away_sets >= 3:
-        # 2.2) Oferece snapshot local apenas deste jogo **antes** de finalizar a partida
+        # Oferece snapshot local apenas deste jogo **antes** de finalizar a partida
         try:
             uv_snapshot_prompt(kind="match_close_auto", match_id=match_id)
         except Exception:
@@ -1835,34 +1836,42 @@ def _apply_set_winner_and_proceed(home_pts: int, away_pts: int):
         return
 
     # Caso contrário, abre próximo set (ou o 5º com alvo 15)
-    next_set = int(set_number) + 1
+    next_set = set_number + 1
     try:
         # Garante que o próximo set exista
         stf = frames["sets"]
         exists = ((stf["match_id"] == match_id) & (stf["set_number"] == next_set)).any()
         if not exists:
             add_set(frames, match_id=match_id, set_number=next_set)
+            stf = frames["sets"]  # recarrega após add_set
 
-        # Limpa potential winner do próximo set
-        stf = frames["sets"]
-        stf.loc[(stf["match_id"] == match_id) & (stf["set_number"] == next_set), "winner_team_id"] = pd.NA
+        # Zera explicitamente o placar do novo set e limpa winner
+        sel_next = (stf["match_id"] == match_id) & (stf["set_number"] == next_set)
+        if "home_points" in stf.columns:
+            stf.loc[sel_next, "home_points"] = 0
+        if "away_points" in stf.columns:
+            stf.loc[sel_next, "away_points"] = 0
+        if "winner_team_id" in stf.columns:
+            stf.loc[sel_next, "winner_team_id"] = pd.NA
         frames["sets"] = stf
 
-        # Remove rallies do novo set (se houver algo indevido)
-        rl = frames["rallies"]
-        if not rl.empty:
+        # Remove quaisquer rallies residuais do próximo set (se houver)
+        rl = frames.get("rallies", pd.DataFrame())
+        if isinstance(rl, pd.DataFrame) and not rl.empty:
             rl = rl[~((rl["match_id"] == match_id) & (rl["set_number"] == next_set))]
             frames["rallies"] = rl
     except Exception:
         pass
+
+    # Atualiza o set corrente para o novo set ANTES de persistir e re-renderizar
+    st.session_state.set_number = next_set
 
     # Persiste abertura do set e força rerender
     _persist_all(frames, reason='set_open')
     st.session_state.frames = frames
     st.session_state.data_rev = st.session_state.get("data_rev", 0) + 1
 
-    st.success(f"Set {set_number} encerrado ({home_pts} x {away_pts}). Novo set: {next_set}")
-
+    st.success(f"Set {set_number} encerrado ({home_pts} x {away_pts}). Novo set: {next_set} (placar reiniciado).")
 
 def auto_close_set_if_needed() -> None:
     """
@@ -1913,7 +1922,6 @@ def auto_close_set_if_needed() -> None:
     except Exception as e:
         if st.session_state.get("DEBUG_PRINTS", False):
             st.warning(f"[auto_close_set_if_needed] erro: {e}")
-
         
 def recompute_set_score_fields(fr: dict, match_id: int, set_number: int):
     rl = fr["rallies"]
@@ -1930,6 +1938,7 @@ def recompute_set_score_fields(fr: dict, match_id: int, set_number: int):
     stf = fr["sets"]; mask = (stf["match_id"]==match_id) & (stf["set_number"]==set_number)
     stf.loc[mask, "home_points"] = home; stf.loc[mask, "away_points"] = away
     fr["sets"] = stf
+
 def undo_last_rally_current_set():
     fr = st.session_state.frames
     match_id = st.session_state.match_id
@@ -1954,6 +1963,7 @@ def undo_last_rally_current_set():
     save_all(Path(st.session_state.db_path), fr)
     st.session_state.data_rev += 1
     dbg_print(f"Desfeito rally_id={last_rally_id}. Placar {hp}-{ap}.")
+
 # ===== who_scored e ação =====
 def _fix_who_scored_from_raw_and_row(raw_line: str, row: dict) -> dict:
     try:
@@ -1969,6 +1979,7 @@ def _fix_who_scored_from_raw_and_row(raw_line: str, row: dict) -> dict:
     except Exception:
         pass
     return row
+
 def _normalize_action_in_row(row: dict) -> dict:
     a = str(row.get("action", "") or "").strip().lower()
     if not a:
@@ -1989,6 +2000,7 @@ def _normalize_action_in_row(row: dict) -> dict:
         if name in ("", "NA", "NONE"): name = ""
     row["action"] = name
     return row
+
 def _fast_apply_scores_to_row(row: dict):
     frames_local = st.session_state.frames
     mid, sn = st.session_state.match_id, st.session_state.set_number
@@ -2002,20 +2014,7 @@ def _fast_apply_scores_to_row(row: dict):
     elif row.get("who_scored") == "ADV": away += 1
     row["score_home"] = home; row["score_away"] = away
     return row
-# ==== CLICK MAPA (compat) ====
-def _capture_court_click_from_query():
-    try:
-        params = dict(st.query_params)
-        if "uvx" in params and "uvy" in params:
-            x = float(params.get("uvx")); y = float(params.get("uvy"))
-            ts = int(params.get("uvt", "0") or 0)
-            st.session_state["last_court_click"] = {"x": x, "y": y, "ts": ts}
-            dbg_print(f"Clique (uvx/uvy) recebido: x={x:.4f}, y={y:.4f}")
-            newp = {k: v for k, v in dict(st.query_params).items() if not k.startswith("uv")}
-            st.query_params.from_dict(newp)
-    except Exception as e:
-        dbg_print(f"Falha ao ler uvx/uvy: {e}")
-_capture_court_click_from_query()
+
 # >>> Persistir Frente/Fundo mesmo que DB ignore colunas soltas
 def _persist_fb_on_last_rally(fb_upper: str):
     try:
@@ -2080,12 +2079,12 @@ def quick_register_line(raw_line: str):
         f"pos={row.get('position_zone')}, placar={row.get('score_home')}-{row.get('score_away')}"
     )
 
-
 def quick_register_click(side: str, number: int | None, action: str, is_error: bool):
     prefix = "1" if side == "NOS" else "0"
     num = f"{number}" if number is not None else ""
     line = f"{prefix} {num} {action}{' e' if is_error else ''}".strip()
     quick_register_line(line)
+
 def resolve_our_roster_numbers(frames: dict) -> list[int]:
     jg = frames.get("jogadoras", pd.DataFrame()).copy()
     if jg.empty: return []
@@ -2093,6 +2092,7 @@ def resolve_our_roster_numbers(frames: dict) -> list[int]:
         if col in jg.columns: jg[col] = pd.to_numeric(jg[col], errors="coerce")
     ours = jg[jg["team_id"] == OUR_TEAM_ID].dropna(subset=["player_number"]).sort_values("player_number")
     return ours["player_number"].astype(int).unique().tolist()
+
 def roster_for_ui(frames: dict) -> list[dict]:
     jg = frames.get("jogadoras", pd.DataFrame()).copy()
     if jg.empty: return []
@@ -2106,6 +2106,7 @@ def roster_for_ui(frames: dict) -> list[dict]:
     return ours[["player_number","player_name"]].rename(
         columns={"player_number":"number","player_name":"name"}
     ).to_dict("records")
+
 def player_name_by_number(frames: dict, number: int | None) -> str:
     if number is None: return ""
     jg = frames.get("jogadoras", pd.DataFrame())
@@ -2113,6 +2114,7 @@ def player_name_by_number(frames: dict, number: int | None) -> str:
     row = jg[(pd.to_numeric(jg["team_id"], errors="coerce")==OUR_TEAM_ID) &
              (pd.to_numeric(jg["player_number"], errors="coerce")==int(number))]
     return (str(row.iloc[0]["player_name"]) if not row.empty else "")
+
 # central de registro
 def register_current(number: int | None = None, action: str | None = None):
     side_code = "NOS" if st.session_state.get("q_side", "Nós") == "Nós" else "ADV"
@@ -2127,17 +2129,24 @@ def register_current(number: int | None = None, action: str | None = None):
         is_err = True
     dbg_print(f"register_current: side={side_code}, num={num_val}, action={act}, is_err={is_err}, pos={st.session_state.get('q_position')}")
     quick_register_click(side_code, num_val, act, is_err)
+
+# =========================
+# QUADRA HTML
+# =========================
 # ========= HEATMAP – POSICIONAMENTO + ANTICOLISÃO =========
 FRONT_Y = {"opp": 44.0, "our": 56.0}
 BACK_Y  = {"opp":  8.0, "our": 92.0}
+
 def _y_net_touch(half: str) -> float:
     return 49.0 if half == "opp" else 51.0
+
 def _x_for_action(act: str) -> float:
     if act in ("MEIO","PIPE","SEGUNDA","SAQUE","REDE","BLOQUEIO","LOB"):
         return 50.0
     if act == "DIAGONAL": return 28.0
     if act == "LINHA":    return 82.0
     return 50.0
+
 def build_heat_points(df: pd.DataFrame,
                       selected_players: list[int] | None,
                       include_success: bool,
@@ -2265,9 +2274,7 @@ def build_heat_points(df: pd.DataFrame,
         return succ_pts, err_pts, adv_pts, adv_err_pts, dbg
     else:
         return succ_pts, err_pts, adv_pts, adv_err_pts
-# =========================
-# QUADRA HTML
-# =========================
+    
 def render_court_html(pts_success, pts_errors, pts_adv=None, pts_adv_err=None, enable_click=False, key="set", show_numbers=False):
     def _norm(points):
         out = []
@@ -2340,7 +2347,7 @@ def render_court_html(pts_success, pts_errors, pts_adv=None, pts_adv_err=None, e
     """
     components.html(html_block, height=468, scrolling=False)
 # =========================
-# Abertura de partida
+# Abertura inicial de partida
 # =========================
 def _list_open_matches(frames: dict) -> list[int]:
     mt = frames.get("amistosos", pd.DataFrame())
@@ -2349,6 +2356,7 @@ def _list_open_matches(frames: dict) -> list[int]:
         mt = mt[~mt["is_closed"].fillna(False).astype(bool)]
     return [int(x) for x in pd.to_numeric(mt["match_id"], errors="coerce").dropna().astype(int).tolist()]
 open_mid = last_open_match(frames)
+
 if st.session_state.match_id is None:
     open_list = _list_open_matches(frames)
     if len(open_list) == 1:
@@ -2383,6 +2391,7 @@ if st.session_state.match_id is None:
         st.stop()
     elif open_mid:
         st.session_state.match_id = int(open_mid)
+
 # set atual
 if st.session_state.match_id is not None and st.session_state.set_number is None:
     sets_m = frames["sets"]
@@ -2397,6 +2406,7 @@ if st.session_state.match_id is not None:
     home_name = team_name_by_id(frames, OUR_TEAM_ID)
     away_name = team_name_by_id(frames, int(mrow["away_team_id"]))
     date_str = str(mrow["date"])
+
 # =========================
 # Navegação: Histórico
 # =========================
@@ -2490,7 +2500,6 @@ with st.container():
         st.session_state.game_mode = st.toggle("🎮 Modo Jogo", value=st.session_state.game_mode, key="game_mode_toggle") 
     st.markdown('</div>', unsafe_allow_html=True)
 
-
 # rerun pós-callbacks
 #if st.session_state._do_rerun_after:
 #    st.session_state._do_rerun_after = False
@@ -2499,7 +2508,7 @@ with st.container():
 #st.markdown('<div class="sectionCard">', unsafe_allow_html=True)
     
 # =========================
-# Topo (Time, Jogo, Tutorial, Histórico)
+# Componentes Topo (Time, Jogo, Tutorial, Histórico)
 # =========================
 if not st.session_state.game_mode:
     top1, top2, top3, top4 = st.columns([2.5, 1, 1, 1])
@@ -2564,7 +2573,6 @@ def _get_set_rallies(frames, match_id, set_number, *, strict: bool = True):
         dbg_print(f"@@@ _get_set_rallies -> match_id={match_id} set={set_number} => {len(sub)} rows")
 
     return sub
-
 
 def _reopen_set():
     frames_local = st.session_state.frames
@@ -2718,7 +2726,10 @@ def _finalizar_partida():
     st.session_state.match_id = None
     st.session_state.set_number = None
     st.session_state._do_rerun_after = True
-        
+
+# =========================
+# Componentes de informações de sets
+# =========================
 if not st.session_state.game_mode:
     top5, top6, top7, top8, top9, top10 = st.columns([0.5, 1, 1, 1, 1, 1])
     sets_df = frames.get("sets", pd.DataFrame())
@@ -2741,7 +2752,6 @@ if not st.session_state.game_mode:
     with top10:
         st.button("🏁 Finalizar Partida", use_container_width=True, on_click=_finalizar_partida)
         
-
 
 # =========================
 # Modais (Config/Tutorial/Cadastro)
@@ -2817,6 +2827,7 @@ if st.session_state.get("show_config_team", False):
             st.warning("Digite um nome.")
     st.button("➕ Adicionar Jogadora", key="add_player_btn", on_click=_add_player)
     st.markdown('</div>', unsafe_allow_html=True)
+
 # Tutorial modal
 if st.session_state.get("show_tutorial", False):
     try:
@@ -2868,12 +2879,10 @@ if st.session_state.get("show_tutorial", False):
 # =========================
 # Novo Jogo — Tipo do Jogo (Amistoso/Campeonato)
 # =========================
-
 def _nvj_normalize_match_type(s: str) -> str:
     """Normaliza o tipo do jogo para armazenamento: 'amistoso' | 'campeonato'."""
     s = (s or "").strip().lower()
     return "campeonato" if s.startswith("c") else "amistoso"
-
 
 def _nvj_render_match_type_fields() -> dict:
     """
@@ -2929,7 +2938,6 @@ def _nvj_render_match_type_fields() -> dict:
     st.session_state["new_match_meta"] = meta
     return meta
 
-
 def _nvj_upgrade_amistosos_schema(frames: dict) -> None:
     """
     Garante que o DataFrame 'amistosos' possua as colunas extras:
@@ -2966,7 +2974,6 @@ def _nvj_upgrade_amistosos_schema(frames: dict) -> None:
         if c not in df.columns:
             df[c] = pd.NA
     frames["amistosos"] = df
-
 
 def _nvj_apply_match_type_meta(frames: dict, match_id, meta: dict) -> bool:
     """
@@ -3015,7 +3022,6 @@ def _nvj_apply_match_type_meta(frames: dict, match_id, meta: dict) -> bool:
         + (f" — {tname} ({tstage})" if mtype == "campeonato" and tname else "")
     )
     return True
-
 
 def _nvj_get_match_meta(frames: dict, match_id) -> dict:
     """
@@ -3127,6 +3133,8 @@ def _create_new_match(opp_name: str, dt: date, meta: dict | None = None):
     opp_label = opp_name or team_name_by_id(frames_local, away_id)
     extra = f" — {tname} ({tstage})" if mtype == "campeonato" and tname else ""
     st.success(f"Novo jogo criado: {team_name_by_id(frames_local, OUR_TEAM_ID)} x {opp_label} — tipo: {mtype}{extra}")
+
+# Chamada Novo Jogo 
 if (st.session_state.match_id is None or st.session_state.show_cadastro) and not st.session_state.show_config_team:
     with st.container():
         st.markdown('<div class="sectionCard">', unsafe_allow_html=True)
@@ -3163,7 +3171,6 @@ if (st.session_state.match_id is None or st.session_state.show_cadastro) and not
         st.markdown('</div>', unsafe_allow_html=True)
     st.stop()
 
-
 # =========================
 # PLACAR (top) – visível fora do Modo Jogo
 if not st.session_state.game_mode:
@@ -3188,7 +3195,6 @@ if not st.session_state.game_mode:
         st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
-
 
 # =========================
 # _criaBtnsJogadoras
@@ -3364,7 +3370,6 @@ def _criaBtnsAtalhos():
                 use_container_width=True
             )
     _paint_adv_rede_buttons()
-
 
 # =========================
 # MODO JOGO
@@ -3632,7 +3637,23 @@ if st.session_state.game_mode:
 
     st.stop()
 
-
+# =========================
+# Garante inicialização de chaves de estado usadas pelos botões
+# =========================
+def _ensure_uv_state() -> None:
+    """Garante que as chaves de estado usadas pelos botões existam."""
+    ss = st.session_state
+    if "uv_player_state" not in ss or not isinstance(ss["uv_player_state"], dict):
+        ss["uv_player_state"] = {}
+    if "uv_adv_state" not in ss or ss["uv_adv_state"] not in ("neutral", "active", "ok", "err"):
+        ss["uv_adv_state"] = "neutral"
+    if "uv_active_player" not in ss:
+        ss["uv_active_player"] = None
+    # defaults úteis para o fluxo (não obrigatórios, mas seguros)
+    if "q_side" not in ss:
+        ss["q_side"] = "Nós"
+    if "q_result" not in ss:
+        ss["q_result"] = "Acerto"
 
 # =========================
 # Painel principal
@@ -3737,21 +3758,8 @@ with st.container():
                 index=["Frente", "Fundo"].index(st.session_state.q_position),
                 key="main_q_position", label_visibility="collapsed"
             )
-
-        def _ensure_uv_state() -> None:
-            """Garante que as chaves de estado usadas pelos botões existam."""
-            ss = st.session_state
-            if "uv_player_state" not in ss or not isinstance(ss["uv_player_state"], dict):
-                ss["uv_player_state"] = {}
-            if "uv_adv_state" not in ss or ss["uv_adv_state"] not in ("neutral", "active", "ok", "err"):
-                ss["uv_adv_state"] = "neutral"
-            if "uv_active_player" not in ss:
-                ss["uv_active_player"] = None
-            # defaults úteis para o fluxo (não obrigatórios, mas seguros)
-            if "q_side" not in ss:
-                ss["q_side"] = "Nós"
-            if "q_result" not in ss:
-                ss["q_result"] = "Acerto"
+        with s3:
+            st.button("↩️ Desfazer", width=10, use_container_width=True, key="btn_undo_main2", on_click=undo_last_rally_current_set)
 
         # ================= Jogadoras (Número/Nome) — cores no próprio botão; sem textos =================
         #st.caption("**Jogadoras:**")
@@ -3818,7 +3826,6 @@ with right:
         st.markdown("---")
         st.markdown("**🧰 Debug (logs recentes)**")
 
-
 def salva_google(frames, reason, statuses, _perf):
     """
     Salva em Google Sheets (e Webhook como fallback), registrando métricas no _perf.
@@ -3852,7 +3859,6 @@ def salva_google(frames, reason, statuses, _perf):
                 statuses.append(f"Webhook bloco falhou: {e2!s}")
                 _logger.warning(statuses[-1])
             _perf_step(_perf, "WEBHOOK", t_wb)
-
 
 # =========================
 # Gravação final opcional do usuário -> Snapshot helpers (por partida) — AUTO-CONTIDOS ===
@@ -3932,12 +3938,10 @@ def uv_snapshot_prompt(kind="set_close", match_id=None):
         with c2:
             st.button("Não, seguir normalmente", key=f"skip_snap_{kind}_{mid}", use_container_width=True)
 
-
 # =========================
 # Boot para Render
 # =========================
 if __name__ == "__main__":
-    
     port = int(os.environ.get("PORT", 10000))
     if not st.session_state.get("_boot_rerun_done", False):
         st.session_state["_boot_rerun_done"] = True
