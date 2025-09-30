@@ -5,7 +5,21 @@ streamlit run index.py
 ***************************************
 
 
-confirmação e salvar arq temporário a cada fim de set/ jogo?
+
+1. Config qtd max sets
+ + finalizar partida respeitando valor. para registro na base de dados se for de 5 sets e um time ganhar 3 ele é o ganhador, se for de 2 sets e o time ganhar 2, ele é o ganhador e assim por diante. Se houver empates de set, registrar na base de dados como empate
+
+OK	2. Retirar auto 25/15
+
+OK	3. Mostrar num bolinhas vem setado
+
+4. De resto deixa so as opções do mapa de calor, retirar tudo do modo jogo no normal
+
+5. Tirar resultado acerto erro radios
+
+
+
+VALIDAR confirmação e salvar arq temporário a cada fim de set/ jogo?
 VALIDAR finalizacao dos jogos e salvamentos (25x20, 27x25, outros)
 
 Estatísticas do set
@@ -13,7 +27,6 @@ Estatísticas do set
 Fazer side out ? Quem inicia no set e pontu
 
 Cadastro de tipo de jogo amistoso e campeonato. se for campeonato posso cadastrar o nome dele e se é um jogo classificatório , semi-final ou final
-
 
 
 
