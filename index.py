@@ -2498,7 +2498,6 @@ with st.container():
         unsafe_allow_html=True
     )
 
-
     bar1, bar2 = st.columns([1.6, 2.5])
     with bar1:
         if home_name and away_name:
@@ -2996,7 +2995,6 @@ def _nvj_render_match_type_fields() -> dict:
     st.session_state["new_match_meta"] = meta
     return meta
 
-
 def _nvj_upgrade_amistosos_schema(frames: dict) -> None:
     """
     Garante que o DataFrame 'amistosos' possua as colunas extras:
@@ -3410,134 +3408,27 @@ def _criaBtnsAtalhos():
 # =========================
 if st.session_state.game_mode:
     with st.container():
-        st.markdown('<div id=\"uv-game-mode\">', unsafe_allow_html=True)
+        #st.markdown('<div id=\"uv-game-mode\">', unsafe_allow_html=True)
         #DEIXEI COMENTADO -> NAO RETIRAR ESTAS LINHAS, HABILITAR SE NECESSÁRIO DEPOIS!
         #st.markdown('<div class="sectionCard game-mode-container">', unsafe_allow_html=True)
         #st.subheader("🎮 Modo Jogo")
         # Linha compacta
-        cR, cP, cM = st.columns([1.1, 1.1, 1.6])
-        with cR:
-            st.markdown("**Resultado**")
-            st.session_state.q_result = st.radio(
-                "", ["Acerto", "Erro"], horizontal=True,
-                index=["Acerto", "Erro"].index(st.session_state.q_result),
-                key="gm_q_result", label_visibility="collapsed"
-            )
-        with cP:
-            st.markdown("**Posição**")
-            st.session_state.q_position = st.radio(
-                "", ["Frente", "Fundo"], horizontal=True,
-                index=["Frente", "Fundo"].index(st.session_state.q_position),
-                key="gm_q_position", label_visibility="collapsed"
-            )
-        with cM:
-            if not st.session_state.game_mode:
-                st.markdown("**Mostrar botões por**")
-                st.session_state.player_label_mode = st.radio(
-                    "", ["Número", "Nome"], horizontal=True,
-                    index=["Número", "Nome"].index(st.session_state.player_label_mode),
-                    key="player_label_mode_gm", label_visibility="collapsed"
-                )
+        st.markdown("**Posição**")
+        st.session_state.q_position = st.radio(
+            "", ["Frente", "Fundo"], horizontal=True,
+            index=["Frente", "Fundo"].index(st.session_state.q_position),
+            key="gm_q_position", label_visibility="collapsed"
+        )
+        
          # Linha de botões de jogadoras + ADV
-        st.markdown('</div>', unsafe_allow_html=True)  # close div2
+        #st.markdown('</div>', unsafe_allow_html=True)  # close div2
         st.markdown('<div class="gm-players-row">', unsafe_allow_html=True)
         
         uv_init_state()
         _criaBtnsJogadoras()
-
-        st.markdown('</div>', unsafe_allow_html=True)
-
-        # >>> MOBILE (VISUAL) – Jogadoras + ADV (SEM IFRAME)
-        if False:
-            try:
-                _labels_players = []
-                for _n in nums or []:
-                    _lab = str(_n) if st.session_state.player_label_mode == "Número" else (name_map.get(_n) or str(_n))
-                    _labels_players.append(_lab)
-                import html as _html
-                _btns = []
-                for _lab in _labels_players:
-                    _lab_esc = _html.escape(str(_lab))
-                    _btns.append(f"<button class='uv-btn' onclick='uvMobClick(\"{_lab_esc}\")'>{_lab_esc}</button>")
-                _btns.append("<button class='uv-btn adv' onclick='uvMobClick(\"ADV\")'>ADV</button>")
-                components.html(
-                    """
-                    <div class="uv-mobile-only" style="margin:0;">
-                      <div class="uv-row" id="gm-mob-players" style="margin:4px 0 4px 0;">
-                    """ + "".join(_btns) + """
-                      </div>
-                    </div>
-                    <script>
-                    (function(){
-                      function uvMobClick(txt){
-                        try{
-                          var doc;
-                          try{
-                            doc = (window.parent && window.parent.document) ? window.parent.document : document;
-                          }catch(e){
-                            doc = document;
-                          }
-                          const t = (txt||'').toString().trim();
-                          const btns = Array.from(doc.querySelectorAll('button'));
-                          const target = btns.find(b => (b.textContent||'').trim() === t);
-                          if(target) target.click();
-                        }catch(e){ console.log('uvMobClick error', e); }
-                      }
-                      if(typeof window.uvMobClick!=='function'){ window.uvMobClick = uvMobClick; }
-                    })();
-                    </script>
-                    """,
-                    height=0, scrolling=False
-                )
-            except Exception:
-                pass
-        # >>> FIM MOBILE (VISUAL) – Jogadoras + ADV (SEM IFRAME)
+        #st.markdown('</div>', unsafe_allow_html=True)
         # Atalhos
         _criaBtnsAtalhos()
-
-        # >>> MOBILE (VISUAL) – Atalhos (SEM IFRAME)
-        if False:
-            try:
-                _btns2 = []
-                for _code, _label in atalho_specs:
-                    _lab_esc = _html.escape(str(_label))
-                    cls = "uv-btn rede" if str(_label).strip().lower()=="rede" else "uv-btn"
-                    _btns2.append(f"<button class='{cls}' onclick='uvMobClick(\"{_lab_esc}\")'>{_lab_esc}</button>")
-                components.html(
-                    """
-                    <div class="uv-mobile-only" style="margin:0;">
-                      <div class="uv-row" id="gm-mob-quick" style="margin:4px 0 6px 0;">
-                    """ + "".join(_btns2) + """
-                      </div>
-                    </div>
-                    <script>
-                    (function(){
-                      if(typeof window.uvMobClick!=='function'){
-                        window.uvMobClick = function(txt){
-                          try{
-                            var doc;
-                            try{
-                              doc = (window.parent && window.parent.document) ? window.parent.document : document;
-                            }catch(e){
-                              doc = document;
-                            }
-                            const t = (txt||'').toString().trim();
-                            const btns = Array.from(doc.querySelectorAll('button'));
-                            const target = btns.find(b => (b.textContent||'').trim() === t);
-                            if(target) target.click();
-                          }catch(e){ console.log('uvMobClick error', e); }
-                        };
-                      }
-                    })();
-                    </script>
-                    """,
-                    height=0, scrolling=False
-                )
-            except Exception:
-                pass
-        # >>> FIM MOBILE (VISUAL) – Atalhos (SEM IFRAME)
-        # ===== Encerramento da UI do Modo Jogo para esconder o restante =====
-        
         # --- Quadra (Modo Jogo) exibida logo antes do encerramento ---
     # --- LINHA DO PLACAR + QUADRA + FILTROS (MODO JOGO) — ULTRA COMPACT (sem :has) ---
     try:
@@ -3649,7 +3540,11 @@ with st.container():
         )
 
     with bar5:
+        # --- título
         st.markdown("**🗺️ Mapa de Calor (clique para mostrar ou retirar informações)**")
+
+        # wrapper para aplicar CSS responsivo
+        st.markdown('<div id="hm-wrap">', unsafe_allow_html=True)
 
         # linha dos filtros — wrapper para CSS responsivo
         st.markdown('<div id="hm-filter-row">', unsafe_allow_html=True)
@@ -3664,68 +3559,89 @@ with st.container():
             with c1:
                 st.markdown("<div class='uv-inline-label'>Jogadora</div>", unsafe_allow_html=True)
             with c2:
-                picked = st.selectbox("", options=player_opts, index=0,
-                                      key="hm_players_filter_main", label_visibility="collapsed")
+                picked = st.selectbox(
+                    "", options=player_opts, index=0,
+                    key="hm_players_filter_main", label_visibility="collapsed"
+                )
             sel_players = None if picked == "Todas" else [picked]
 
         with f2:
             show_success = st.checkbox("Nossos acertos", value=True, key="hm_show_succ_main")
+
         with f3:
             show_errors  = st.checkbox("Nossos erros",   value=True, key="hm_show_err_main")
+
         with f4:
             show_adv_pts = st.checkbox("ADV acertos",    value=True, key="hm_show_adv_ok_main")
+
         with f5:
             show_adv_err = st.checkbox("ADV erros",      value=True, key="hm_show_adv_err_main")
+
         with f6:
             st.session_state.show_heat_numbers = st.checkbox(
                 "Mostrar número/ADV nas bolinhas",
                 value=st.session_state.show_heat_numbers, key="hm_show_numbers_main"
             )
 
-        st.markdown('</div>', unsafe_allow_html=True)  # fecha #hm-filter-row
+        st.markdown('</div>', unsafe_allow_html=True)   # fecha #hm-filter-row
+        st.markdown('</div>', unsafe_allow_html=True)   # fecha #hm-wrap
 
-    st.markdown('</div>', unsafe_allow_html=True)  # fecha #hm-wrap
+        # --- CSS RESPONSIVO (apenas acrescenta; não mexe no restante do seu CSS) ---
+        st.markdown(
+            """
+            <style>
+            /* gap suave entre colunas criadas por st.columns */
+            #hm-wrap [data-testid="stHorizontalBlock"] {
+            gap: 10px !important;
+            }
 
-    # --- CSS RESPONSIVO (não mexe no seu CSS existente; só acrescenta) ---
-    st.markdown(
-        """
-        <style>
-        /* Espaçamento sutil entre colunas horizontais */
-        #hm-wrap [data-testid="stHorizontalBlock"] { gap: 10px !important; }
+            /* Permite quebrar linhas dos filtros (wrap) */
+            #hm-filter-row [data-testid="stHorizontalBlock"] {
+            flex-wrap: wrap !important;
+            }
 
-        /* Em telas médias, encolhe a coluna de controles */
-        @media (max-width: 1100px) {
-          #hm-wrap [data-testid="column"] { min-width: 0 !important; }
-        }
+            /* Em telas médias, duas colunas por linha para os filtros */
+            @media (max-width: 1100px) {
+            #hm-filter-row [data-testid="column"] {
+                min-width: 0 !important;
+                width: calc(50% - 8px) !important;
+                flex: 1 1 calc(50% - 8px) !important;
+            }
+            }
 
-        /* Breakpoint principal: abaixo de 900px empilha as 2 colunas (mapa e controles) */
-        @media (max-width: 900px) {
-          #hm-wrap [data-testid="column"] {
+            /* Em telas pequenas (celular), um filtro por linha (100%) */
+            @media (max-width: 700px) {
+            #hm-filter-row [data-testid="column"] {
+                width: 100% !important;
+                flex: 1 1 100% !important;
+            }
+            }
+
+            /* Garante que o select ocupe toda a largura disponível */
+            #hm-filter-row [data-baseweb="select"] {
             width: 100% !important;
-            flex: 1 1 100% !important;
-          }
-        }
+            }
 
-        /* Empilha também os 6 filtros do mapa em 1 coluna no mobile */
-        @media (max-width: 900px) {
-          #hm-filter-row [data-testid="column"] {
-            width: 100% !important;
-            flex: 1 1 100% !important;
-            padding-bottom: 6px !important;
-          }
-        }
+            /* Ajuste tipográfico leve no mobile para evitar “estouro” horizontal */
+            @media (max-width: 600px) {
+            #hm-filter-row label,
+            #hm-filter-row [data-baseweb="select"] * {
+                font-size: 0.92rem !important;
+            }
+            #hm-filter-row .stMarkdown p { margin-bottom: 4px !important; }
+            }
 
-        /* Ajuste de tipografia dos filtros no mobile para evitar “estouro” */
-        @media (max-width: 600px) {
-          #hm-filter-row label, #hm-filter-row [data-baseweb="select"] * {
-            font-size: 0.92rem !important;
-          }
-          #hm-filter-row .stMarkdown p { margin-bottom: 4px !important; }
-        }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
+            /* Empilhar os dois subcampos (c1,c2) dentro do primeiro filtro no mobile */
+            @media (max-width: 700px) {
+            #hm-filter-row [data-testid="column"] [data-testid="stHorizontalBlock"] [data-testid="column"] {
+                width: 100% !important;
+                flex: 1 1 100% !important;
+            }
+            }
+            </style>
+            """,
+            unsafe_allow_html=True
+        )
 
     # ================= Jogadoras (Número/Nome) — cores no próprio botão; sem textos =================
     #st.caption("**Jogadoras:**")

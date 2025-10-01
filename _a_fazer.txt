@@ -5,6 +5,9 @@ streamlit run index.py
 ***************************************
 
 
+erro carregamento preloader zoando componentes
+Imagem personalizada do time
+Imagem das posicoes
 
 1. Config qtd max sets
  + finalizar partida respeitando valor. para registro na base de dados se for de 5 sets e um time ganhar 3 ele é o ganhador, se for de 2 sets e o time ganhar 2, ele é o ganhador e assim por diante. Se houver empates de set, registrar na base de dados como empate
