@@ -1,0 +1,142 @@
+# ===============================
+# ?? MODO JOGO — bloco ultra-compacto (mesmas keys/ids/classes)
+# ===============================
+if st.session_state.game_mode:
+    # Wrap para escopar o CSS de compactação
+    st.markdown('<div id="gm-wrap">', unsafe_allow_html=True)
+
+    with st.container():
+        # --- Posição ---
+        st.markdown('<div id="div2"></div>', unsafe_allow_html=True)
+        st.markdown("**Posição**")
+        st.session_state.q_position = st.radio(
+            "", ["Frente", "Fundo"], horizontal=True,
+            index=["Frente", "Fundo"].index(st.session_state.q_position),
+            key="gm_q_position", label_visibility="collapsed"
+        )
+
+        # --- Jogadoras + ADV ---
+        st.markdown('<div id="div3"></div>', unsafe_allow_html=True)
+        st.markdown('<div class="gm-players-row">', unsafe_allow_html=True)
+        uv_init_state()
+        _criaBtnsJogadoras()
+        st.markdown('</div>', unsafe_allow_html=True)  # fecha .gm-players-row
+
+        # --- Atalhos (mantidos) ---
+        _criaBtnsAtalhos()
+
+        st.markdown('<div id="div4"></div>', unsafe_allow_html=True)
+
+    # --- Pré-linha informativa do set/placar (mantida) ---
+    try:
+        _df_for_score = df_hm if 'df_hm' in locals() else current_set_df(
+            st.session_state.frames, st.session_state.match_id, st.session_state.set_number
+        )
+        _home_pts, _away_pts = set_score_from_df(_df_for_score)
+        _set_raw = st.session_state.get("set_number")
+        _setn = int(str(_set_raw).strip()) if (_set_raw is not None and str(_set_raw).strip().isdigit()) else 1
+        st.markdown(
+            f"<div class='gm-preline'><strong>Set {_setn} — Placar: {_home_pts} x {_away_pts}</strong></div>",
+            unsafe_allow_html=True
+        )
+        df_hm = current_set_df(st.session_state.frames, st.session_state.match_id, st.session_state.set_number)
+    except Exception:
+        df_hm = None
+
+    # --- flags heatmap (mantidas) ---
+    show_success_gm = bool(st.session_state.get("gm_show_succ", True))
+    show_errors_gm  = bool(st.session_state.get("gm_show_err", True))
+    show_adv_pts_gm = bool(st.session_state.get("gm_show_adv_ok", True))
+    show_adv_errs_gm= bool(st.session_state.get("gm_show_adv_err", True))
+    _picked = st.session_state.get("gm_players_filter", "Todas")
+    _sel_players_gm = None if _picked == "Todas" else [_picked]
+
+    # --- pontos para a quadra ---
+    pts_succ, pts_errs, pts_adv, pts_adv_err = build_heat_points(
+        df_hm,
+        selected_players=_sel_players_gm,
+        include_success=show_success_gm,
+        include_errors=show_errors_gm,
+        include_adv_points=show_adv_pts_gm,
+        include_adv_errors=show_adv_errs_gm,
+        return_debug=False
+    )
+
+    # --- PLACAR ---
+    st.markdown('<div id="div5"></div>', unsafe_allow_html=True)
+    st.markdown('<div class="gm-score-row">', unsafe_allow_html=True)
+
+    frames = st.session_state.frames
+    df_set = current_set_df(frames, st.session_state.match_id, st.session_state.set_number)
+    home_pts, away_pts = set_score_from_df(df_set)
+    stf = frames["sets"]; sm = stf[stf["match_id"] == st.session_state.match_id]
+    home_sets_w = int((sm["winner_team_id"] == 1).sum())
+    away_sets_w = int((sm["winner_team_id"] == 2).sum())
+
+    sc1, sc2, sc3, sc4 = st.columns([1.1, .8, 1.1, 2.2])
+    with sc1:
+        st.markdown(
+            f"<div class='score-box'><div class='score-team'>{html.escape(home_name or 'Nós')}</div><div class='score-points'>{home_pts}</div></div>",
+            unsafe_allow_html=True
+        )
+    with sc2:
+        st.markdown("<div class='score-box'><div class='score-x'>×</div></div>", unsafe_allow_html=True)
+    with sc3:
+        st.markdown(
+            f"<div class='score-box'><div class='score-team'>{away_name}</div><div class='score-points'>{away_pts}</div></div>",
+            unsafe_allow_html=True
+        )
+    with sc4:
+        st.markdown(
+            f"<div class='set-summary'>Sets: <b>{home_sets_w}</b> × <b>{away_sets_w}</b>  |  Set atual: <b>{st.session_state.set_number}</b></div>",
+            unsafe_allow_html=True
+        )
+    st.markdown('</div>', unsafe_allow_html=True)  # fecha .gm-score-row
+
+    # --- QUADRA ---
+    st.markdown('<div id="div6"></div>', unsafe_allow_html=True)
+    render_court_html(
+        pts_succ, pts_errs, pts_adv, pts_adv_err,
+        enable_click=True, key="gm", show_numbers=st.session_state.show_heat_numbers
+    )
+
+    st.markdown('</div>', unsafe_allow_html=True)  # fecha #gm-wrap
+
+    st.stop()
+
+# --- CSS específico que cola tudo dentro de #gm-wrap ---
+st.markdown("""
+<style>
+  /* Escopo do modo jogo */
+  #gm-wrap { line-height: 1.05; }
+
+  /* Mata os respiros padrão do Streamlit dentro do wrap */
+  #gm-wrap .element-container { padding-top: 0 !important; padding-bottom: 6px !important; margin: 0 !important; }
+  #gm-wrap [data-testid="stMarkdownContainer"] p { margin: 0 0 4px 0 !important; }
+
+  /* Radios mais compactos */
+  #gm-wrap .stRadio > label { margin-bottom: 2px !important; }
+  #gm-wrap .stRadio [role="radiogroup"] { gap: 8px !important; }
+
+  /* Colunas: gaps mínimos */
+  #gm-wrap [data-testid="stHorizontalBlock"] { gap: 6px !important; }
+  #gm-wrap [data-testid="column"] { padding: 0 !important; }
+
+  /* Filas principais */
+  #gm-wrap .gm-players-row { margin: 2px 0 !important; }
+  #gm-wrap .gm-score-row   { margin: 2px 0 !important; }
+  #gm-wrap .gm-preline     { margin: 2px 0 4px 0 !important; }
+
+  /* Placar: comprime ainda mais */
+  #gm-wrap .score-box { padding: 2px 6px !important; }
+  #gm-wrap .score-team { margin-bottom: 0 !important; }
+  #gm-wrap .score-points { line-height: 1 !important; }
+
+  /* Marcações de ancoragem (div2..div6): elimina espaçamentos adjacentes */
+  #div2, #div3, #div4, #div5, #div6 { height: 0; margin: 0; padding: 0; }
+  #div2 + div, #div3 + div, #div4 + div, #div5 + div, #div6 + div { margin-top: 0 !important; }
+
+  /* Botões/atalhos: cola um pouco mais */
+  #gm-wrap .stButton > button { margin-top: 2px !important; margin-bottom: 2px !important; }
+</style>
+""", unsafe_allow_html=True)

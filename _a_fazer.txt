@@ -5,32 +5,48 @@ streamlit run index.py
 ***************************************
 
 
-erro carregamento preloader zoando componentes
-Imagem personalizada do time
-Imagem das posicoes
+
+
+
+salvar google nao mostrando preloader mais.. sendo chamado?
+Desfazer se for 0x0 deve reabrir o set anterior tirando o ultimo ponto, como no reabrir setjá faz
+
+VER
+	Estatísticas do set
+
+	Fazer side out ? Quem inicia no set e pontu
+	erro carregamento preloader zoando componentes
+	Imagem das posicoes
+	UNIFICAR unir uv_init_state e uv_ensure_state?
 
 1. Config qtd max sets
  + finalizar partida respeitando valor. para registro na base de dados se for de 5 sets e um time ganhar 3 ele é o ganhador, se for de 2 sets e o time ganhar 2, ele é o ganhador e assim por diante. Se houver empates de set, registrar na base de dados como empate
 
+VALIDAR confirmação e salvar arq temporário a cada fim de set/ jogo?
+VALIDAR finalizacao dos jogos e salvamentos (25x20, 27x25, outros)
+
+
+
+***************************************
+FASE 2 
+	MARCA DAGUA ?
+
+OK	Imagem personalizada do time e talvez colocar como fundo do preloader?
 OK	2. Retirar auto 25/15
 
 OK	3. Mostrar num bolinhas vem setado
 
-4. De resto deixa so as opções do mapa de calor, retirar tudo do modo jogo no normal
+OK	Cadastro de tipo de jogo amistoso e campeonato. se for campeonato posso cadastrar o nome dele e se é um jogo classificatório , semi-final ou final
+OK	4. De resto deixa so as opções do mapa de calor, retirar tudo do modo jogo no normal
 
-5. Tirar resultado acerto erro radios
+OK	5. Tirar resultado acerto erro radios
 
+***************************************
 
-
-VALIDAR confirmação e salvar arq temporário a cada fim de set/ jogo?
-VALIDAR finalizacao dos jogos e salvamentos (25x20, 27x25, outros)
-
-Estatísticas do set
-
-Fazer side out ? Quem inicia no set e pontu
-
-Cadastro de tipo de jogo amistoso e campeonato. se for campeonato posso cadastrar o nome dele e se é um jogo classificatório , semi-final ou final
-
+------------------
+Agora quero implementar a opção de subir uma imagem para customização de layout como fundo para o aplicativo (pense em uma janela pequena de celular e que a imagem ficará no meio, como marca dágua
+para fazer upload na criacao do jogo, crie um novo campo como Logo time e faça upload da imagem na pasta imgs do projeto. Meu code atual é este abaixo, refaça ele mas com muito cuidado para nao retirar nada do que já existe.
+------------------
 
 
 
@@ -54,7 +70,11 @@ Se quiser, eu crio um pequeno “modo offline” no seu index.py (com a variáve
 
 
 
-
+1. no inicio antes do titulo tem uma div ou iframe do streamlit com fundo branco, retire via css aqui dentro do codigo mesmo
+2. deixe a tabela inicial na altura de 4 linhas, depois fica com rolagem mesmo
+3. use as cores de 📊 Estatísticas do Jogo para 🧩 Comparativo por Fundamento
+4. os graficos que pedi para vc diminuir parece que ficaram maiores, reduza pela metade agora o tamanho deles, pelo menos
+faça apenas esses ajustes e me envie a versao final completa. vou parar por hoje
 ***************************************
 com muito cuidado, sem erros e sem retirar nada do que nao pedi:
 1	retirar 📈 Placar (evolução no set) e  📊 KPIs e Análises do Set e tudo abaixo dele do modo normal e colocar no codigo histórico (os gráficos que já tiverem lá de forma repetida, vc pode regirar os que ja tem no histórico, que acho que estao mais pobres visivelmente
@@ -63,8 +83,34 @@ gere o codigo novo corrigido, completo sem erros
 3. vc deve verificar meu codigo antigo e aplicar novamente o "mostrar jogadoras por nome"
 
 
+---------------------
 
+o titulo 🗂️ Histórico e análise de jogos deixe na mesma altura e linha, apenas antes que busca geral e fltrar por colunas
+insira mais uma coluna na tabela principal antes de status com a indicacao de Vitória, Empate ou derrota, com cores ou algum icone em cada um destes tipos
+📊 Estatísticas do Set devem virar 📊 Estatísticas do Jogo e o filtro de set deve vir selecionado todos os sets daquele jogo, se eu quiser filtrar algum set especifico edito o filtro
+organize e faça mais bonitas estas tabelas, coloque elas uma do lado da outra com cores nos cabelhos, algo assim e faça graficos relevantes para análise dos dados
+faça essas correcoes pontuais sem erros e sem retirar nada, me enviando o codigo final e completo
 
+faça estes ajustes e novas implementacoes em meu codigo atual de historico, tome muito cuidado para nao errar em nada e mee envie o codigo final e completo
+os componentes Mostrar lista completa e botao fechar podem ficar bem mais pra cima (posicao mais no inicio da pagina)
+tabela precisa que ao clicar em cada coluna de cabeçalho, ordene os dados conforme a coluna, exemplo por data
+tabela deve ser clicavel, se clicar em uma linha, os dados daquele jogo devem ser carregados e alterar todos os graficos e tabelas
+tabela deve ter alguma forma de filtrar dados, por qualquer coluna que eu queira
+
+abaixo da tabela sets, a primeira tabela deve zer algo assim:
+📊 Estatísticas do Set
+Fundamento	
+Univoleo	Nome do adversario
+
+Pontos de Ataque	14	12
+
+Pontos de Bloqueio	4	6
+
+Aces			3	2
+
+Erros do adversário	8	10
+
+Total de pontos	29	30
 ---------------------
 meu code inicial está em anexo, comecei a revisar es estruturar meu codigo de uma maneira profissional que gostaria que vc indicasse e seguisse mas vc nao fez. Verifique o que fiz, que foi separar blocos de chamadas de funcoes e uma estrutura lógica para iniciar elas e os componentes, mas que isso nao precise e nao ocorra a cada reload de página, por exemplo (essa criacao acredito que só precisa ser uma vez). Revise, siga a logica e se quiser em cada funcao, pode colocar até uma print inicial com m nome da funcao e uma numeracao, para irmos acompanhando o andamento do código.
 Outra coisa, corrija esses erros que apareceram que vou enviar abaixo e revise tb os botoes mais usados (ex: jogadoras, atalhos e modo jogo, para que nao fiquem dando reload desnecessário na página... a nova estrutura deve corrigir isso, mas identifique os motivos e quando ocorre isso

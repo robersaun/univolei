@@ -2,7 +2,6 @@
 from __future__ import annotations
 from pathlib import Path
 import re
-import pandas as pd
 import streamlit as st
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -11,27 +10,27 @@ import html
 import numpy as np
 import time as _time
 from datetime import date, datetime
-import json
+import pandas as pd
 from db_duck import ensure_db as duck_ensure, replace_all as duck_replace
 import logging, os
 import gsheets_sync
 from io import BytesIO
 from parser_free import parse_line
-import html as html_mod
 from string import Template
 import datetime as _dt, pandas as _pd, json as _json
 import configparser, os as _os
 from pathlib import Path as _P
-from db_excel import save_all
-import pandas as _pd
-import datetime as _dt
+import duckdb as _duck
 import os
+import gspread
+import base64
+from pathlib import Path
+import base64, mimetypes, os
+from google.oauth2.service_account import Credentials
 from db_excel import (
-
     init_or_load, save_all, add_set,
     append_rally, last_open_match, finalize_match
 )   
-
 
 # === UV STATE & ACTIONS (aplicado aos botões reais) ===
 def uv_init_state():
@@ -84,16 +83,6 @@ def gm_quick_click(code: str):
     """Wrapper para ações rápidas reais: aplica resultado via estado e registra."""
     uv_apply_result_from_state()
     register_current(action=code)
-
-def _uv_badge(state: str) -> str:
-    if state == 'ok':
-        return ("<span style='display:inline-block;padding:2px 8px;border-radius:9999px;"
-                "border:1px solid #15803d;background:#16a34a;color:#fff;font-weight:700;line-height:1'>OK</span>")
-    if state == 'err':
-        return ("<span style='display:inline-block;padding:2px 8px;border-radius:9999px;"
-                "border:1px solid #7f1d1d;background:#b91c1c;color:#fff;font-weight:700;line-height:1'>ERRO</span>")
-    return ("<span style='display:inline-block;padding:2px 8px;border-radius:9999px;"
-            "border:1px solid #d1d5db;background:#e5e7eb;color:#111827;line-height:1'>-</span>")
 
 # =========================
 # [1] CONFIGURAÇÃO INICIAL (dinâmica e segura)
@@ -291,21 +280,19 @@ def _render_latency_panel(max_rows: int = 12):
         st.caption("Médias (últimos 20): " + " · ".join(meds))
 
 # =========================
-# Logs
-# =========================
-def _uv2_log(msg):
-    print(f"[UV2] {msg}", flush=True)
-
-# =========================
 # Carrega config.ini 
 # =========================
 if _cfg_path.exists():
     # Carrega config.ini (sem interpolation para não quebrar com % no JSON)
-    _cp = configparser.ConfigParser(interpolation=None)
+    #_cp = configparser.ConfigParser(interpolation=None)
+    _cp = configparser.ConfigParser(interpolation=None); _cp.read(_cfg_path, encoding="utf-8")
     _cp.read(_cfg_path, encoding="utf-8")
     # atualiza todas as seções presentes, criando chaves conforme necessário
     for sec in _cp.sections():
         CONFIG.setdefault(sec, {}).update({k: v for k, v in _cp.items(sec)})
+    for sec in ("online","backup","secrets","gcp"):
+        if _cp.has_section(sec):
+            CONFIG[sec].update({k: v for k,v in _cp.items(sec)})
 # =========================
 # Config GOOGLE_DRIVE
 # =========================
@@ -323,12 +310,6 @@ GOOGLE_WEBHOOK_URL = ""
 CONFIG["online"]["webhook_url"]      = GOOGLE_WEBHOOK_URL#CONFIG["online"].get("webhook_url", "")
 CONFIG["online"]["gsheet_id"]        = GOOGLE_SHEETS_SPREADSHEET_ID#CONFIG["online"].get("gsheet_id", "")
 CONFIG["backup"]["drive_folder_url"] = GOOGLE_DRIVE_ROOT_FOLDER_URL#CONFIG["backup"].get("drive_folder_url", "")
-
-if _cfg_path.exists():
-    _cp = configparser.ConfigParser(interpolation=None); _cp.read(_cfg_path, encoding="utf-8")
-    for sec in ("online","backup","secrets","gcp"):
-        if _cp.has_section(sec):
-            CONFIG[sec].update({k: v for k,v in _cp.items(sec)})
 
 # =========================
 # Config + Estilos
@@ -571,10 +552,7 @@ def _get_gspread_client():
     """
     Retorna cliente gspread autenticado - PRIORIZA Streamlit Secrets
     """
-    try:
-        import gspread
-        from google.oauth2.service_account import Credentials
-        
+    try:        
         scopes = [
             "https://www.googleapis.com/auth/spreadsheets",
             "https://www.googleapis.com/auth/drive",
@@ -592,7 +570,6 @@ def _get_gspread_client():
 
         # 2) SEGUNDO: Variável de ambiente (fallback)
         try:
-            import os
             cred_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "").strip()
             if cred_path and os.path.exists(cred_path):
                 print(f"🔍 [AUTH] Usando variável de ambiente: {cred_path}")
@@ -612,11 +589,10 @@ def _get_gspread_client():
                     creds = Credentials.from_service_account_file(cpath, scopes=scopes)
                     return gspread.authorize(creds)
             elif mode == "inline":
-                import json
                 inline = gcp_cfg.get("inline_json")
                 if inline:
                     print("🔍 [AUTH] Usando config.ini inline JSON")
-                    sa_info = json.loads(inline)
+                    sa_info = _json.loads(inline)
                     creds = Credentials.from_service_account_info(sa_info, scopes=scopes)
                     return gspread.authorize(creds)
         except Exception as e:
@@ -741,243 +717,6 @@ def _persist_to_gsheets(frames, reason: str) -> str | None:
 
     except Exception as e:
         return f"GSHEETS: erro geral ({e!s})"
-
-# === UV2 GAME MODE INJECT (auto) — functional version ===
-def _flag_param_true(val):
-    if val is None:
-        return False
-    if isinstance(val, (list, tuple)) and val:
-        val = val[0]
-    return str(val).lower() in ("1","true","on","yes","y","sim","s")
-
-def _uv2_read_file(path: Path) -> str:
-    try:
-        return Path(path).read_text(encoding="utf-8")
-    except Exception:
-        return ""
-
-def _uv2_build_html() -> str:
-    # EMBEDDED layout: não lê mais uv2_game.html/css do disco
-    css_txt = """/* ===== Base 100% branco, sem “respiradores” entre componentes ===== */
-:root{
-  --pad:6px;       /* padding interno mínimo */
-  --gap:0px;       /* sem espaçamento entre blocos */
-  --pill-r:9999px;
-  --fg:#222;       /* texto neutro */
-  --bd:#dfe3ea;    /* borda leve */
-  --bg:#ffffff;    /* fundo branco absoluto */
-  --muted:#777;
-  --danger:#b91c1c;
-  --danger-soft:#fae3e3;
-}
-
-*{ box-sizing:border-box; }
-html,body{ height:100%; }
-body.uv2-body{
-  margin:0; color:var(--fg); background:#fff;            /* TUDO branco */
-  font:400 13px/1.18 "Inter", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-}
-
-/* App ocupa a viewport inteira (sem rolagem) */
-#uv2-app{
-  height:100svh;
-  display:grid;
-  grid-template-rows:
-    min-content   /* header */
-    min-content   /* controles (1 linha) */
-    min-content   /* jogadoras */
-    min-content   /* atalhos */
-    min-content   /* placar */
-    1fr;          /* quadra */
-  gap:var(--gap);                 /* **sem** espaço entre os cards */
-  padding:0;                      /* borda da tela colada */
-}
-
-/* Cartões brancos, super enxutos */
-.uv2-card{
-  background:var(--bg);
-  border:1px solid var(--bd);
-  border-radius:6px;
-  padding:var(--pad);
-}
-
-/* ===== Título / badge ===== */
-.badge{
-  display:inline-flex; align-items:center; gap:6px;
-  padding:2px 8px; border:1px solid var(--bd); border-radius:var(--pill-r);
-  background:#fff; font-weight:800; font-size:clamp(11px, 3.0vw, 16px);
-}
-.badge .x{ font-weight:900; }
-.badge .date{ font-weight:600; color:var(--muted); }
-
-/* Header: título + toggle (neutro) */
-#uv2-header{
-  display:flex; align-items:center; justify-content:space-between; gap:6px;
-  padding:4px var(--pad);
-}
-
-/* Toggle SEM verde (cinza quando ligado) */
-.uv2-toggle{ display:inline-flex; align-items:center; gap:6px; cursor:pointer; user-select:none; }
-.uv2-toggle input{ display:none; }
-.uv2-toggle .knob{
-  width:38px; height:22px; border-radius:9999px; position:relative;
-  background:#e6e8ec; border:1px solid #cfd6e0; display:inline-block;
-}
-.uv2-toggle .knob::after{
-  content:""; position:absolute; top:2px; left:2px; width:16px; height:16px; border-radius:50%;
-  background:#fff; border:1px solid #cfd6e0; transition:.16s;
-}
-.uv2-toggle input:checked + .knob{ background:#d9def2; border-color:#c6cbe0; } /* tom frio neutro */
-.uv2-toggle input:checked + .knob::after{ transform:translateX(16px); }
-.uv2-toggle .lbl{ color:#111; font-weight:800; }
-
-/* ===== Controles: 1 LINHA ===== */
-#uv2-controls{ padding:4px var(--pad); }
-/* CONTROLES: Resultado | Posição em 2 colunas (1 linha) */
-.uv2-ctrl-row{
-  display:grid !important;
-  grid-template-columns: 1fr 1fr !important; /* 2 colunas lado a lado */
-  align-items:center !important;
-  gap:6px !important;
-}
-.uv2-field{ display:flex; align-items:center; gap:8px; min-width:0; }
-.uv2-legend{ font-weight:800; margin:0; white-space:nowrap; }
-.uv2-radio{ display:flex; gap:10px; flex-wrap:nowrap; }
-.uv2-radio label span{ white-space:nowrap; }
-
-.uv2-radio input{ accent-color:#111; }
-
-/* ===== Jogadoras ===== */
-#uv2-players .uv2-legend{ margin-bottom:4px; }
-#uv2-players .uv2-grid{
-  display:grid; grid-template-columns:repeat(12,minmax(0,1fr));
-  gap:4px;
-}
-.pill{
-  display:inline-flex; align-items:center; justify-content:center;
-  height:24px; padding:0 8px; border-radius:var(--pill-r);
-  border:1px solid var(--bd); background:#fff; font-weight:700;
-}
-.pill.adv{ background:#efe8ff; border-color:#d6c8ff; }
-
-/* ===== Atalhos ===== */
-#uv2-shortcuts .uv2-legend{ margin-bottom:4px; }
-#uv2-shortcuts .uv2-row{ display:flex; flex-wrap:wrap; gap:4px; }
-#uv2-shortcuts .pill{ height:24px; padding:0 8px; }
-.pill.danger{ background:var(--danger); color:#fff; border-color:#7f1d1d; }
-.pill.danger.soft{ background:var(--danger-soft); color:#222; border-color:#e8b4b4; }
-
-/* ===== Placar ===== */
-#uv2-score{ padding:4px var(--pad); }
-#uv2-score .teams{
-  display:grid; grid-template-columns:1fr auto 1fr; align-items:end; gap:4px;
-}
-#uv2-score .team{ text-align:center; }
-#uv2-score .name{ font-size:clamp(11px,2.8vw,14px); font-weight:900; }
-#uv2-score .points{ font-size:clamp(26px,9vw,48px); font-weight:900; line-height:1; }
-#uv2-score .x{ font-size:clamp(14px,5.6vw,24px); font-weight:900; align-self:center; }
-#uv2-score .sets{ text-align:center; font-weight:800; margin-top:2px; font-size:clamp(10px,2.7vw,13px); }
-
-/* ===== Quadra (ocupa o restante) ===== */
-#uv2-court{ display:grid; grid-template-rows:min-content 1fr min-content; gap:2px; }
-.uv2-court-head,.uv2-court-foot{
-  text-align:center; font-weight:800; font-size:clamp(11px,2.9vw,14px);
-}
-.uv2-court-box{
-  position:relative; border:2px solid #111827; border-radius:6px;
-  background:#f3a23a;                /* laranja (sem verde) */
-  height:100%; min-height:160px;
-}
-.uv2-net{
-  position:absolute; left:6%; right:6%; top:50%; transform:translateY(-50%);
-  height:6px; background:
-    repeating-linear-gradient(90deg,#111827 0 8px, transparent 8px 14px),
-    linear-gradient(#111827,#111827);
-  background-size:auto, 100% 2px; background-position:0 50%, 0 50%;
-  background-repeat:repeat,no-repeat;
-}
-.uv2-dot{
-  position:absolute; left:26%; top:58%;
-  width:10px; height:10px; border-radius:50%; background:#1d4ed8; box-shadow:0 0 0 2px #0f172a40;
-}
-
-/* ===== Responsivo: manter 1 tela ===== */
-@media (max-width:480px){
-  .badge{ padding:2px 8px; }
-  #uv2-players .uv2-grid{ grid-template-columns:repeat(12,minmax(0,1fr)); }
-  #uv2-players .pill.adv{ grid-column:span 2; }
-}
-
-/* Larguras maiores centralizam sem criar espaços entre blocos */
-@media (min-width:481px){
-  #uv2-app{ max-width:520px; margin:0 auto; }
-}
-
-/* FORÇA Resultado | Posição em UMA linha (2 colunas) */
-#uv2-controls .uv2-ctrl-row{
-  display: grid !important;
-  grid-template-columns: minmax(0,1fr) minmax(0,1fr) !important;
-  column-gap: 6px !important;
-  row-gap: 0 !important;
-  align-items: center !important;
-  width: 100% !important;
-}
-#uv2-controls .uv2-ctrl-row > .uv2-field{ min-width: 0 !important; }
-
-#uv2-controls .uv2-legend{ white-space: nowrap !important; }
-#uv2-controls .uv2-radio{ display:flex !important; flex-wrap: nowrap !important; gap:10px !important; }
-#uv2-controls .uv2-radio label span{ white-space: nowrap !important; }
-"""
-    html_tpl = """<!doctype html><html><head><meta charset='utf-8'></head><body><div id='app'></div></body></html>"""
-    # Se o HTML original referenciava o css via <link>, injeta inline
-    html_tpl = html_tpl.replace('<link rel="stylesheet" href="uv2_game.css" />', '<style>$CSS</style>')
-    if '$CSS' not in html_tpl:
-        # garante css inline no <head>
-        if '</head>' in html_tpl:
-            html_tpl = html_tpl.replace('</head>', '<style>$CSS</style></head>')
-        else:
-            html_tpl = '<!doctype html><html><head><meta charset="utf-8"><style>$CSS</style></head>' + html_tpl
-    # --- valores dinâmicos ---
-    frames = st.session_state.get("frames", {})
-    def _n(v, d=""):
-        try: return str(v) if v is not None else d
-        except Exception: return d
-    try:
-        home_name = team_name_by_id(frames, 1)
-        away_name = team_name_by_id(frames, 2)
-    except Exception:
-        home_name = "Nós"; away_name = "Adversário"
-    try:
-        date_str = datetime.today().strftime("%d/%m/%Y")
-    except Exception:
-        date_str = ""
-    try:
-        mid = st.session_state.get("match_id")
-        sn  = int(st.session_state.get("set_number") or 1)
-        if mid is not None:
-            df_cur = current_set_df(frames, mid, sn)
-            hp, ap = set_score_from_df(df_cur)
-            hs, as_ = update_sets_score_and_match(frames, mid)
-        else:
-            hp = ap = 0; hs = as_ = 0; sn = 1
-    except Exception:
-        hp = ap = 0; hs = as_ = 0; sn = 1
-    from string import Template
-    tpl = Template(html_tpl)
-    html_doc = tpl.safe_substitute({
-        "CSS": css_txt,
-        "home": _n(home_name, "Nós"),
-        "away": _n(away_name, "Adversário"),
-        "date": _n(date_str, ""),
-        "home_pts": _n(hp, "0"),
-        "away_pts": _n(ap, "0"),
-        "home_sets": _n(hs, "0"),
-        "away_sets": _n(as_, "0"),
-        "set_atual": _n(sn, "1"),
-    })
-    if "</head>" in html_doc:
-        html_doc = html_doc.replace("</head>", "<script>console.log('[UV2] inline embutido');</script></head>")
-    return html_doc
 
 # =========================
 # Quadra
@@ -1539,7 +1278,6 @@ def _persist_all(frames, reason: str = "rally"):
     t = _time.perf_counter()
     try:
         try:
-            import duckdb as _duck
             duck_path = st.session_state.get("duck_path", DEFAULT_DUCK)
             con = _duck.connect(duck_path)
             for tname, df in frames.items():
@@ -1571,11 +1309,15 @@ def _persist_all(frames, reason: str = "rally"):
             rcount = 0
         N = int(st.session_state.get("QTD_PONTOS_SALVAR_GOOGLE", QTD_PONTOS_SALVAR_GOOGLE))
 
+        print("********** CHAMA QTD_PONTOS_SALVAR_GOOGLE ", QTD_PONTOS_SALVAR_GOOGLE , " reason = ",reason)
         if reason in ("set_open", "set_close", "match_close", "manual"):
             should_gs = True
         elif reason == "rally":
             if N > 0 and rcount > 0 and (rcount % N == 0):
                 should_gs = True
+        
+        print("********** reason ", reason , " N = ",N, " should_gs ",should_gs)
+        
 
         if should_gs:
             # Define a mensagem do preloader conforme o motivo
@@ -1586,6 +1328,8 @@ def _persist_all(frames, reason: str = "rally"):
             else:
                 kind = "gs"                 # "Salvando informações..." (ex.: a cada N pontos)
 
+            print("********** if should_gs ", should_gs , " kind = ",kind)
+        
             # Mostra o spinner durante a sincronização com o Google Sheets
             with uv_preloader(kind):
                 salva_google(frames, reason, statuses, _perf)
@@ -1697,11 +1441,6 @@ def _handle_tutorial_qp():
 _handle_tutorial_qp()
 
 frames = st.session_state.frames
-# — garante inicialização de chaves de estado usadas pelos botões
-try:
-    _ensure_uv_state()
-except Exception:
-    pass
 
 # =========================
 # Normalização jogadoras
@@ -2327,7 +2066,7 @@ def render_court_html(pts_success, pts_errors, pts_adv=None, pts_adv_err=None, e
             adv_lbl = team_name_by_id(fr, away_id)
     except Exception:
         pass
-    adv_lbl_esc = html_mod.escape(str(adv_lbl))
+    adv_lbl_esc = html.escape(str(adv_lbl))
     html_block = f"""
     <div style="width:100%; text-align:center; font-weight:700; margin-bottom:6px;">{adv_lbl_esc}</div>
     <div id="{container_id}" style="background:#FFA94D; border:2px solid #333; position:relative; width:100%; height:320px; border-radius:6px;">
@@ -2498,6 +2237,9 @@ with st.container():
         unsafe_allow_html=True
     )
 
+ #   if not st.session_state.game_mode:
+ #       st.markdown("**Existe um jogo em aberto**")
+
     bar1, bar2 = st.columns([1.6, 2.5])
     with bar1:
         if home_name and away_name:
@@ -2540,7 +2282,6 @@ if not st.session_state.game_mode:
             '<a href="/historico" target="_self" style="display:block;text-align:center;padding:.4rem .6rem;border:1px solid rgba(49,51,63,.2);border-radius:.5rem;font-weight:600;">🗂️ Histórico</a>',
             unsafe_allow_html=True
         )
-
 # =========================
 # Sets
 # =========================
@@ -2785,7 +2526,6 @@ if not st.session_state.game_mode:
     with top9:
         st.button("🗑️ Remover Set Vazio", use_container_width=True, key="remove_empty_set_btn", on_click=_remove_empty_set)
         st.markdown('</div>', unsafe_allow_html=True)
-    ########   
     with top10:
         st.button("🏁 Finalizar Partida", use_container_width=True, on_click=_finalizar_partida)
         
@@ -2796,13 +2536,141 @@ if not st.session_state.game_mode:
 if st.session_state.get("show_config_team", False):
     st.markdown('<div class="sectionCard">', unsafe_allow_html=True)
     col_title, col_close = st.columns([4, 1])
-    with col_title: st.subheader("⚙️ Nosso Time e Jogadoras")
+    with col_title:
+        st.subheader("⚙️ Nosso Time e Jogadoras")
     with col_close:
-        st.button("❌ Fechar", key="close_config_top_btn", on_click=lambda: st.session_state.__setitem__("show_config_team", False))
+        st.button("❌ Fechar", key="close_config_top_btn",
+                  on_click=lambda: st.session_state.__setitem__("show_config_team", False))
+
     st.markdown("**Nome do Nosso Time**")
     current_team_name = team_name_by_id(frames, OUR_TEAM_ID)
     new_team_name = st.text_input("Nome do time:", value=current_team_name, key="team_name_input")
-    # download de template (xlsx + csv)
+
+    # ================================
+    # NOVO: Funções auxiliares de logo
+    # ================================
+    def _teamcfg_ensure_equipes_logo_col():
+        """Garante coluna 'team_logo_path' na aba 'equipes'."""
+        try:
+            eq = frames.get("equipes", pd.DataFrame())
+            if eq is None or eq.empty:
+                # Se não existir nada ainda, cria com colunas mínimas
+                frames["equipes"] = pd.DataFrame(
+                    [{"team_id": OUR_TEAM_ID, "team_name": current_team_name, "team_logo_path": pd.NA}]
+                )
+            else:
+                if "team_logo_path" not in eq.columns:
+                    eq["team_logo_path"] = pd.NA
+                    frames["equipes"] = eq
+        except Exception:
+            pass
+
+    def _teamcfg_current_logo_path() -> str | None:
+        """Retorna o caminho (string) da logo do nosso time, se cadastrada."""
+        try:
+            eq = frames.get("equipes", pd.DataFrame())
+            if eq is None or eq.empty:
+                return None
+            row = eq[eq["team_id"] == OUR_TEAM_ID]
+            if row.empty:
+                return None
+            p = row.iloc[0].get("team_logo_path")
+            if pd.notna(p) and str(p).strip():
+                return str(p)
+        except Exception:
+            return None
+        return None
+
+    def _teamcfg_apply_watermark(img_path: Path, opacity: float = 0.10):
+        """Aplica marca d'água central leve com a imagem fornecida."""
+        try:
+            if not img_path or not img_path.exists():
+                return
+            ext = img_path.suffix.lower()
+            if ext in (".png",):
+                mime = "image/png"
+            elif ext in (".jpg", ".jpeg"):
+                mime = "image/jpeg"
+            elif ext in (".webp",):
+                mime = "image/webp"
+            else:
+                mime = "image/png"
+            b64 = base64.b64encode(img_path.read_bytes()).decode("utf-8")
+            st.markdown(
+                f"""
+                <style>
+                  [data-testid="stAppViewContainer"] > .main {{
+                    position: relative; z-index: 1;
+                  }}
+                  #uv-bg-watermark {{
+                    position: fixed;
+                    inset: 0;
+                    z-index: 0;
+                    pointer-events: none;
+                    background: url('data:{mime};base64,{b64}') center center no-repeat;
+                    background-size: min(20vw, 20vh);
+                    opacity: {opacity};
+                  }}
+                </style>
+                <div id="uv-bg-watermark"></div>
+                """,
+                unsafe_allow_html=True
+            )
+            st.session_state["app_bg_logo"] = img_path.as_posix()
+        except Exception:
+            pass
+
+    def _teamcfg_save_logo():
+        """Salva a imagem enviada em ./imgs e grava caminho em 'equipes.team_logo_path'."""
+        up = st.session_state.get("team_logo_uploader")
+        if not up:
+            st.warning("Selecione uma imagem primeiro.")
+            return
+        try:
+            _teamcfg_ensure_equipes_logo_col()
+            try:
+                base_dir = Path(__file__).parent
+            except Exception:
+                base_dir = Path(".").resolve()
+            imgs_dir = base_dir / "imgs"
+            imgs_dir.mkdir(parents=True, exist_ok=True)
+
+            ext = Path(up.name).suffix.lower()
+            if ext not in (".png", ".jpg", ".jpeg", ".webp"):
+                ext = ".png"
+            out_path = imgs_dir / f"team{OUR_TEAM_ID}_logo{ext}"
+            out_path.write_bytes(up.getbuffer())
+
+            # Atualiza a tabela 'equipes'
+            eq = frames.get("equipes", pd.DataFrame())
+            if eq is None or eq.empty:
+                eq = pd.DataFrame([{"team_id": OUR_TEAM_ID, "team_name": new_team_name, "team_logo_path": out_path.as_posix()}])
+            else:
+                if "team_logo_path" not in eq.columns:
+                    eq["team_logo_path"] = pd.NA
+                mask = (eq["team_id"] == OUR_TEAM_ID)
+                if mask.any():
+                    eq.loc[mask, "team_logo_path"] = out_path.as_posix()
+                    if new_team_name.strip():
+                        eq.loc[mask, "team_name"] = new_team_name.strip()
+                else:
+                    # Se o nosso time não existir ainda na tabela, cria a linha
+                    eq = pd.concat([
+                        eq,
+                        pd.DataFrame([{"team_id": OUR_TEAM_ID, "team_name": new_team_name, "team_logo_path": out_path.as_posix()}])
+                    ], ignore_index=True)
+            frames["equipes"] = eq
+            _persist_all(frames, reason="team_logo")
+
+            # Aplica marca d'água imediatamente
+            _teamcfg_apply_watermark(out_path, opacity=0.10)
+            st.success("Logo salva e aplicada como marca d’água.")
+        except Exception as e:
+            st.error(f"Falha ao salvar logo: {e}")
+
+    # ============================
+    # download de template (xlsx + csv) — (mantido)
+    # ============================
     def _download_template():
         cols = ["team_id","player_number","player_name","position"]
         df = pd.DataFrame(columns=cols)
@@ -2811,47 +2679,104 @@ if st.session_state.get("show_config_team", False):
             with pd.ExcelWriter(bio, engine="openpyxl") as writer:
                 df.to_excel(writer, index=False, sheet_name="jogadoras")
             data = bio.getvalue()
-            st.download_button("⬇️ Baixar modelo Excel (jogadoras.xlsx)", data=data, file_name="jogadoras_template.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            st.download_button("⬇️ Baixar modelo Excel (jogadoras.xlsx)", data=data,
+                               file_name="jogadoras_template.xlsx",
+                               mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         except Exception:
             st.info("Não consegui gerar XLSX aqui. Baixe como CSV e abra no Excel.")
         csv = df.to_csv(index=False).encode("utf-8")
-        st.download_button("⬇️ Baixar modelo CSV (jogadoras.csv)", data=csv, file_name="jogadoras_template.csv", mime="text/csv")
+        st.download_button("⬇️ Baixar modelo CSV (jogadoras.csv)", data=csv,
+                           file_name="jogadoras_template.csv", mime="text/csv")
     _download_template()
+
+    # ============================
+    # Salvar nome do time — (mantido)
+    # ============================
     def _save_team_name():
         if "equipes" in frames:
-            equipes = frames["equipes"]; mask = equipes["team_id"] == OUR_TEAM_ID
-            if mask.any(): equipes.loc[mask, "team_name"] = new_team_name
+            equipes = frames["equipes"]
+            mask = equipes["team_id"] == OUR_TEAM_ID
+            if mask.any():
+                equipes.loc[mask, "team_name"] = new_team_name
             else:
                 new_team = pd.DataFrame({"team_id":[OUR_TEAM_ID], "team_name":[new_team_name]})
+                # garante a coluna de logo
+                if "team_logo_path" not in new_team.columns:
+                    new_team["team_logo_path"] = pd.NA
+                if "equipes" in frames and "team_logo_path" in frames.get("equipes", pd.DataFrame()).columns:
+                    pass  # já está padronizado
                 equipes = pd.concat([equipes, new_team], ignore_index=True)
-            frames["equipes"] = equipes; _persist_all(frames, reason='generic')
+            frames["equipes"] = equipes
+            _persist_all(frames, reason='generic')
             st.session_state.show_config_team = False
     st.button("💾 Salvar Nome do Time", key="save_team_name_btn", on_click=_save_team_name)
-    st.markdown("---"); st.subheader("👥 Jogadoras")
+
+    # ============================
+    # NOVO: Logo do time (upload + salvar)
+    # ============================
+    st.markdown("---")
+    st.subheader("🖼️ Logo do Time")
+
+    # mostra logo atual, se existir
+    _teamcfg_ensure_equipes_logo_col()
+    _logo_path_str = _teamcfg_current_logo_path()
+    if _logo_path_str:
+        try:
+            st.image(_logo_path_str, caption="Logo atual", width=160)
+        except Exception:
+            pass
+
+    # uploader e botão salvar
+    logo_up = st.file_uploader("Selecione a imagem (PNG, JPG, WEBP)",
+                               type=["png","jpg","jpeg","webp"],
+                               key="team_logo_uploader")
+    st.button("💾 Salvar Logo do Time", key="save_team_logo_btn", on_click=_teamcfg_save_logo)
+
+    st.markdown("---")
+    st.subheader("👥 Jogadoras")
+
+    # ============================
+    # Jogadoras — (mantido)
+    # ============================
     jogadoras_df = frames.get("jogadoras", pd.DataFrame())
     our_players = jogadoras_df[jogadoras_df["team_id"] == OUR_TEAM_ID].copy()
     if not our_players.empty:
         st.markdown("**Cadastradas**")
         display_df = our_players[["player_number", "player_name", "position"]].copy()
-        display_df.columns = ["Número", "Nome", "Posição"]; display_dataframe(display_df, height=140)
+        display_df.columns = ["Número", "Nome", "Posição"]
+        display_dataframe(display_df, height=140)
+
         st.markdown("**Excluir**")
         players_to_delete = our_players["player_number"].astype(str) + " - " + our_players["player_name"]
         player_to_delete = st.selectbox("Escolha:", players_to_delete.tolist(), key="delete_player_select")
+
         def _delete_player():
             if player_to_delete:
                 player_num = int(player_to_delete.split(" - ")[0])
                 jog_df = frames["jogadoras"]
                 jog_df = jog_df[~((jog_df["team_id"] == OUR_TEAM_ID) & (jog_df["player_number"] == player_num))]
-                frames["jogadoras"] = jog_df; _persist_all(frames, reason='generic')
+                frames["jogadoras"] = jog_df
+                _persist_all(frames, reason='generic')
         st.button("🗑️ Excluir", key="delete_player_btn", on_click=_delete_player)
-    st.markdown("---"); st.subheader("➕ Adicionar")
+
+    st.markdown("---")
+    st.subheader("➕ Adicionar")
     c1, c2, c3 = st.columns(3)
-    with c1: new_number = st.number_input("Número:", min_value=1, max_value=99, key="new_player_number")
-    with c2: new_name = st.text_input("Nome:", key="new_player_name")
-    with c3: new_position = st.selectbox("Posição:", ["oposto","levantador","central","ponteiro","líbero"], key="new_player_position")
+    with c1:
+        new_number = st.number_input("Número:", min_value=1, max_value=99, key="new_player_number")
+    with c2:
+        new_name = st.text_input("Nome:", key="new_player_name")
+    with c3:
+        new_position = st.selectbox("Posição:", ["oposto","levantador","central","ponteiro","líbero"], key="new_player_position")
+
     def _add_player():
         if new_name.strip():
-            new_player = pd.DataFrame({"team_id":[OUR_TEAM_ID],"player_number":[new_number],"player_name":[new_name],"position":[new_position]})
+            new_player = pd.DataFrame({
+                "team_id":[OUR_TEAM_ID],
+                "player_number":[new_number],
+                "player_name":[new_name],
+                "position":[new_position]
+            })
             if "jogadoras" in frames:
                 jog_df = frames["jogadoras"]
                 jog_df = jog_df[~((jog_df["team_id"] == OUR_TEAM_ID) & (jog_df["player_number"] == new_number))]
@@ -2863,7 +2788,9 @@ if st.session_state.get("show_config_team", False):
         else:
             st.warning("Digite um nome.")
     st.button("➕ Adicionar Jogadora", key="add_player_btn", on_click=_add_player)
+
     st.markdown('</div>', unsafe_allow_html=True)
+
 
 # Tutorial modal
 if st.session_state.get("show_tutorial", False):
@@ -2879,7 +2806,7 @@ if st.session_state.get("show_tutorial", False):
                     <button id='uv-close'
                          style='position:absolute; top:10px; right:10px; z-index:1001; background:#ff4b4b; color:white;
                                 border:none; border-radius:50%; width:30px; height:30px; cursor:pointer; font-weight:bold;'>X</button>
-                    <iframe srcdoc='{html_mod.escape(html_content)}' style='width:100%; height:100%; border:none; margin-top:40px;'></iframe>
+                    <iframe srcdoc='{html.escape(html_content)}' style='width:100%; height:100%; border:none; margin-top:40px;'></iframe>
                 </div>
                 <script>
                   (function(){{
@@ -3191,7 +3118,10 @@ def _create_new_match(opp_name: str, dt: date, meta: dict | None = None):
     extra = f" — {tname} ({tstage})" if mtype == "campeonato" and tname else ""
     st.success(f"Novo jogo criado: {team_name_by_id(frames_local, OUR_TEAM_ID)} x {opp_label} — tipo: {mtype}{extra}")
 
-# Chamada Novo Jogo 
+
+# =========================
+# Chamada Novo Jogo
+# =========================
 if (st.session_state.match_id is None or st.session_state.show_cadastro) and not st.session_state.show_config_team:
     with st.container():
         st.markdown('<div class="sectionCard">', unsafe_allow_html=True)
@@ -3234,7 +3164,6 @@ if (st.session_state.match_id is None or st.session_state.show_cadastro) and not
 def _criaBtnsJogadoras():
     sel_num   = st.session_state.get("uv_active_player")
     adv_state = st.session_state.get("uv_adv_state", "neutral")
-
     # Texto da seleção (como já era)
     if sel_num is not None:
         sel_txt = f"#{sel_num}"
@@ -3242,14 +3171,12 @@ def _criaBtnsJogadoras():
         sel_txt = "ADV"
     else:
         sel_txt = "-"
-
     # Cores dinâmicas conforme q_result (ativo forte, inativo claro)
     is_ok  = (st.session_state.get("q_result", "Acerto") == "Acerto")
     ok_bg  = f"rgba(22,163,74,{1.0 if is_ok else 0.25})"
     ok_bd  = f"rgba(21,128,61,{1.0 if is_ok else 0.35})"
     err_bg = f"rgba(185,28,28,{1.0 if not is_ok else 0.25})"
     err_bd = f"rgba(127,29,29,{1.0 if not is_ok else 0.35})"
-
     # Linha: "Jogadora Selecionada: ..." + pills Acerto/Erro
     st.markdown(
         f"""
@@ -3265,11 +3192,8 @@ def _criaBtnsJogadoras():
         """,
         unsafe_allow_html=True
     )
-
-
     # Garante estado
     uv_init_state()
-
     # Callbacks: exclusividade e atualização de q_result
     def _click_player(n: int):
         uv_init_state()
@@ -3292,7 +3216,6 @@ def _criaBtnsJogadoras():
         cur_state = st.session_state.get("uv_player_state", {}).get(n, "neutral")
         if cur_state in ("ok", "err"):
             st.session_state["q_result"] = "Acerto" if cur_state == "ok" else "Erro"
-
     def _click_adv():
         uv_init_state()
         # reset jogadora ativa
@@ -3306,27 +3229,22 @@ def _criaBtnsJogadoras():
         st.session_state["q_side"] = "Adv"
         # resultado conforme ADV
         st.session_state["q_result"] = "Acerto" if st.session_state["uv_adv_state"] == "ok" else "Erro"
-
     # Dados e label mode
     frames = st.session_state.frames
     try:
         nums = resolve_our_roster_numbers(frames)
     except Exception:
         nums = list(range(1, 13))
-
     try:
         name_map = {r["number"]: r["name"] for r in roster_for_ui(frames)}
     except Exception:
         name_map = {}
 
     label_mode = st.session_state.get("player_label_mode", "Número")
-
     if nums:
         st.markdown('<div class="jogadoras-container">', unsafe_allow_html=True)
-
         # colunas (máx 12) + ADV
         jcols = st.columns(min(12, max(1, len(nums) + 1)))
-
         for i, n in enumerate(nums):
             label_txt = str(n) if label_mode == "Número" else (name_map.get(n) or str(n))
             with jcols[i % len(jcols)]:
@@ -3337,15 +3255,12 @@ def _criaBtnsJogadoras():
                     args=(n,),
                     use_container_width=True
                 )
-
         # ADV
         with jcols[(len(nums)) % len(jcols)]:
             st.button("ADV", key="pill_main_adv", on_click=_click_adv, use_container_width=True)
-
         # === Cores nos próprios botões (após renderizar) ===
         def _esc(label: str) -> str:
             return str(label).replace("\\", "\\\\").replace('"', '\\"')
-
         rules = []
         states = st.session_state["uv_player_state"]
         for n in nums:
@@ -3367,12 +3282,9 @@ def _criaBtnsJogadoras():
             rules.append('.stButton button[aria-label="ADV"] { background:#16a34a !important; color:#fff !important; border:1px solid #15803d !important; }')
         elif adv_state == "err":
             rules.append('.stButton button[aria-label="ADV"] { background:#b91c1c !important; color:#fff !important; border:1px solid #7f1d1d !important; }')
-
         if rules:
             st.markdown("<style>\n" + "\n".join(rules) + "\n</style>", unsafe_allow_html=True)
-
         st.markdown("</div>", unsafe_allow_html=True)
-
     else:
         st.caption("Sem jogadoras")
 
@@ -3392,47 +3304,168 @@ def _criaBtnsAtalhos():
         ("sa",   "Saque"),
         ("rede", "Rede"),
     ]
-    acols = st.columns(12)
-    for i, (code, label) in enumerate(atalho_specs):
-        with acols[i % len(acols)]:
+    # --- Linha de Atalhos + Rádio (Frente/Fundo) na mesma linha ---
+    max_cols = 12  # total de colunas da faixa
+    n_btns   = len(atalho_specs)
+
+    # Quantos botões cabem na 1ª linha (deixa a última coluna para o rádio)
+    first_row_btns = max_cols - 1 if n_btns >= (max_cols - 1) else n_btns
+
+    # 1ª linha: [botões ...] [RÁDIO]
+    # Dê um pouquinho mais de largura para o rádio (ex.: 1.4)
+    row_weights = [1] * first_row_btns + [1.4]
+    row1 = st.columns(row_weights)
+
+    # Botões da 1ª linha
+    for i in range(first_row_btns):
+        code, label = atalho_specs[i]
+        with row1[i]:
             st.button(
                 label,
                 key=f"main_quick_{code}",
                 on_click=lambda code=code: gm_quick_click(code),
                 use_container_width=True
             )
+
+    # Rádio na última coluna da 1ª linha
+    with row1[-1]:
+        st.session_state.q_position = st.radio(
+            "", ["Frente", "Fundo"], horizontal=True,
+            index=["Frente", "Fundo"].index(st.session_state.q_position),
+            key="gm_q_position", label_visibility="collapsed"
+        )
+
+    # Linhas seguintes (se ainda houver botões de atalho)
+    remaining = atalho_specs[first_row_btns:]
+    while remaining:
+        chunk = remaining[:max_cols]       # até 12 por linha
+        cols  = st.columns(len(chunk))
+        for i, (code, label) in enumerate(chunk):
+            with cols[i]:
+                st.button(
+                    label,
+                    key=f"main_quick_{code}",
+                    on_click=lambda code=code: gm_quick_click(code),
+                    use_container_width=True
+                )
+        remaining = remaining[max_cols:]
+
     _paint_adv_rede_buttons()
+
+
+
+def uv_apply_game_mode_branding(our_team_id: int | None = None) -> None:
+    """
+    Aplica a marca visual no Modo Jogo:
+      - Marca-d’água central leve ( ::before )
+      - Logo pequena fixa no canto superior direito ( ::after ) como fallback
+
+    Onde usar:
+      Chame imediatamente após abrir o wrapper do Modo Jogo:
+        st.markdown('<div id="uv-game-mode">', unsafe_allow_html=True)
+        uv_apply_game_mode_branding(OUR_TEAM_ID)
+    """
+
+    try:
+        # 1) tenta session_state (mesma lógica já usada no seu código)
+        logo_path = st.session_state.get("app_bg_logo", "")
+
+        # 2) fallback: equipes.team_logo_path (mesma lógica já usada)
+        if not logo_path:
+            eq = st.session_state.frames.get("equipes", pd.DataFrame())
+            tid = our_team_id if our_team_id is not None else st.session_state.get("OUR_TEAM_ID")
+            if not tid:
+                tid = globals().get("OUR_TEAM_ID", None)
+            if isinstance(eq, pd.DataFrame) and not eq.empty and "team_logo_path" in eq.columns and tid is not None:
+                row = eq[eq["team_id"] == tid]
+                if not row.empty:
+                    logo_path = str(row.iloc[0].get("team_logo_path") or "")
+
+        if not logo_path:
+            return  # sem logo, não injeta nada
+
+        p = Path(logo_path)
+        if not p.exists():
+            return
+
+        mime = mimetypes.guess_type(p.name)[0] or "image/png"
+        b64  = base64.b64encode(p.read_bytes()).decode("utf-8")
+
+        # CSS:
+        # - ::before = marca-d’água central leve, com mix-blend para aparecer mesmo com fundos claros
+        # - ::after  = selo pequeno no canto superior direito (fallback visual)
+        st.markdown(
+            f"""
+            <style>
+              #uv-game-mode {{
+                position: relative !important;
+                isolation: isolate !important; /* contexto de empilhamento separado */
+              }}
+
+              /* Marca-d’água central leve */
+              #uv-game-mode::before {{
+                content: "";
+                position: absolute; inset: 0;
+                pointer-events: none;
+                background: url('data:{mime};base64,{b64}') center 45% no-repeat;
+                background-size: min(42vw, 360px);
+                opacity: 0.12;             /* ajuste fino de intensidade */
+                z-index: 0;                 /* atrás do conteúdo */
+                mix-blend-mode: multiply;   /* melhora visibilidade em fundos claros */
+                filter: saturate(0.85);
+              }}
+
+              /* Logo pequena fixa (fallback garantido) */
+              #uv-game-mode::after {{
+                content: "";
+                position: absolute;
+                top: -80px; right: 8px;
+                width: 88px; height: 88px;      /* ajuste o tamanho conforme preferir */
+                background: url('data:{mime};base64,{b64}') center center / contain no-repeat;
+                opacity: 0.95;
+                z-index: 3;                      /* acima dos componentes */
+                pointer-events: none;
+              }}
+
+              /* No mobile, reduz um pouco o selo para não encostar nos botões */
+              @media (max-width: 640px) {{
+                #uv-game-mode::after {{
+                  top: 6px; right: 6px; width: 56px; height: 56px; opacity: 0.92;
+                }}
+              }}
+            </style>
+            """,
+            unsafe_allow_html=True
+        )
+
+    except Exception:
+        # Silencioso para não quebrar o Modo Jogo em caso de exceção
+        pass
 
 # =========================
 # MODO JOGO
 # =========================
 if st.session_state.game_mode:
     with st.container():
-        #st.markdown('<div id=\"uv-game-mode\">', unsafe_allow_html=True)
-        #DEIXEI COMENTADO -> NAO RETIRAR ESTAS LINHAS, HABILITAR SE NECESSÁRIO DEPOIS!
-        #st.markdown('<div class="sectionCard game-mode-container">', unsafe_allow_html=True)
-        #st.subheader("🎮 Modo Jogo")
-        # Linha compacta
-        st.markdown("**Posição**")
-        st.session_state.q_position = st.radio(
-            "", ["Frente", "Fundo"], horizontal=True,
-            index=["Frente", "Fundo"].index(st.session_state.q_position),
-            key="gm_q_position", label_visibility="collapsed"
-        )
-        
-         # Linha de botões de jogadoras + ADV
-        #st.markdown('</div>', unsafe_allow_html=True)  # close div2
-        st.markdown('<div class="gm-players-row">', unsafe_allow_html=True)
-        
+        # ABRE o wrapper do Modo Jogo
+        st.markdown('<div id="uv-game-mode">', unsafe_allow_html=True)
+
+        # === (NOVO) Marca-d'água específica do Modo Jogo ===
+        # ABRE o wrapper do Modo Jogo
+        st.markdown('<div id="uv-game-mode">', unsafe_allow_html=True)
+
+        # ✔️ NOVO: aplica marca visual (marca-d’água + logo no canto)
+        uv_apply_game_mode_branding(OUR_TEAM_ID)
+
+# === (FIM NOVO) Marca-d'água ===
+
+        # (SEU CÓDIGO EXISTENTE)
+        # st.markdown('<div class="gm-players-row">', unsafe_allow_html=True)
         uv_init_state()
         _criaBtnsJogadoras()
-        #st.markdown('</div>', unsafe_allow_html=True)
-        # Atalhos
         _criaBtnsAtalhos()
-        # --- Quadra (Modo Jogo) exibida logo antes do encerramento ---
     # --- LINHA DO PLACAR + QUADRA + FILTROS (MODO JOGO) — ULTRA COMPACT (sem :has) ---
     try:
-        # --- Linha do placar (texto auxiliar acima do placar) ---
         _df_for_score = df_hm if 'df_hm' in locals() else current_set_df(
             st.session_state.frames, st.session_state.match_id, st.session_state.set_number
         )
@@ -3466,9 +3499,7 @@ if st.session_state.game_mode:
         return_debug=False
     )
 
-    # === P L A C A R  (imediatamente acima da quadra) ===
     st.markdown('<div class="gm-score-row">', unsafe_allow_html=True)
-
     frames = st.session_state.frames
     df_set = current_set_df(frames, st.session_state.match_id, st.session_state.set_number)
     home_pts, away_pts = set_score_from_df(df_set)
@@ -3478,7 +3509,7 @@ if st.session_state.game_mode:
     sc1, sc2, sc3, sc4 = st.columns([1.1, .8, 1.1, 2.2])
     with sc1:
         st.markdown(
-            f"<div class='score-box'><div class='score-team'>{html_mod.escape(home_name or 'Nós')}</div><div class='score-points'>{home_pts}</div></div>", unsafe_allow_html=True
+            f"<div class='score-box'><div class='score-team'>{html.escape(home_name or 'Nós')}</div><div class='score-points'>{home_pts}</div></div>", unsafe_allow_html=True
         )
     with sc2:
         st.markdown("<div class='score-box'><div class='score-x'>×</div></div>", unsafe_allow_html=True)
@@ -3492,11 +3523,13 @@ if st.session_state.game_mode:
         )
     st.markdown('</div>', unsafe_allow_html=True)  # fecha .gm-score-row
 
-    # === Q U A D R A ===
     render_court_html(
         pts_succ, pts_errs, pts_adv, pts_adv_err,
         enable_click=True, key="gm", show_numbers=st.session_state.show_heat_numbers
     )
+
+    # FECHA o wrapper do Modo Jogo (DEPOIS de renderizar tudo)
+    st.markdown('</div>', unsafe_allow_html=True)
 
     st.stop()
 
@@ -3518,6 +3551,27 @@ def _ensure_uv_state() -> None:
     if "q_result" not in ss:
         ss["q_result"] = "Acerto"
 
+# — garante inicialização de chaves de estado usadas pelos botões
+try:
+    _ensure_uv_state()
+except Exception:
+    pass
+
+# =========================
+# Uma das chamadas de debug
+# =========================
+if DEBUG_PRINTS:
+    if show_debug_ui() and st.session_state.get("dbg_prints"):
+            st.markdown("---")
+            st.markdown("**🧰 Debug (logs recentes)**")
+            
+    if show_debug_ui():
+        with st.expander("🔎 Debug Heatmap (Painel Principal)"):
+            st.write(
+                f"Acertos (azul): **{len(pts_succ)}**  |  Erros (vermelho): **{len(pts_errs)}**  |  "
+                f"ADV acertos (magenta): **{len(pts_adv)}**  |  ADV erros (roxo): **{len(pts_adv_err)}**"
+            )
+ 
 # =========================
 # Painel principal
 # =========================
@@ -3538,110 +3592,99 @@ with st.container():
             index=["Número", "Nome"].index(st.session_state.player_label_mode),
             key="player_label_mode_main"
         )
-
-    with bar5:
-        # --- título
-        st.markdown("**🗺️ Mapa de Calor (clique para mostrar ou retirar informações)**")
-
-        # wrapper para aplicar CSS responsivo
-        st.markdown('<div id="hm-wrap">', unsafe_allow_html=True)
-
-        # linha dos filtros — wrapper para CSS responsivo
-        st.markdown('<div id="hm-filter-row">', unsafe_allow_html=True)
-
-        # Filtros do mapa de calor
-        f1, f2, f3, f4, f5, f6 = st.columns([1.0, 1.0, 1.0, 1.2, 1.2, 1.2])
-
-        with f1:
-            nums_all = resolve_our_roster_numbers(st.session_state.frames)
-            player_opts = ["Todas"] + nums_all
-            c1, c2 = st.columns([0.40, 0.60])
-            with c1:
-                st.markdown("<div class='uv-inline-label'>Jogadora</div>", unsafe_allow_html=True)
-            with c2:
-                picked = st.selectbox(
-                    "", options=player_opts, index=0,
-                    key="hm_players_filter_main", label_visibility="collapsed"
-                )
-            sel_players = None if picked == "Todas" else [picked]
-
-        with f2:
-            show_success = st.checkbox("Nossos acertos", value=True, key="hm_show_succ_main")
-
-        with f3:
-            show_errors  = st.checkbox("Nossos erros",   value=True, key="hm_show_err_main")
-
-        with f4:
-            show_adv_pts = st.checkbox("ADV acertos",    value=True, key="hm_show_adv_ok_main")
-
-        with f5:
-            show_adv_err = st.checkbox("ADV erros",      value=True, key="hm_show_adv_err_main")
-
-        with f6:
-            st.session_state.show_heat_numbers = st.checkbox(
+        st.session_state.show_heat_numbers = st.checkbox(
                 "Mostrar número/ADV nas bolinhas",
-                value=st.session_state.show_heat_numbers, key="hm_show_numbers_main"
+                value=st.session_state.show_heat_numbers,
+                key="hm_show_numbers_main"
             )
+    with bar5:
+        st.markdown("**🗺️ Mapa de Calor: Informações mostradas**")
 
-        st.markdown('</div>', unsafe_allow_html=True)   # fecha #hm-filter-row
-        st.markdown('</div>', unsafe_allow_html=True)   # fecha #hm-wrap
+        # marcador para a faixa 1 (usaremos CSS p/ torná-la responsiva)
+        st.markdown('<div id="hm-row1-marker"></div>', unsafe_allow_html=True)
 
-        # --- CSS RESPONSIVO (apenas acrescenta; não mexe no restante do seu CSS) ---
+        # === ROW 1: 3 colunas no desktop (vira 1 no mobile) ===
+        c1, c2, c3 = st.columns([2.2, 1.2, 1.2])
+
+        # ---- col1: Jogadoras (multiselect) ----
+        with c1:
+            nums_all = resolve_our_roster_numbers(st.session_state.frames)
+            sel_players_list = st.multiselect(
+                "Jogadoras (nº)",
+                options=nums_all,
+                default=[],
+                key="hm_players_filter_main_multi",
+                help="Selecione uma ou mais jogadoras. Deixe vazio para considerar todas."
+            )
+        sel_players = None if len(sel_players_list) == 0 else sel_players_list
+
+        # ---- col2: Nossos acertos/erros ----
+        with c2:
+            show_success = st.checkbox("Nossos acertos", value=True, key="hm_show_succ_main")
+            show_errors  = st.checkbox("Nossos erros",   value=True, key="hm_show_err_main")
+        # ---- col3: ADV acertos/erros + Mostrar número/ADV ----
+        with c3:
+            show_adv_pts = st.checkbox("ADV acertos",    value=True, key="hm_show_adv_ok_main")
+            show_adv_err = st.checkbox("ADV erros",      value=True, key="hm_show_adv_err_main")
+            
+        # === CSS: força a ROW1 virar grid responsivo de 3→1 colunas e limita larguras ===
         st.markdown(
             """
             <style>
-            /* gap suave entre colunas criadas por st.columns */
-            #hm-wrap [data-testid="stHorizontalBlock"] {
-            gap: 10px !important;
-            }
+            /* Nunca deixe o app rolar horizontalmente */
+            [data-testid="stAppViewContainer"] { overflow-x: hidden; }
 
-            /* Permite quebrar linhas dos filtros (wrap) */
-            #hm-filter-row [data-testid="stHorizontalBlock"] {
-            flex-wrap: wrap !important;
+            /* Localiza o bloco de colunas imediatamente após o marcador */
+            #hm-row1-marker + div[data-testid="stHorizontalBlock"] {
+                display: grid !important;
+                grid-template-columns: 2.2fr 1.2fr 1.2fr;  /* desktop: 3 colunas */
+                gap: 10px !important;
+                width: 100%;
             }
-
-            /* Em telas médias, duas colunas por linha para os filtros */
-            @media (max-width: 1100px) {
-            #hm-filter-row [data-testid="column"] {
+            /* zera larguras fixas herdadas das colunas do Streamlit */
+            #hm-row1-marker + div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+                width: auto !important;
+                flex: 1 1 auto !important;
                 min-width: 0 !important;
-                width: calc(50% - 8px) !important;
-                flex: 1 1 calc(50% - 8px) !important;
-            }
             }
 
-            /* Em telas pequenas (celular), um filtro por linha (100%) */
-            @media (max-width: 700px) {
-            #hm-filter-row [data-testid="column"] {
+            /* Multiselect ocupa toda a coluna mas com limite p/ não “estourar” */
+            #hm-row1-marker + div [data-baseweb="select"] {
                 width: 100% !important;
-                flex: 1 1 100% !important;
-            }
-            }
-
-            /* Garante que o select ocupe toda a largura disponível */
-            #hm-filter-row [data-baseweb="select"] {
-            width: 100% !important;
+                max-width: 460px;            /* desktop/tablet */
             }
 
-            /* Ajuste tipográfico leve no mobile para evitar “estouro” horizontal */
-            @media (max-width: 600px) {
-            #hm-filter-row label,
-            #hm-filter-row [data-baseweb="select"] * {
-                font-size: 0.92rem !important;
-            }
-            #hm-filter-row .stMarkdown p { margin-bottom: 4px !important; }
+            /* Tablets: 2 colunas (jogadoras | grupo Nossos+ADV) */
+            @media (max-width: 1050px) {
+                #hm-row1-marker + div[data-testid="stHorizontalBlock"] {
+                grid-template-columns: 1.6fr 1.4fr;   /* 2 colunas */
+                }
+                /* Junta c2 e c3 numa coluna empilhando internamente */
+                #hm-row1-marker + div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(3) {
+                grid-column: 2 / 3;
+                }
             }
 
-            /* Empilhar os dois subcampos (c1,c2) dentro do primeiro filtro no mobile */
+            /* Celular: 1 coluna (tudo empilhado, SEM rolagem lateral) */
             @media (max-width: 700px) {
-            #hm-filter-row [data-testid="column"] [data-testid="stHorizontalBlock"] [data-testid="column"] {
-                width: 100% !important;
-                flex: 1 1 100% !important;
+                #hm-row1-marker + div[data-testid="stHorizontalBlock"] {
+                grid-template-columns: 1fr;   /* empilha */
+                }
+                #hm-row1-marker + div [data-baseweb="select"] {
+                max-width: 100%;              /* ocupa 100% no mobile */
+                }
             }
+
+            /* Garante quebra de linha em labels longas (não cria scroll) */
+            #hm-row1-marker + div label {
+                white-space: normal !important;
+                word-break: break-word !important;
             }
             </style>
             """,
             unsafe_allow_html=True
         )
+
 
     # ================= Jogadoras (Número/Nome) — cores no próprio botão; sem textos =================
     #st.caption("**Jogadoras:**")
@@ -3650,26 +3693,9 @@ with st.container():
     # ================= RETIRANDO DA VISUALIZACAO INICIAL =================
     #_criaBtnsJogadoras()
     #_criaBtnsAtalhos()
-    
-if show_debug_ui():
-    with st.expander("🔎 Debug Heatmap (Painel Principal)"):
-        st.write(
-            f"Acertos (azul): **{len(pts_succ)}**  |  Erros (vermelho): **{len(pts_errs)}**  |  "
-            f"ADV acertos (magenta): **{len(pts_adv)}**  |  ADV erros (roxo): **{len(pts_adv_err)}**"
-        )
-        if not dbg_hm.empty:
-            view = dbg_hm[["rally_no","player_number","action_u","res_u","who_u","used_x","used_y","origem","cor"]].tail(30)
-            display_dataframe(view, height=220, width='stretch')
-        else:
-            st.write("_Sem registros elegíveis._")
 
 # -------- DIREITA --------
 #with right:
-    
-
-    if show_debug_ui() and st.session_state.get("dbg_prints"):
-        st.markdown("---")
-        st.markdown("**🧰 Debug (logs recentes)**")
 
 def salva_google(frames, reason, statuses, _perf):
     """
@@ -3745,10 +3771,6 @@ def _filter_frames_for_match(frames, match_id):
     return out
 
 def uv_snapshot_prompt(kind="set_close", match_id=None):
-    import json as _json
-    from datetime import datetime as _dt
-    import streamlit as st
-    import pandas as pd
     try:
         frames = st.session_state.frames
     except Exception:
@@ -3782,6 +3804,95 @@ def uv_snapshot_prompt(kind="set_close", match_id=None):
             )
         with c2:
             st.button("Não, seguir normalmente", key=f"skip_snap_{kind}_{mid}", use_container_width=True)
+
+# =========================
+# Logo de fundo na criação de time
+# =========================
+# === Marca-d'água / background de seção ===
+def _uv_encode_file_to_data_url(path: str | os.PathLike) -> str | None:
+    """Converte um arquivo de imagem local em data URL (inline)."""
+    try:
+        p = Path(path)
+        if not p.exists():
+            return None
+        mime, _ = mimetypes.guess_type(p.name)
+        mime = mime or "image/png"
+        data = base64.b64encode(p.read_bytes()).decode("ascii")
+        return f"data:{mime};base64,{data}"
+    except Exception:
+        return None
+
+def uv_inject_watermark_css(
+    data_url: str,
+    selectors: list[str],
+    *,
+    opacity: float = 0.12,
+    size: str = "clamp(160px, 40vw, 520px)",   # controla o tamanho (responsivo)
+    position: str = "center center",           # ex.: "center 40%", "right 20px bottom 30%"
+    zindex: int = 0
+):
+    """
+    Injeta CSS que desenha a imagem como marca-d'água via ::before nos 'selectors' informados.
+    Dica: use ids que você mesmo renderiza com st.markdown('<div id="...">').
+    """
+    sel = ", ".join(selectors)
+    st.markdown(
+        f"""
+        <style>
+        {sel} {{
+          position: relative !important;
+          z-index: {zindex};
+        }}
+        {sel}::before {{
+          content: "";
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          background-image: url("{data_url}");
+          background-repeat: no-repeat;
+          background-position: {position};
+          background-size: {size};
+          opacity: {max(0.0, min(opacity, 1.0))};
+        }}
+        /* Modo escuro: leve ajuste opcional */
+        @media (prefers-color-scheme: dark) {{
+          {sel}::before {{ opacity: {max(0.0, min(opacity*0.9, 1.0))}; }}
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+def uv_guess_team_logo_data_url() -> str | None:
+    """
+    Busca a logo em:
+      1) st.session_state['team_logo_path'] (se você salvou no 'Configurar Time')
+      2) ./imgs/logo_team_1.* (png|jpg|jpeg|webp)
+    Retorna data URL para usar no CSS.
+    """
+    # 1) session_state direto
+    p = st.session_state.get("team_logo_path")
+    if p:
+        du = _uv_encode_file_to_data_url(p)
+        if du:
+            return du
+
+    # 2) nomes comuns na pasta imgs
+    base = Path(__file__).parent / "imgs"
+    for name in ("logo_team_1.png", "logo_team_1.jpg", "logo_team_1.jpeg", "logo_team_1.webp", "univolei_logo.png"):
+        du = _uv_encode_file_to_data_url(base / name)
+        if du:
+            return du
+    return None
+
+
+###FUNDO DA CRIACAO DE NOVO TIME
+try:
+    lp = st.session_state.get("app_bg_logo") or _teamcfg_current_logo_path()
+    if lp:
+        _teamcfg_apply_watermark(Path(lp), opacity=0.10)
+except Exception:
+    pass
 
 # =========================
 # Boot para Render
