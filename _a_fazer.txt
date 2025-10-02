@@ -5,7 +5,7 @@ streamlit run index.py
 ***************************************
 
 
-
+layout jogo menor???
 
 
 salvar google nao mostrando preloader mais.. sendo chamado?
