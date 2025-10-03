@@ -1,62 +1,158 @@
-<!-- tutorial.html -->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <title>Tutorial de Registro - Scout Vôlei</title>
+  <title>Tutorial UniVolei</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      margin: 30px;
-      background: #f8f9fa;
-      color: #333;
+      background: #f8fafc;
+      margin: 0;
+      padding: 0;
+      color: #0f172a;
     }
-    h1 {
-      color: #2d64b1;
+    header {
+      background: linear-gradient(90deg,#0ea5e9,#1e3a8a);
+      padding: 16px;
+      color: #fff;
+      text-align: center;
     }
-    code {
-      background: #eee;
-      padding: 2px 6px;
-      border-radius: 4px;
+    h1 { margin: 0; font-size: 1.6rem; }
+    .tabs {
+      display: flex;
+      justify-content: center;
+      background: #e2e8f0;
+      border-bottom: 2px solid #cbd5e1;
     }
-    .btn {
-      display: inline-block;
-      margin-top: 20px;
-      padding: 10px 15px;
-      background: #2d64b1;
-      color: white;
-      text-decoration: none;
-      border-radius: 6px;
+    .tab {
+      padding: 12px 20px;
+      cursor: pointer;
+      font-weight: bold;
+      color: #334155;
+      border-bottom: 3px solid transparent;
+      transition: all .3s;
     }
-    .btn:hover {
-      background: #1b4b8c;
+    .tab:hover { background: #f1f5f9; }
+    .tab.active {
+      border-bottom: 3px solid #0ea5e9;
+      color: #0f172a;
+      background: #fff;
+    }
+    .tab-content {
+      display: none;
+      padding: 20px;
+      max-width: 1000px;
+      margin: auto;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.1);
+    }
+    .tab-content.active { display: block; }
+    .img-box {
+      text-align: center;
+      margin-bottom: 12px;
+    }
+    .img-box img {
+      max-width: 100%;
+      border-radius: 8px;
+      border: 1px solid #cbd5e1;
+    }
+    .desc {
+      font-size: 1rem;
+      line-height: 1.5;
+      color: #334155;
+      padding: 8px 12px;
+    }
+    .highlight {
+      font-weight: bold;
+      color: #1e3a8a;
     }
   </style>
 </head>
 <body>
-  <h1>📘 Tutorial de Registro - Scout de Vôlei</h1>
 
-  <p>Regras de como registrar cada lance:</p>
-  <ul>
-    <li>Use <code>1</code> no início → ponto do <strong>nosso time</strong></li>
-    <li>Use <code>0</code> no início → ponto do <strong>adversário</strong></li>
-  </ul>
+<header>
+  <h1>📘 Tutorial UniVolei Live Scout</h1>
+</header>
 
-  <h2>Exemplos</h2>
-  <ul>
-    <li><code>1 ponteira 9 diagonal</code> → Nossa ponteira #9 atacou na diagonal (ponto nosso)</li>
-    <li><code>0 erro recepção</code> → Erro de recepção nosso, ponto adversário</li>
-    <li><code>1 central 5 bloqueio</code> → Nossa central #5 fez ponto de bloqueio</li>
-    <li><code>0 ponteira diagonal</code> → Adversária pontuou na diagonal</li>
-  </ul>
+<div class="tabs">
+  <div class="tab active" onclick="openTab('inicio')">Início</div>
+  <div class="tab" onclick="openTab('jogo')">Modo Jogo</div>
+  <div class="tab" onclick="openTab('historico')">Histórico</div>
+  <div class="tab" onclick="openTab('rodizio')">Rodízio 5x1</div>
+</div>
 
-  <h2>Dicas</h2>
-  <ul>
-    <li>Padronize sempre: <code>[0 ou 1] [posição] [número se tiver] [tipo da ação]</code></li>
-    <li>Tipos de ação comuns: ataque, bloqueio, erro, saque, recepção</li>
-    <li>Você pode evoluir adicionando códigos mais curtos (ex: <code>A9D</code> = Ataque ponteira 9 diagonal)</li>
-  </ul>
+<!-- Aba Início -->
+<div id="inicio" class="tab-content active">
+  <div class="img-box">
+    <img src="imgs/print_1.jpg" alt="Tela inicial">
+  </div>
+  <div class="desc">
+    Acesse pelo endereço <span class="highlight">https://univolei-scout.streamlit.app/</span>.<br><br>
+    Caso haja <b>jogo em aberto</b>, o título e a data aparecem no cabeçalho.<br>
+    Na primeira linha você encontra os botões:
+    <ul>
+      <li><b>Time</b> → cadastrar jogadoras.</li>
+      <li><b>Jogo</b> → iniciar/continuar partida.</li>
+      <li><b>Tutorial</b> → abre este guia.</li>
+      <li><b>Histórico</b> → análise de jogos anteriores.</li>
+    </ul>
+  </div>
+</div>
 
-  <a href="http://localhost:8501" class="btn">⬅ Voltar ao Index</a>
+<!-- Aba Jogo -->
+<div id="jogo" class="tab-content">
+  <div class="img-box">
+    <img src="imgs/print_2.jpg" alt="Modo Jogo">
+  </div>
+  <div class="desc">
+    O <b>Modo Jogo</b> é o <span class="highlight">principal local de marcação de pontos</span>. 
+    Aqui você registra acertos e erros, visualiza mapa de calor, placar por set e controla jogadoras.
+  </div>
+</div>
+
+<!-- Aba Histórico -->
+<div id="historico" class="tab-content">
+  <div class="img-box">
+    <img src="imgs/print_3.jpg" alt="Histórico de Jogos">
+  </div>
+  <div class="desc">
+    O <b>Histórico</b> é o <span class="highlight">dashboard principal de análise</span>. 
+    Mostra evolução do placar, comparativo por fundamento, erros cometidos e mapas de calor.
+    <br><br>
+    É aqui que você identifica <b>pontos fortes e fraquezas</b> para direcionar treinos e melhorar o desempenho.
+  </div>
+</div>
+
+<!-- Aba Rodízio -->
+<div id="rodizio" class="tab-content">
+  <div class="img-box"><img src="imgs/p1.jpg" alt="Rodízio P1"></div>
+  <div class="desc"><b>P1 (Levantadora):</b> posição 1, arma jogadas rápidas, cobre defesa direita.</div>
+
+  <div class="img-box"><img src="imgs/p2.jpg" alt="Rodízio P2"></div>
+  <div class="desc"><b>P2 (Oposta):</b> ataque pela direita, ajuda na cobertura e bolas de fundo.</div>
+
+  <div class="img-box"><img src="imgs/p3.jpg" alt="Rodízio P3"></div>
+  <div class="desc"><b>P3 (Central):</b> ataque rápido pelo meio, responsável pelo bloqueio central.</div>
+
+  <div class="img-box"><img src="imgs/p4.jpg" alt="Rodízio P4"></div>
+  <div class="desc"><b>P4 (Ponteira):</b> atacante pela esquerda, forte no passe e apoio de cobertura.</div>
+
+  <div class="img-box"><img src="imgs/p5.jpg" alt="Rodízio P5"></div>
+  <div class="desc"><b>P5 (Defensora/Ponteira):</b> fundo esquerdo, prioridade em recepção e coberturas.</div>
+
+  <div class="img-box"><img src="imgs/p6.jpg" alt="Rodízio P6"></div>
+  <div class="desc"><b>P6 (Líbero ou Ponteira de fundo):</b> fundo central, defesa principal e recepção de saque.</div>
+</div>
+
+<script>
+  function openTab(tabId) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.querySelector('.tab[onclick="openTab(\''+tabId+'\')"]').classList.add('active');
+    document.getElementById(tabId).classList.add('active');
+  }
+</script>
+
 </body>
 </html>

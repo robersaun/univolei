@@ -719,7 +719,7 @@ def _persist_to_gsheets(frames, reason: str) -> str | None:
         return f"GSHEETS: erro geral ({e!s})"
 
 # =========================
-# Quadra
+# Quadra BTNS
 # =========================
 def _paint_adv_rede_buttons():
     components.html("""
@@ -739,7 +739,8 @@ def _paint_adv_rede_buttons():
           if(p){ p.style.margin='0'; p.style.padding='0'; p.style.height='0'; p.style.minHeight='0'; }
         }
       }catch(e){}
-      // pinta botões
+
+      // pinta botões por texto
       function paint(){
         var doc;
         try{
@@ -748,15 +749,21 @@ def _paint_adv_rede_buttons():
           doc = document;
         }
         const map = [
-          {text:'adv',  bg:'rgba(255,0,255,0.20)', border:'rgba(160,0,160,0.55)'},
-          {text:'rede', bg:'rgba(220,50,50,0.18)', border:'rgba(160,20,20,0.55)'},
-          {text:'refazer rally', bg:'#b91c1c', border:'#7f1d1d'}
+          {text:'adv',        bg:'rgba(255,0,255,0.20)', border:'rgba(160,0,160,0.55)'},
+          {text:'rede',       bg:'rgba(220,50,50,0.18)', border:'rgba(160,20,20,0.55)'},
+          {text:'refazer rally', bg:'#b91c1c', border:'#7f1d1d'},
+
+          // <<< NOVO: desfazer igual ao "rede" (fundo vermelho)
+          {text:'desfazer',   bg:'rgba(220,50,50,0.18)', border:'rgba(160,20,20,0.55)'},
+          {text:'↩️Desfazer',   bg:'rgba(220,50,50,0.18)', border:'rgba(160,20,20,0.55)'},
+          {text:'↩️',         bg:'rgba(220,50,50,0.18)', border:'rgba(160,20,20,0.55)'},
+          {text:'↩',          bg:'rgba(220,50,50,0.18)', border:'rgba(160,20,20,0.55)'}
         ];
         const btns = Array.from(doc.querySelectorAll('button'));
         btns.forEach(b=>{
           const t = (b.textContent || '').trim().toLowerCase();
           map.forEach(m=>{
-            if(t === m.text){
+            if (t === m.text){
               b.style.background = m.bg;
               b.style.border = '1px solid ' + m.border;
               b.style.color = '#fff';
@@ -1035,6 +1042,8 @@ if "set_number" not in st.session_state: st.session_state.set_number = None
 if "auto_close" not in st.session_state: st.session_state.auto_close = True
 if "graph_filter" not in st.session_state: st.session_state.graph_filter = "Ambos"
 st.session_state.setdefault("data_rev", 0)
+options = ["Quem Sacou"]  # ou ["Frente", "Fundo"], etc.
+st.session_state.setdefault("quemsacou", options[0])
 # auxiliares
 st.session_state.setdefault("q_side", "Nós")
 st.session_state.setdefault("q_result", "Acerto")
@@ -1681,27 +1690,70 @@ def recompute_set_score_fields(fr: dict, match_id: int, set_number: int):
 def undo_last_rally_current_set():
     fr = st.session_state.frames
     match_id = st.session_state.match_id
-    set_number = st.session_state.set_number
+    set_number = int(st.session_state.set_number)
     rl = fr["rallies"]
-    sub = rl[(rl["match_id"]==match_id) & (rl["set_number"]==set_number)].copy().sort_values("rally_no")
+    stf = fr["sets"]
+
+    # Subconjunto do set atual, em ordem
+    sub = rl[(rl["match_id"] == match_id) & (rl["set_number"] == set_number)].copy().sort_values("rally_no")
+
     if sub.empty:
-        st.warning("Não há rallies para desfazer neste set."); return
+        # Mesmo sem rallies, se o set atual estiver 0x0 e existir set anterior, reabrimos o anterior.
+        mask_cur = (stf["match_id"] == match_id) & (stf["set_number"] == set_number)
+        if mask_cur.any():
+            row = stf[mask_cur].iloc[0]
+            hp0 = int(row.get("home_points", 0))
+            ap0 = int(row.get("away_points", 0))
+            if hp0 == 0 and ap0 == 0 and set_number > 1:
+                _reopen_set()  # reabre set anterior
+                st.session_state.set_number = set_number - 1
+                st.session_state.frames = fr
+                st.session_state.data_rev += 1
+                st.success(f"Set {set_number-1} reaberto (desfazer com set atual 0x0).")
+                return
+        st.warning("Não há rallies para desfazer neste set.")
+        return
+
+    # Remove o último rally do set atual
     last_row = sub.iloc[-1]
     last_rally_id = last_row["rally_id"]
     rl = rl[rl["rally_id"] != last_rally_id]
     fr["rallies"] = rl
+
+    # Define placar do set após remoção
     if len(sub) >= 2:
         prev = sub.iloc[-2]
-        hp, ap = int(prev["score_home"]), int(prev["score_away"])
+        hp, ap = int(prev.get("score_home", 0)), int(prev.get("score_away", 0))
     else:
+        # Ficou sem rallies no set
         hp, ap = 0, 0
-    stf = fr["sets"]
-    mask = (stf["match_id"]==match_id) & (stf["set_number"]==set_number)
-    stf.loc[mask, "home_points"] = hp; stf.loc[mask, "away_points"] = ap
-    fr["sets"] = stf
+
+    # Atualiza placar do set atual
+    mask_set = (stf["match_id"] == match_id) & (stf["set_number"] == set_number)
+    if mask_set.any():
+        stf.loc[mask_set, "home_points"] = hp
+        stf.loc[mask_set, "away_points"] = ap
+        # Se havia winner/is_closed marcados por engano, mantemos como aberto sem vencedor
+        if "winner_team_id" in stf.columns:
+            stf.loc[mask_set, "winner_team_id"] = pd.NA
+        if "is_closed" in stf.columns:
+            stf.loc[mask_set, "is_closed"] = False
+        fr["sets"] = stf
+
+    # Persiste
     save_all(Path(st.session_state.db_path), fr)
+    st.session_state.frames = fr
     st.session_state.data_rev += 1
-    dbg_print(f"Desfeito rally_id={last_rally_id}. Placar {hp}-{ap}.")
+    dbg_print(f"Desfeito rally_id={last_rally_id}. Placar {hp}-{ap} no set {set_number}.")
+
+    # ---- NOVO: se o set atual ficou 0x0 e existe set anterior, reabra o anterior
+    if hp == 0 and ap == 0 and set_number > 1:
+        _reopen_set()
+        st.session_state.set_number = set_number - 1
+        save_all(Path(st.session_state.db_path), fr)
+        st.session_state.frames = fr
+        st.session_state.data_rev += 1
+        st.success(f"Set {set_number-1} reaberto (set atual ficou 0x0).")
 
 # ===== who_scored e ação =====
 def _fix_who_scored_from_raw_and_row(raw_line: str, row: dict) -> dict:
@@ -2240,7 +2292,7 @@ with st.container():
  #   if not st.session_state.game_mode:
  #       st.markdown("**Existe um jogo em aberto**")
 
-    bar1, bar2 = st.columns([1.6, 2.5])
+    bar1, bar2, bar3 = st.columns([1.6, 2.5, 2.0])
     with bar1:
         if home_name and away_name:
             st.markdown(
@@ -2253,6 +2305,13 @@ with st.container():
             )
     with bar2:
         st.session_state.game_mode = st.toggle("🎮 **Modo Jogo**", value=st.session_state.game_mode, key="game_mode_toggle") 
+    #with bar3:
+        # 2) Radio imediatamente antes do seu texto (mesma linha via CSS acima)
+     #   options = ["Saque Nosso", "Saque Adv"]  # "—" = sem seleção
+      #  if "quemsacou" not in st.session_state:
+       #     st.session_state.quemsacou = options[0]
+        #choice = st.radio("", options, key="st.session_state.quemsacou.quemsacou", horizontal=True, label_visibility="collapsed")
+
     st.markdown('</div>', unsafe_allow_html=True)
 
 # rerun pós-callbacks
@@ -2274,8 +2333,12 @@ if not st.session_state.game_mode:
         st.button("🆕 Jogo", use_container_width=True, key="top_new_game_btn",
             on_click=lambda: st.session_state.__setitem__("show_cadastro", True))
     with top3:
-        st.button("📘 Tutorial", use_container_width=True, key="top_tutorial_btn",
-            on_click=lambda: st.session_state.__setitem__("show_tutorial", True))
+        st.markdown(
+            '<a href="/tutorial" target="_self" style="display:block;text-align:center;padding:.4rem .6rem;border:1px solid rgba(49,51,63,.2);border-radius:.5rem;font-weight:600;">📘 Tutorial</a>',
+            unsafe_allow_html=True
+        )
+        #st.button("📘 Tutorial", use_container_width=True, key="top_tutorial_btn",
+           # on_click=lambda: st.session_state.__setitem__("show_tutorial", True))
     with top4:
         # Abrir Histórico (link direto — evita issues com switch_page)
         st.markdown(
@@ -2329,26 +2392,50 @@ def _get_set_rallies(frames, match_id, set_number, *, strict: bool = True):
     return sub
 
 def _reopen_set():
+    """
+    Reabre um set:
+      - Se 'set_picked' existir (cenário original), reabre esse set.
+      - Se 'set_picked' NÃO existir (ex.: chamada via Desfazer), reabre o set anterior ao set atual.
+    Mantém a lógica de voltar 1 rally/1 ponto do lado vencedor e limpar winner/is_closed.
+    """
+    import pandas as pd
+
     frames_local = st.session_state.frames
     stf = frames_local["sets"]
-    rl = frames_local["rallies"]
+    rl  = frames_local["rallies"]
     mid = st.session_state.match_id
-    sn = int(set_picked)
 
-    # Reabre preservando o placar do set, voltando 1 ponto do lado vencedor
+    # 1) Descobrir qual set reabrir (sn)
+    sn = None
+    try:
+        # se set_picked existir no escopo global, usa-o
+        sn = int(set_picked)  # noqa: F821  (pode não existir em alguns fluxos)
+    except Exception:
+        pass
+
+    if sn is None:
+        # fallback: reabre o set ANTERIOR ao atual quando chamado pelo Desfazer
+        cur = int(st.session_state.get("set_number", 1))
+        if cur > 1:
+            sn = cur - 1
+        else:
+            st.warning("Nada a reabrir: não há set anterior e nenhum set foi selecionado.")
+            return
+
+    # 2) Seleciona o set
     mask_set = (stf["match_id"] == mid) & (stf["set_number"] == sn)
     if not mask_set.any():
-        st.warning("Nada a reabrir para este set.")
+        st.warning(f"Nada a reabrir para o set {sn}.")
         return
 
-    # Limpa somente o vencedor (se a coluna existir) e marca como ABERTO (se a coluna existir)
+    # 3) Limpa vencedor/is_closed (se existirem)
     if "winner_team_id" in stf.columns:
         stf.loc[mask_set, "winner_team_id"] = pd.NA
     if "is_closed" in stf.columns:
         stf.loc[mask_set, "is_closed"] = False
 
-    # Tenta remover APENAS o último rally do set (equivale a -1 do vencedor)
-    sub = _get_set_rallies(frames_local, mid, sn)
+    # 4) Tenta remover o último rally do set (equivale a -1 do vencedor)
+    sub = rl[(rl["match_id"] == mid) & (rl["set_number"] == sn)].copy().sort_values("rally_no")
 
     if not sub.empty:
         last = sub.iloc[-1]
@@ -2356,7 +2443,7 @@ def _reopen_set():
         rl = rl[rl["rally_id"] != last["rally_id"]]
         frames_local["rallies"] = rl
 
-        # define o placar como o do penúltimo rally (se existir), senão aplica -1 no vencedor
+        # define o placar como o do penúltimo rally (se existir), senão aplica -1 no vencedor “atual”
         if len(sub) >= 2:
             prev = sub.iloc[-2]
             hp = int(prev.get("score_home", 0))
@@ -2370,7 +2457,7 @@ def _reopen_set():
             else:
                 hp, ap = hp0, max(0, ap0 - 1)
     else:
-        # Não há rallies: aplica -1 no lado vencedor
+        # Não há rallies: aplica -1 no lado vencedor “atual”
         row = stf[mask_set].iloc[0]
         hp0 = int(row.get("home_points", 0))
         ap0 = int(row.get("away_points", 0))
@@ -2379,17 +2466,23 @@ def _reopen_set():
         else:
             hp, ap = hp0, max(0, ap0 - 1)
 
-    # Atualiza o placar do set (sem zerar)
+    # 5) Atualiza placar
     stf.loc[mask_set, "home_points"] = hp
     stf.loc[mask_set, "away_points"] = ap
     frames_local["sets"] = stf
 
-    # Persiste e atualiza estado
+    # 6) Persiste e atualiza estado (foca no set reaberto quando for fallback)
     save_all(Path(st.session_state.db_path), frames_local)
-    st.session_state.set_number = sn
     st.session_state.frames = frames_local
+    # Se foi fallback (sem set_picked), atualiza o set atual para o reaberto
+    try:
+        _ = set_picked  # noqa: F821
+    except Exception:
+        st.session_state.set_number = sn
+
     st.session_state.data_rev += 1
-    st.success(f"Set {sn} reaberto. Placar: {hp} x {ap}.")
+    st.success(f"Set {sn} reaberto. Placar ajustado: {hp} x {ap}.")
+    dbg_print(f"Set {sn} reaberto. Placar {hp}-{ap}.")
 
 def _close_set():
     frames_local = st.session_state.frames
@@ -3178,20 +3271,43 @@ def _criaBtnsJogadoras():
     err_bg = f"rgba(185,28,28,{1.0 if not is_ok else 0.25})"
     err_bd = f"rgba(127,29,29,{1.0 if not is_ok else 0.35})"
     # Linha: "Jogadora Selecionada: ..." + pills Acerto/Erro
+    # 1) CSS: coloca o container do radio e o container do markdown lado a lado
+    st.markdown("""
+    <style>
+    /* deixa o bloco do radio inline e sem margem extra */
+    .element-container:has(> div[data-testid="stRadio"]) {
+    display: inline-block;
+    margin: 0 10px 0 0 !important;
+    vertical-align: middle;
+    }
+    /* deixa o bloco desse markdown inline também */
+    .element-container:has(> div.stMarkdown) {
+    display: inline-block;
+    margin: 0 !important;
+    vertical-align: middle;
+    }
+    /* estiliza o grupo do radio para ficar compacto */
+    div[data-testid="stRadio"] label { margin: 0 !important; }
+    div[data-testid="stRadio"] > div[role="radiogroup"] { display: inline-flex; gap: 8px; }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # 3) Seu HTML SEM <div>, só <span> (continua na mesma linha)
     st.markdown(
         f"""
-        <div style="display:flex; align-items:center; gap:10px;">
-        <span>Jogadora Selecionada: <strong>{sel_txt}</strong></span>
+        <span>Jogadora Selecionada:
+        <strong style="font-size:25px; line-height:1;">{sel_txt}</strong>
+        </span>
         <span style="display:inline-block; padding:2px 10px; border-radius:10px;
                     border:1px solid {ok_bd}; background:{ok_bg};
                     color:#fff; font-weight:700; line-height:1;">Acerto</span>
         <span style="display:inline-block; padding:2px 10px; border-radius:10px;
                     border:1px solid {err_bd}; background:{err_bg};
                     color:#fff; font-weight:700; line-height:1;">Erro</span>
-        </div>
         """,
         unsafe_allow_html=True
     )
+
     # Garante estado
     uv_init_state()
     # Callbacks: exclusividade e atualização de q_result
@@ -3304,16 +3420,16 @@ def _criaBtnsAtalhos():
         ("sa",   "Saque"),
         ("rede", "Rede"),
     ]
-    # --- Linha de Atalhos + Rádio (Frente/Fundo) na mesma linha ---
-    max_cols = 12  # total de colunas da faixa
-    n_btns   = len(atalho_specs)
 
-    # Quantos botões cabem na 1ª linha (deixa a última coluna para o rádio)
-    first_row_btns = max_cols - 1 if n_btns >= (max_cols - 1) else n_btns
+    # --- Linha de Atalhos + [Frente/Fundo] + [↩️] na MESMA linha ---
+    max_cols = 12  # grade "fictícia" de 12
+    n_btns = len(atalho_specs)
 
-    # 1ª linha: [botões ...] [RÁDIO]
-    # Dê um pouquinho mais de largura para o rádio (ex.: 1.4)
-    row_weights = [1] * first_row_btns + [1.4]
+    # Deixa 2 colunas para o rádio e o botão minúsculo
+    first_row_btns = max_cols - 2 if n_btns >= (max_cols - 2) else n_btns
+
+    # Pesos: muitos botões (1 cada), rádio um pouco maior (1.4), desfazer minúsculo (0.001)
+    row_weights = [1] * first_row_btns + [1.4, 0.001]
     row1 = st.columns(row_weights)
 
     # Botões da 1ª linha
@@ -3327,19 +3443,23 @@ def _criaBtnsAtalhos():
                 use_container_width=True
             )
 
-    # Rádio na última coluna da 1ª linha
-    with row1[-1]:
+    # Rádio na penúltima coluna
+    with row1[-2]:
         st.session_state.q_position = st.radio(
             "", ["Frente", "Fundo"], horizontal=True,
             index=["Frente", "Fundo"].index(st.session_state.q_position),
             key="gm_q_position", label_visibility="collapsed"
         )
 
+    # Botão DESFAZER bem pequeno na última coluna
+    with row1[-1]:
+        st.button("↩️", key="btn_undo_main", on_click=undo_last_rally_current_set, help="Desfazer")
+
     # Linhas seguintes (se ainda houver botões de atalho)
     remaining = atalho_specs[first_row_btns:]
     while remaining:
-        chunk = remaining[:max_cols]       # até 12 por linha
-        cols  = st.columns(len(chunk))
+        chunk = remaining[:max_cols]  # até 12 por linha
+        cols = st.columns(len(chunk))
         for i, (code, label) in enumerate(chunk):
             with cols[i]:
                 st.button(
@@ -3351,8 +3471,6 @@ def _criaBtnsAtalhos():
         remaining = remaining[max_cols:]
 
     _paint_adv_rede_buttons()
-
-
 
 def uv_apply_game_mode_branding(our_team_id: int | None = None) -> None:
     """

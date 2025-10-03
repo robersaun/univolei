@@ -5,19 +5,16 @@ streamlit run index.py
 ***************************************
 
 
-layout jogo menor???
 
 
-salvar google nao mostrando preloader mais.. sendo chamado?
-Desfazer se for 0x0 deve reabrir o set anterior tirando o ultimo ponto, como no reabrir setjá faz
+VER	
+2	layout jogo menor???
+3	Fazer side out ? Quem inicia no set e pontu
 
-VER
-	Estatísticas do set
 
-	Fazer side out ? Quem inicia no set e pontu
-	erro carregamento preloader zoando componentes
-	Imagem das posicoes
-	UNIFICAR unir uv_init_state e uv_ensure_state?
+4	UNIFICAR unir uv_init_state e uv_ensure_state?
+5	bugs e 	erro carregamento preloader zoando componentes
+
 
 1. Config qtd max sets
  + finalizar partida respeitando valor. para registro na base de dados se for de 5 sets e um time ganhar 3 ele é o ganhador, se for de 2 sets e o time ganhar 2, ele é o ganhador e assim por diante. Se houver empates de set, registrar na base de dados como empate
@@ -30,7 +27,10 @@ VALIDAR finalizacao dos jogos e salvamentos (25x20, 27x25, outros)
 ***************************************
 FASE 2 
 	MARCA DAGUA ?
+OK		Imagem das posicoes E TUTORIAL
+OK		Estatísticas do set
 
+OK	salvar google nao mostrando preloader mais.. sendo chamado?
 OK	Imagem personalizada do time e talvez colocar como fundo do preloader?
 OK	2. Retirar auto 25/15
 
@@ -40,7 +40,7 @@ OK	Cadastro de tipo de jogo amistoso e campeonato. se for campeonato posso cadas
 OK	4. De resto deixa so as opções do mapa de calor, retirar tudo do modo jogo no normal
 
 OK	5. Tirar resultado acerto erro radios
-
+OK	1	Desfazer se for 0x0 deve reabrir o set anterior tirando o ultimo ponto, como no reabrir setjá faz
 ***************************************
 
 ------------------
@@ -67,6 +67,21 @@ Dá, mas é bem mais trabalhoso (Termux/Python e compilar dependências). Na pr�
 
 Se quiser, eu crio um pequeno “modo offline” no seu index.py (com a variável UV_OFFLINE) e troco automaticamente Google Sheets → XLSX/DuckDB quando estiver offline. Quer que eu aplique isso na sua versão atual?
 ***************************************
+
+
+
+
+Baseado no layout (textos e cores) do meu codigo de historico que vou enviar, crie um novo arquivo de tutorial do aplicativo e suas funcionalidades. criei o arquivo print_1.jpg na pasta imgs que traz a página 1 do aplicativo, que está acessível em https://univolei-scout.streamlit.app/ (se conseguir leia esse caminho e acesse por ele as funcionalidades, senao, vou enviar a print 1 para que vc crie a descricao simples.
+O tutorial deve descrever o passo 1 de acesso ao endereço https://univolei-scout.streamlit.app/, indicar que se tiver jogo em aberto (sem estar finalizado a marcacao de pontos ainda) irá trazer o título e sua data de criaçao no cabecalho. Há os botoes time, jogo, tutorial e historico na primeira linha. Ao clicar em Time, permitirá cadastrar o time e jogadoras... etc etc.
+Vou te enviar o arquivo index e vc fará um resumo das principais funcionalidades neste html, mas de forma simples e objetiva, ok?
+O modo jogo é o principal lugar de marcacao de pontos e o botao historico é o dashboard principal de análise de dados dos jogos e que servirá para análise de melhorias e treinos focados de volei do nosso time. isto precisa ser reforçado no tutorial (em negrito), pois é importante.
+Faça uma versão 1 e eu valido e te retorno para direcionamento..
+você pode criar 4 abas (1 a parte inicial do aplicativo, 2 o modo jogo, 3 o historico e 4 Serão 5 imagens que tb estao na pasta imgs (p1.jpg, p2.jpg e assim por diante, que vc irá apenas carregar as imagens e em baixo de cada uma delas fará um resumo textual  simples, rapido e efetivo do rodizio 5 x 1 (procure na web a p1 a levantadora fica na p1, p2 é a xxx, na defesa elas devem xxx, na posicao de ataque devem ficar xxx)
+***************************************
+1. 📊 Estatísticas do Jogo,  🧩 Comparativo por Fundamento podem ser diminuidas 50% na largura e o grafico comparativo por fundamento pode ficar do lado dessas duas tabelas, deste tamanho: CHART_FUND_INCH = (9.0, 3.9)
+CHART_EVOL_INCH = (9.0, 3.6)
+2. o grafico de 📈 Placar (evolução) da mesma forma, vai para o lado direito da tabela, nao em baixo e essa tabela (Set	Rally	Quem pontuou	Resultado	Ação	Jog.	Home	Away) pode ficar bem mais alta na altura, tipo umas 3 vezes mais está bom.. algo com umas 20,25 linhas de altura
+3. faça um erro de pontos e erros nossos tb, para mostrar visualmente o que mais estamos acertando e errando (no grafico para acerto pode usar cor verde escuro e vermelho para erro)
 
 
 

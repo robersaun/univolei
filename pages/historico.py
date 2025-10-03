@@ -1,4 +1,4 @@
-# pages/historico.py — Histórico de jogos (tabela 3 linhas, 2 gráficos pequenos com largura fixa)
+
 from __future__ import annotations
 
 # ===== Imports no topo =====
@@ -19,18 +19,11 @@ except Exception:
     MPL_AVAILABLE = False
 
 # ===== Config fácil p/ tamanho dos gráficos (edite aqui, se quiser) =====
-# => Ambos são exibidos com st.image(width=...), então o valor abaixo manda de verdade.
-CHART_FUND_PX = 900   # largura (px) do gráfico de barras “Comparativo por fundamento”
-CHART_EVOL_PX = 900   # largura (px) do gráfico de linha “Placar (evolução)”
-
-# ~aspect ratios usados ao salvar a figura (só para ficar proporcional bonitinho)
+CHART_FUND_PX = 900
+CHART_EVOL_PX = 900
 CHART_FUND_INCH = (9.0, 3.9)
 CHART_EVOL_INCH = (9.0, 3.6)
 
-
-# =========================
-# Utilitários compatíveis
-# =========================
 OUR_TEAM_ID = 1
 
 def _base_dir() -> Path:
@@ -59,45 +52,110 @@ def display_dataframe(df: pd.DataFrame, height: int | None = None, use_container
     html_table = html_table.replace("<thead>", f"<thead style='{thead_style}'>")
     h = f"{height}px" if height else "auto"
     w = "100%" if use_container_width else "auto"
-    st.markdown(
-        f"<div style='overflow:auto; height:{h}; width:{w}; margin:0'>{html_table}</div>",
-        unsafe_allow_html=True
-    )
+    st.markdown(f"<div style='overflow:auto; height:{h}; width:{w}; margin:0'>{html_table}</div>", unsafe_allow_html=True)
 
 def current_match_df(fr: dict, match_id: int) -> pd.DataFrame:
     rl = fr.get("rallies", pd.DataFrame())
-    return rl[rl["match_id"] == match_id].copy().sort_values(["set_number","rally_no"])
+    return rl[rl["match_id"] == match_id].copy().sort_values(["set_number","rally_no"]) if not rl.empty else pd.DataFrame()
 
 def current_set_df(fr: dict, match_id: int, set_number: int) -> pd.DataFrame:
     rl = fr.get("rallies", pd.DataFrame())
+    if rl.empty: return pd.DataFrame()
     return rl[(rl["match_id"]==match_id) & (rl["set_number"]==set_number)].copy().sort_values("rally_no")
 
 def fig_to_png_bytes(fig, dpi=140) -> bytes:
-    """Converte uma figura matplotlib para PNG bytes; ideal para st.image(width=...)."""
-    buf = io.BytesIO()
+    import io as _io
+    buf = _io.BytesIO()
     fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight", facecolor="white")
     plt.close(fig)
     buf.seek(0)
     return buf.getvalue()
 
+# ---------- helpers p/ normalizar tabela de sets ----------
+def _pick_col(df: pd.DataFrame, candidates: list[str]):
+    for c in candidates:
+        if c in df.columns: return c
+    return None
+
+def build_sets_view(frames: dict, match_id: int, home_name: str, away_name: str) -> pd.DataFrame:
+    """Retorna DataFrame com colunas: Set, Resultado, Pts home, Pts away, winner_team_id
+       Robusto para esquemas diferentes ou ausência da tabela 'sets' (reconstrói via rallies)."""
+    sets_raw = frames.get("sets", pd.DataFrame()).copy()
+    if not sets_raw.empty:
+        sets_raw = sets_raw[sets_raw.get("match_id").astype(str) == str(match_id)] if "match_id" in sets_raw.columns else sets_raw
+    # Detectar nomes
+    set_col  = _pick_col(sets_raw, ["set_number","set","numero_set","n_set","setnum"])
+    hp_col   = _pick_col(sets_raw, ["home_points","home_pts","home","score_home","pontos_home"])
+    ap_col   = _pick_col(sets_raw, ["away_points","away_pts","away","score_away","pontos_away"])
+    win_col  = _pick_col(sets_raw, ["winner_team_id","winner","vencedor_id","id_vencedor"])
+
+    if sets_raw.empty or set_col is None or hp_col is None or ap_col is None:
+        # Reconstruir via rallies
+        rl = current_match_df(frames, match_id)
+        if rl.empty:
+            return pd.DataFrame(columns=["Set","Resultado",f"Pts {home_name}",f"Pts {away_name}","winner_team_id"])
+        # garantir colunas
+        for c in ["set_number","score_home","score_away"]:
+            if c not in rl.columns: rl[c] = None
+        g = rl.groupby("set_number").agg({"score_home":"max","score_away":"max"}).reset_index().rename(columns={
+            "set_number":"Set","score_home":f"Pts {home_name}","score_away":f"Pts {away_name}"
+        })
+        # vencedor por set
+        def _winner(r):
+            try:
+                h, a = int(r[f"Pts {home_name}"]), int(r[f"Pts {away_name}"])
+                return OUR_TEAM_ID if h>a else -1 if a>h else 0
+            except: return 0
+        g["winner_team_id"] = g.apply(_winner, axis=1)
+        # coluna Resultado com ícone V/X
+        def _indic(win_id):
+            if int(win_id)==OUR_TEAM_ID:
+                return "<span title='Vitória' style='color:#166534;font-weight:800'>V:  </span> <b>Univolei</b>"
+            elif int(win_id)==-1:
+                return f"<span title='Derrota' style='color:#b91c1c;font-weight:800'>X:  </span> <b>{away_name}</b>"
+            else:
+                return "<b>Empate</b>"
+        g["Resultado"] = g["winner_team_id"].map(_indic)
+        return g[["Set","Resultado",f"Pts {home_name}",f"Pts {away_name}","winner_team_id"]].sort_values("Set")
+
+    # Se temos a tabela 'sets' com colunas detectadas
+    sm = sets_raw.rename(columns={
+        set_col:"Set",
+        hp_col:f"Pts {home_name}",
+        ap_col:f"Pts {away_name}",
+        win_col:"winner_team_id" if win_col else "winner_team_id",
+    }).copy()
+
+    # caso não exista winner_team_id, inferir
+    if "winner_team_id" not in sm.columns:
+        def _w(row):
+            try:
+                h,a = int(row[f"Pts {home_name}"]), int(row[f"Pts {away_name}"])
+                return OUR_TEAM_ID if h>a else -1 if a>h else 0
+            except: return 0
+        sm["winner_team_id"] = sm.apply(_w, axis=1)
+
+    def _indicador(winner_team_id: int | None) -> str:
+        try:
+            if int(winner_team_id) == OUR_TEAM_ID:
+                return "<span title='Vitória' style='color:#166534;font-weight:800'>V</span> <b>Univolei</b>"
+            elif int(winner_team_id) == -1:
+                return f"<span title='Derrota' style='color:#b91c1c;font-weight:800'>X</span> <b>{away_name}</b>"
+            else:
+                return "<b>Empate</b>"
+        except:
+            return "<b>Empate</b>"
+
+    sm["Resultado"] = sm["winner_team_id"].map(_indicador)
+    cols = ["Set","Resultado",f"Pts {home_name}",f"Pts {away_name}","winner_team_id"]
+    sm = sm[[c for c in cols if c in sm.columns]].copy()
+    return sm.sort_values("Set")
 
 # =========================
-# AgGrid (bonito) + Fallback para tabela antiga
+# AgGrid + fallback
 # =========================
 def render_games_grid(df_show: pd.DataFrame, total: int):
-    """
-    Mostra a grade com AgGrid (busca global, filtros por coluna, ordenação e clique).
-    Altura: no modo compacto, exatamente 3 linhas (com rolagem). Em "Lista completa", altura maior.
-    Fallback automático para a tabela HTML antiga se streamlit-aggrid não estiver instalada.
-    Retorna o match_id selecionado (ou None).
-    """
-    # Alturas calculadas p/ 3 linhas
-    ROW_H = 26
-    HEADER_H = 28
-    COMPACT_H = HEADER_H + ROW_H * 3 + 10   # => ~3 linhas visíveis (o que você pediu)
-    FULL_H = 360
-
-    # IMPORT opcional (aqui dentro): evita erro de import quando o pacote não está instalado
+    ROW_H = 26; HEADER_H = 28; COMPACT_H = HEADER_H + ROW_H*3 + 10; FULL_H = 360
     try:
         from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode
         AGGRID_OK = True
@@ -105,29 +163,19 @@ def render_games_grid(df_show: pd.DataFrame, total: int):
         AGGRID_OK = False
 
     if not AGGRID_OK:
-        # ---- FALLBACK: tabela HTML (melhorada) ----
         rows_html = []
         for _, r in df_show.iterrows():
             mid = int(r["match_id"]) if pd.notna(r["match_id"]) else 0
-            date = str(r["date"])
-            adv = str(r["Adversário"])
-            sets_txt = str(r["Sets (Nós-Adv)"])
-            res_html = r.get("ResHTML","—")
-            status = r["Status"]
-            rows_html.append(
-                f"<tr data-id='{mid}'>"
-                f"<td>{mid}</td><td>{date}</td><td><b>{adv}</b></td><td>{sets_txt}</td>"
-                f"<td>{res_html}</td><td>{status}</td></tr>"
-            )
+            date = str(r["date"]); adv = str(r["Adversário"]); sets_txt = str(r["Sets (Nós-Adv)"])
+            res_html = r.get("ResHTML","—"); status = r["Status"]
+            rows_html.append(f"<tr data-id='{mid}'><td>{mid}</td><td>{date}</td><td><b>{adv}</b></td><td>{sets_txt}</td><td>{res_html}</td><td>{status}</td></tr>")
         rows_html = "".join(rows_html)
         height = FULL_H if st.session_state.get("hist_full_open") else COMPACT_H
         table_id = "hg_tbl"
-
         html_template = r"""
         <style>
         .hg-table{width:100%; border-collapse:separate; border-spacing:0; font-size:.92rem;}
-        .hg-table thead th{position:sticky; top:0; background:#0f172a; color:#fff; text-align:left;
-                           padding:8px 10px; font-weight:800; user-select:none; cursor:pointer;}
+        .hg-table thead th{position:sticky; top:0; background:#0f172a; color:#fff; text-align:left; padding:8px 10px; font-weight:800; user-select:none; cursor:pointer;}
         .hg-table tbody td{padding:6px 10px; border-bottom:1px solid #e2e8f0;}
         .hg-table tbody tr:nth-child(even){background:#f8fafc;}
         .hg-table tbody tr:hover{background:#e2e8f0; cursor:pointer;}
@@ -147,12 +195,7 @@ def render_games_grid(df_show: pd.DataFrame, total: int):
             <table class='hg-table' id='__TABLE_ID__'>
               <thead>
                 <tr>
-                  <th data-col='0'>ID</th>
-                  <th data-col='1'>Data</th>
-                  <th data-col='2'>Adversário</th>
-                  <th data-col='3'>Sets</th>
-                  <th data-col='4'>Resultado</th>
-                  <th data-col='5'>Status</th>
+                  <th data-col='0'>ID</th><th data-col='1'>Data</th><th data-col='2'>Adversário</th><th data-col='3'>Sets</th><th data-col='4'>Resultado</th><th data-col='5'>Status</th>
                 </tr>
               </thead>
               <tbody>__ROWS__</tbody>
@@ -178,57 +221,23 @@ def render_games_grid(df_show: pd.DataFrame, total: int):
             }
           };
           T.querySelectorAll('tbody tr').forEach(tr=>tr.addEventListener('click', ()=>go(tr.getAttribute('data-id'))));
-          const parseVal=(txt)=>{ if(!txt) return {type:'str', val:''};
-            const t=txt.trim();
-            const num=parseFloat(t.replace(/[^0-9\.\-]/g,'')); if(!isNaN(num)) return {type:'num', val:num};
-            const d=Date.parse(t.replace(/\//g,'-')); if(!Number.isNaN(d)) return {type:'date', val:d};
-            return {type:'str', val:t.toLowerCase()};
-          };
-          const ths=[...T.querySelectorAll('thead th')];
-          ths.forEach((th,idx)=>{
-            th.addEventListener('click', ()=>{
-              const tbody=T.querySelector('tbody');
-              const rows=[...tbody.querySelectorAll('tr')];
-              const cur=th.getAttribute('data-sort')||'none';
-              const dir=cur==='asc'?'desc':'asc';
-              ths.forEach(x=>{x.removeAttribute('data-sort'); x.classList.remove('th-sort-asc','th-sort-desc');});
-              th.setAttribute('data-sort', dir);
-              th.classList.add(dir==='asc'?'th-sort-asc':'th-sort-desc');
-              rows.sort((a,b)=>{
-                const A=a.children[idx].innerText, B=b.children[idx].innerText;
-                const pa=parseVal(A), pb=parseVal(B);
-                if(pa.type===pb.type){
-                  if(pa.val<pb.val) return dir==='asc'?-1:1;
-                  if(pa.val>pb.val) return dir==='asc'?1:-1;
-                  return 0;
-                }
-                const rank={'num':0,'date':1,'str':2};
-                return dir==='asc'?(rank[pa.type]-rank[pb.type]):(rank[pb.type]-rank[pa.type]);
-              });
-              rows.forEach(r=>tbody.appendChild(r));
-            });
-          });
         })();
         </script>
         """
-        html_final = (
-            html_template
-              .replace("__TOTAL__", str(total))
-              .replace("__HEIGHT__", str(height))
-              .replace("__TABLE_ID__", table_id)
-              .replace("__ROWS__", rows_html)
-        )
+        html_final = (html_template
+                      .replace("__TOTAL__", str(total))
+                      .replace("__HEIGHT__", str(height))
+                      .replace("__TABLE_ID__", table_id)
+                      .replace("__ROWS__", rows_html))
         components.html(html_final, height=height+100, scrolling=True)
         return None
 
-    # ============ AgGrid ============
+    # AgGrid path
+    from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode
     df_grid = df_show.copy()
     df_grid["Status"] = df_grid["Status"].astype(str).str.replace(r"<.*?>", "", regex=True)
     df_grid = df_grid.rename(columns={
-        "match_id": "ID",
-        "date": "Data",
-        "Adversário": "Adversário",
-        "Sets (Nós-Adv)": "Sets"
+        "match_id":"ID","date":"Data","Adversário":"Adversário","Sets (Nós-Adv)":"Sets"
     })[["ID","Data","Adversário","Sets","Resultado","Status"]]
 
     gob = GridOptionsBuilder.from_dataframe(df_grid)
@@ -243,22 +252,12 @@ def render_games_grid(df_show: pd.DataFrame, total: int):
         }
     """)
     gob.configure_column("Resultado", width=140, cellStyle=res_style)
-    gob.configure_grid_options(
-        rowSelection="single",
-        suppressRowClickSelection=False,
-        domLayout="normal",
-        pagination=False,             # rolagem
-        rowHeight=ROW_H, headerHeight=HEADER_H,
-        enableCellTextSelection=True,
-        animateRows=True,
-        suppressMenuHide=False,
-        quickFilterText = st.session_state.get("hist_q", "")
-    )
-    gob.configure_column("ID", width=90)
-    gob.configure_column("Data", width=140)
+    gob.configure_grid_options(rowSelection="single", suppressRowClickSelection=False, domLayout="normal",
+                               pagination=False, rowHeight=26, headerHeight=28, enableCellTextSelection=True,
+                               animateRows=True, suppressMenuHide=False, quickFilterText=st.session_state.get("hist_q",""))
+    gob.configure_column("ID", width=90); gob.configure_column("Data", width=140)
     gob.configure_column("Adversário", flex=2, minWidth=220)
-    gob.configure_column("Sets", width=120)
-    gob.configure_column("Status", width=110)
+    gob.configure_column("Sets", width=120); gob.configure_column("Status", width=110)
     grid_options = gob.build()
 
     st.markdown("""
@@ -271,97 +270,65 @@ def render_games_grid(df_show: pd.DataFrame, total: int):
         </style>
     """, unsafe_allow_html=True)
 
-    height_grid = FULL_H if st.session_state.get("hist_full_open") else COMPACT_H
-    grid = AgGrid(
-        df_grid,
-        gridOptions=grid_options,
-        theme="alpine",
-        update_mode=GridUpdateMode.SELECTION_CHANGED | GridUpdateMode.MODEL_CHANGED,
-        allow_unsafe_jscode=True,
-        height=height_grid,
-        fit_columns_on_grid_load=True
-    )
-
+    height_grid = 360 if st.session_state.get("hist_full_open") else 26*3 + 28 + 10
+    grid = AgGrid(df_grid, gridOptions=grid_options, theme="alpine",
+                  update_mode=GridUpdateMode.SELECTION_CHANGED | GridUpdateMode.MODEL_CHANGED,
+                  allow_unsafe_jscode=True, height=height_grid, fit_columns_on_grid_load=True)
     rows = grid.get("selected_rows", [])
-    if rows:
-        return int(rows[0]["ID"])
+    if rows: return int(rows[0]["ID"])
     return None
-
 
 # =========================
 # Página
 # =========================
 st.set_page_config(page_title="Histórico — UniVolei", layout="wide")
-
-# ---------- CSS (remove header/toolbar/fundo branco; layout enxuto) ----------
-st.markdown(
-    """
+st.markdown("""
     <style>
       header[data-testid="stHeader"], [data-testid="stToolbar"], [data-testid="stDecoration"] { display:none !important; }
       [data-testid="stAppViewContainer"] { padding-top:0 !important; background:transparent !important; }
-
       .block-container { padding-top: .2rem !important; padding-bottom: .6rem !important; }
       .topbar-row { margin-top: 6px; }
-      .stMarkdown, .stText, .stSelectbox, .stNumberInput, .stButton { margin:0 !important; padding:0 !important; }
-      .stSelectbox > div, .stTextInput > div, .stMultiSelect > div, .stNumberInput > div { margin:0 !important; }
-      .stSelectbox label, .stTextInput label, .stMultiSelect label, .stNumberInput label { margin-bottom:2px !important; }
-
-      .hist-card{background:#fff; border:1px solid #e2e8f0; border-radius:10px;
-        padding:8px 10px; margin:6px 0; box-shadow:0 1px 2px rgba(15,23,42,.04);}
+      .hist-card{background:#fff; border:1px solid #e2e8f0; border-radius:10px; padding:8px 10px; margin:6px 0; box-shadow:0 1px 2px rgba(15,23,42,.04);}
       .hist-title{font-weight:800; letter-spacing:.2px; margin:0}
       .muted{color:#64748b; font-weight:600; margin:0}
       .hg-pill{display:inline-block; padding:2px 6px; border-radius:999px; font-size:.75rem; font-weight:700;}
       .hg-pill.ok{background:#dcfce7; color:#14532d; border:1px solid #86efac;}
       .hg-pill.open{background:#fef9c3; color:#78350f; border:1px solid #fde68a;}
-
       .res-badge{display:inline-block; padding:2px 8px; border-radius:999px; font-weight:800; font-size:.82rem;}
       .res-win{background:#dcfce7; color:#14532d; border:1px solid #86efac;}
       .res-draw{background:#fef9c3; color:#78350f; border:1px solid #fde68a;}
       .res-loss{background:#fee2e2; color:#7f1d1d; border:1px solid #fecaca;}
-
-      .scroll-wrap{overflow:auto; border:1px solid #e2e8f0; border-radius:10px; background:#fff;}
       .controls-row{display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:2px 0 4px 0;}
       .btn-ghost{background:#fff; border:1px solid #cbd5e1; border-radius:8px; padding:4px 8px; cursor:pointer; font-weight:700;}
       .btn-ghost:hover{background:#f8fafc;}
-
       .tiny-note{font-size:.8rem; color:#64748b; margin-left:6px;}
       .subtle{font-size:.9rem; color:#475569; margin:2px 0 4px 0;}
-
       .card-title{font-weight:800; color:#fff; padding:6px 10px; border-radius:8px 8px 0 0;}
       .card-wrap{border:1px solid #e2e8f0; border-radius:10px; overflow:hidden; box-shadow:0 1px 2px rgba(15,23,42,.04); margin:6px 0;}
-      .title-blue{background:linear-gradient(90deg,#0ea5e9,#1e3a8a);}  /* usado nos dois cards principais */
+      .title-blue{background:linear-gradient(90deg,#0ea5e9,#1e3a8a);}
       .title-amber{background:linear-gradient(90deg,#f59e0b,#92400e);}
       .title-slate{background:linear-gradient(90deg,#475569,#0f172a);}
     </style>
-    """,
-    unsafe_allow_html=True
-)
+""", unsafe_allow_html=True)
 
 # =========================
 # Dados
 # =========================
 frames = load_frames()
 mt = frames.get("amistosos", pd.DataFrame())
-sets = frames.get("sets", pd.DataFrame())
-
 if mt.empty:
     st.info("Nenhum jogo cadastrado ainda."); st.stop()
 
 home_name = team_name_by_id(frames, OUR_TEAM_ID)
 
-# Normalizações
 mt = mt.copy()
 mt["match_id"] = pd.to_numeric(mt["match_id"], errors="coerce").astype("Int64")
 mt["date"] = mt["date"].astype(str)
-
-def away_name_for(row):
-    return team_name_by_id(frames, row["away_team_id"])
-
-mt["Adversário"] = mt.apply(away_name_for, axis=1)
+mt["Adversário"] = mt.apply(lambda r: team_name_by_id(frames, r.get("away_team_id")), axis=1)
 mt["Sets (Nós-Adv)"] = mt.apply(lambda r: f'{int(r.get("home_sets",0))} - {int(r.get("away_sets",0))}', axis=1)
 
 # =========================
-# TOPO: título + filtros principais NA MESMA LINHA + toggle + fechar
+# Topo filtros
 # =========================
 st.session_state.setdefault("hist_full_open", False)
 st.session_state.setdefault("hist_page_size", 50)
@@ -372,43 +339,36 @@ st.session_state.setdefault("hist_filter_status", "Todos")
 
 st.markdown("<div class='topbar-row'>", unsafe_allow_html=True)
 c_title, c_busca, c_cols, c_toggle, c_close = st.columns([3, 3, 3, 2, 1])
-with c_title:
-    st.markdown("### 🗂️ Histórico e análise de jogos")
-with c_busca:
-    st.session_state["hist_q"] = st.text_input("Busca geral", st.session_state["hist_q"], placeholder="ID, data, adversário, sets…")
+with c_title: st.markdown("### 🗂️ Histórico e análise de jogos")
+with c_busca: st.session_state["hist_q"] = st.text_input("Busca geral", st.session_state["hist_q"], placeholder="ID, data, adversário, sets…")
 with c_cols:
     cols_opts = ["ID", "Data", "Adversário", "Sets", "Status"]
     st.session_state["hist_filter_cols"] = st.multiselect("Filtrar por colunas", cols_opts, default=st.session_state["hist_filter_cols"])
-with c_toggle:
-    st.toggle("🔎 Lista completa", key="hist_full_open")
+with c_toggle: st.toggle("🔎 Lista completa", key="hist_full_open")
 with c_close:
     def _back_index():
         try: st.switch_page("index.py")
         except Exception:
             try: st.switch_page("../index.py")
             except Exception: st.write("Abrir o Index pelo menu lateral.")
-    try:
-        st.page_link("index.py", label="❌ Fechar")
-    except Exception:
-        st.button("❌ Fechar", on_click=_back_index, use_container_width=True)
+    try: st.page_link("index.py", label="❌ Fechar")
+    except Exception: st.button("❌ Fechar", on_click=_back_index, use_container_width=True)
 st.markdown("</div>", unsafe_allow_html=True)
 
-# Sub-filtros (linha compacta)
+# Sub-filtros
 sf1, sf2, sf3 = st.columns([4, 4, 4])
 with sf1:
     id_filter = st.text_input("ID contém", key="hist_f_id") if "ID" in st.session_state["hist_filter_cols"] else ""
 with sf2:
     date_filter = st.text_input("Data contém", key="hist_f_date") if "Data" in st.session_state["hist_filter_cols"] else ""
-    adv_filter = st.text_input("Adversário contém", key="hist_f_adv") if "Adversário" in st.session_state["hist_filter_cols"] else ""
+    adv_filter  = st.text_input("Adversário contém", key="hist_f_adv") if "Adversário" in st.session_state["hist_filter_cols"] else ""
 with sf3:
     sets_filter = st.text_input("Sets contém", key="hist_f_sets") if "Sets" in st.session_state["hist_filter_cols"] else ""
     if "Status" in st.session_state["hist_filter_cols"]:
-        st.session_state["hist_filter_status"] = st.selectbox("Status", ["Todos", "Aberto", "Fechado"],
+        st.session_state["hist_filter_status"] = st.selectbox("Status", ["Todos","Aberto","Fechado"],
                                                               index=["Todos","Aberto","Fechado"].index(st.session_state["hist_filter_status"]))
 
-# =========================
-# Base, filtros, paginação
-# =========================
+# Base + filtros
 games_list = mt.sort_values(["date","match_id"], ascending=[False, True]).reset_index(drop=True)
 gl = games_list.copy()
 gl["__StatusTxt__"] = gl.apply(lambda r: "Fechado" if bool(r.get("is_closed", False)) else "Aberto", axis=1)
@@ -421,11 +381,12 @@ def _res_text(r):
         return "🟨 Empate"
     except Exception:
         return "—"
+
 def _res_html(r):
     txt = _res_text(r)
     if "Vitória" in txt: return f"<span class='res-badge res-win'>{txt}</span>"
     if "Derrota" in txt: return f"<span class='res-badge res-loss'>{txt}</span>"
-    if "Empate" in txt:  return f"<span class='res-badge res-draw'>{txt}</span>"
+    if "Empate"  in txt: return f"<span class='res-badge res-draw'>{txt}</span>"
     return txt
 
 gl["Resultado"] = gl.apply(_res_text, axis=1)
@@ -433,12 +394,10 @@ gl["ResHTML"]  = gl.apply(_res_html, axis=1)
 
 q = (st.session_state.get("hist_q") or "").strip().lower()
 if q:
-    gl = gl[
-        gl["Adversário"].astype(str).str.lower().str.contains(q, na=False) |
-        gl["date"].astype(str).str.lower().str.contains(q, na=False) |
-        gl["Sets (Nós-Adv)"].astype(str).str.lower().str.contains(q, na=False) |
-        gl["match_id"].astype(str).str.lower().str.contains(q, na=False)
-    ]
+    gl = gl[ gl["Adversário"].astype(str).str.lower().str.contains(q, na=False) |
+             gl["date"].astype(str).str.lower().str.contains(q, na=False) |
+             gl["Sets (Nós-Adv)"].astype(str).str.lower().str.contains(q, na=False) |
+             gl["match_id"].astype(str).str.lower().str.contains(q, na=False) ]
 if "ID" in st.session_state["hist_filter_cols"]:
     v = (st.session_state.get("hist_f_id") or "").strip().lower()
     if v: gl = gl[gl["match_id"].astype(str).str.lower().str.contains(v, na=False)]
@@ -453,30 +412,25 @@ if "Sets" in st.session_state["hist_filter_cols"]:
     if v: gl = gl[gl["Sets (Nós-Adv)"].astype(str).str.lower().str.contains(v, na=False)]
 if "Status" in st.session_state["hist_filter_cols"]:
     stv = st.session_state["hist_filter_status"]
-    if stv in ("Aberto", "Fechado"):
-        gl = gl[gl["__StatusTxt__"] == stv]
+    if stv in ("Aberto","Fechado"): gl = gl[gl["__StatusTxt__"] == stv]
 
-# Paginação (quando lista completa)
 total = len(gl)
 if st.session_state["hist_full_open"]:
     pages = max(1, math.ceil(total / st.session_state["hist_page_size"]))
     st.session_state["hist_page"] = st.number_input("Página:", min_value=1, max_value=pages,
                                                     value=min(st.session_state["hist_page"], pages), step=1)
     start = (st.session_state["hist_page"] - 1) * st.session_state["hist_page_size"]
-    end = start + st.session_state["hist_page_size"]
+    end   = start + st.session_state["hist_page_size"]
     show_df = gl.iloc[start:end].copy()
 else:
     show_df = gl.head(12).copy()
 
 def _row_status(r):
-    is_closed = bool(r.get("is_closed", False))
+    is_closed = bool(r.get("__StatusTxt__","Aberto") == "Fechado" or r.get("is_closed", False))
     return "<span class='hg-pill ok'>Fechado</span>" if is_closed else "<span class='hg-pill open'>Aberto</span>"
 
 show_df["Status"] = show_df.apply(_row_status, axis=1)
 
-# =========================
-# Tabela de jogos
-# =========================
 sel_from_grid = render_games_grid(show_df.assign(match_id=show_df["match_id"]), total=total)
 if sel_from_grid is not None:
     try: st.query_params.update({"sel_id": str(sel_from_grid)})
@@ -484,9 +438,6 @@ if sel_from_grid is not None:
     st.session_state["sel_id_override"] = sel_from_grid
     st.rerun()
 
-# =========================
-# Seleção de jogo
-# =========================
 ids = gl["match_id"].dropna().astype(int).tolist()
 default_id = ids[0] if ids else None
 
@@ -508,42 +459,28 @@ if sel_id is None:
 # =========================
 row = mt[mt["match_id"] == sel_id].iloc[0]
 away_name = row["Adversário"]; date_str = str(row["date"])
-st.markdown(
-    f"<div class='hist-card' style='padding:6px 8px'><span class='hist-title'>Jogo:</span> "
-    f"<b>{home_name}</b> x <b>{away_name}</b> — <span class='muted'>{date_str}</span></div>",
-    unsafe_allow_html=True
-)
+st.markdown(f"<div class='hist-card' style='padding:6px 8px'><span class='hist-title'>Jogo:</span> <b>{home_name}</b> x <b>{away_name}</b> — <span class='muted'>{date_str}</span></div>", unsafe_allow_html=True)
 
 # =========================
-# Sets
+# Sets (agora robusto)
 # =========================
 st.markdown("<div class='subtle'>Sets</div>", unsafe_allow_html=True)
-sets_df = frames.get("sets", pd.DataFrame())
-if not sets_df.empty:
-    sm = sets_df[sets_df["match_id"] == sel_id].copy().sort_values("set_number")
-    if not sm.empty:
-        view_tbl = sm.rename(columns={
-            "set_number":"Set",
-            "home_points":f"Pts {home_name}",
-            "away_points":f"Pts {away_name}",
-        })[["Set", f"Pts {home_name}", f"Pts {away_name}", "winner_team_id"]]
-        view_tbl["Vencedor"] = view_tbl["winner_team_id"].map({1: home_name, 2: away_name}).fillna("")
-        display_dataframe(view_tbl.drop(columns=["winner_team_id"]), height=130, use_container_width=True, header_bg="#1e293b")
-    else:
-        st.write("_Sem sets para este jogo._")
+view_tbl = build_sets_view(frames, sel_id, home_name, away_name)
+if view_tbl is None or view_tbl.empty:
+    st.write("_Sem sets para este jogo._")
 else:
-    st.write("_Sem sets._")
+    # Mostrar TODAS as linhas sem rolagem
+    display_dataframe(view_tbl.drop(columns=[c for c in ["winner_team_id"] if c in view_tbl.columns]),
+                      height=None, use_container_width=True, header_bg="#1e293b")
 
 # =========================
-# 📊 Estatísticas do Jogo (Todos por padrão)
+# Estatísticas / Gráficos
 # =========================
 all_df = current_match_df(frames, sel_id)
 sets_disp = sorted(all_df["set_number"].dropna().unique().tolist()) if not all_df.empty and "set_number" in all_df.columns else []
-
 scope_col, _ = st.columns([1.6, 6])
 with scope_col:
     set_scope = st.selectbox("📊 Estatísticas — escopo", (["Todos"] + [int(s) for s in sets_disp]), index=0, key="hist_stats_scope")
-
 df_scope = all_df.copy() if set_scope == "Todos" else current_set_df(frames, sel_id, int(set_scope))
 
 if df_scope is not None and not df_scope.empty:
@@ -555,117 +492,111 @@ if df_scope is not None and not df_scope.empty:
     attack_actions = {"DIAGONAL","LINHA","MEIO","PIPE","SEGUNDA","LOB","ATAQUE"}
     def _cnt(mask): return int(mask.sum()) if hasattr(mask, "sum") else 0
 
-    atk_home = _cnt((dfx.get("who_scored","")=="NOS") & (dfx.get("result","")=="PONTO") & (dfx.get("action","").isin(attack_actions)))
-    blk_home = _cnt((dfx.get("who_scored","")=="NOS") & (dfx.get("result","")=="PONTO") & (dfx.get("action","")=="BLOQUEIO"))
-    ace_home = _cnt((dfx.get("who_scored","")=="NOS") & (dfx.get("result","")=="PONTO") & (dfx.get("action","")=="SAQUE"))
+    atk_home    = _cnt((dfx.get("who_scored","")=="NOS") & (dfx.get("result","")=="PONTO") & (dfx.get("action","").isin(attack_actions)))
+    blk_home    = _cnt((dfx.get("who_scored","")=="NOS") & (dfx.get("result","")=="PONTO") & (dfx.get("action","")=="BLOQUEIO"))
+    ace_home    = _cnt((dfx.get("who_scored","")=="NOS") & (dfx.get("result","")=="PONTO") & (dfx.get("action","")=="SAQUE"))
     erradv_home = _cnt((dfx.get("who_scored","")=="NOS") & (dfx.get("result","")=="ERRO"))
 
-    atk_away = _cnt((dfx.get("who_scored","")=="ADV") & (dfx.get("result","")=="PONTO") & (dfx.get("action","").isin(attack_actions)))
-    blk_away = _cnt((dfx.get("who_scored","")=="ADV") & (dfx.get("result","")=="PONTO") & (dfx.get("action","")=="BLOQUEIO"))
-    ace_away = _cnt((dfx.get("who_scored","")=="ADV") & (dfx.get("result","")=="PONTO") & (dfx.get("action","")=="SAQUE"))
+    atk_away    = _cnt((dfx.get("who_scored","")=="ADV") & (dfx.get("result","")=="PONTO") & (dfx.get("action","").isin(attack_actions)))
+    blk_away    = _cnt((dfx.get("who_scored","")=="ADV") & (dfx.get("result","")=="PONTO") & (dfx.get("action","")=="BLOQUEIO"))
+    ace_away    = _cnt((dfx.get("who_scored","")=="ADV") & (dfx.get("result","")=="PONTO") & (dfx.get("action","")=="SAQUE"))
     erradv_away = _cnt((dfx.get("who_scored","")=="ADV") & (dfx.get("result","")=="ERRO"))
 
     try:
         last_row = dfx.sort_values(["set_number","rally_no"]).iloc[-1]
-        tot_home = int(last_row.get("score_home", 0))
-        tot_away = int(last_row.get("score_away", 0))
+        tot_home = int(last_row.get("score_home", 0)); tot_away = int(last_row.get("score_away", 0))
     except Exception:
         tot_home = atk_home + blk_home + ace_home + erradv_home
         tot_away = atk_away + blk_away + ace_away + erradv_away
 
     df_stats_final = pd.DataFrame({
-        "Fundamento": ["Pontos de Ataque", "Pontos de Bloqueio", "Aces (saques)", "Erros do adversário", "Total de pontos"],
-        home_name:    [atk_home,        blk_home,            ace_home,          erradv_home,              tot_home],
-        away_name:    [atk_away,        blk_away,            ace_away,          erradv_away,              tot_away],
+        "Fundamento": ["Pontos de Ataque","Pontos de Bloqueio","Aces (saques)","Erros do adversário","Total de pontos"],
+        home_name:    [atk_home, blk_home, ace_home, erradv_home, tot_home],
+        away_name:    [atk_away, blk_away, ace_away, erradv_away, tot_away],
     })
-
-    s_left, s_right = st.columns(2)
-    with s_left:
-        st.markdown("<div class='card-wrap'><div class='card-title title-blue'>📊 Estatísticas do Jogo</div></div>", unsafe_allow_html=True)
-        display_dataframe(df_stats_final, height=170, use_container_width=True, header_bg="#0ea5e9")
 
     by_fund = pd.DataFrame({
         "Fundamento": ["Ataque","Bloqueio","Ace","Erro Adversário"],
         home_name:    [atk_home, blk_home, ace_home, erradv_home],
         away_name:    [atk_away, blk_away, ace_away, erradv_away],
     })
-    with s_right:
-        st.markdown("<div class='card-wrap'><div class='card-title title-blue'>🧩 Comparativo por Fundamento</div></div>", unsafe_allow_html=True)
-        display_dataframe(by_fund, height=170, use_container_width=True, header_bg="#0ea5e9")
 
-    # ======== Gráficos (apenas 2; exportados para PNG e exibidos com largura fixa) ========
-    if MPL_AVAILABLE:
-        # 1) Barras comparativas (fundamentos)
-        figB, axB = plt.subplots(figsize=CHART_FUND_INCH)
-        cats = ["Ataque","Bloqueio","Ace","Erro Adv."]
-        H = [atk_home, blk_home, ace_home, erradv_home]
-        A = [atk_away, blk_away, ace_away, erradv_away]
-        x = range(len(cats)); width = 0.34
-        axB.bar([i - width/2 for i in x], H, width, label=home_name)
-        axB.bar([i + width/2 for i in x], A, width, label=away_name)
-        axB.set_xticks(list(x)); axB.set_xticklabels(cats, fontsize=7)
-        axB.set_ylabel("Pontos", fontsize=7); axB.set_title("Comparativo por fundamento", fontsize=8)
-        axB.legend(loc="best", fontsize=6)
-        axB.grid(True, linestyle='--', alpha=0.35)
-        st.image(fig_to_png_bytes(figB), width=CHART_FUND_PX)   # <<< tamanho controlado
+    tbl1_col, tbl2_col, chart_col = st.columns([1, 1, 1.2])
+    with tbl1_col:
+        st.markdown("<div class='card-wrap'><div class='card-title title-blue'>📊 Estatísticas do Jogo</div></div>", unsafe_allow_html=True)
+        display_dataframe(df_stats_final, height=None, use_container_width=True, header_bg="#0ea5e9")
+    with tbl2_col:
+        st.markdown("<div class='card-wrap'><div class='card-title title-blue'>🧩 Comparativo por Fundamento</div></div>", unsafe_allow_html=True)
+        display_dataframe(by_fund, height=None, use_container_width=True, header_bg="#0ea5e9")
+    with chart_col:
+        if MPL_AVAILABLE:
+            figB, axB = plt.subplots(figsize=CHART_FUND_INCH)
+            cats = ["Ataque","Bloqueio","Ace","Erro Adv."]
+            H = [atk_home, blk_home, ace_home, erradv_home]
+            A = [atk_away, blk_away, ace_away, erradv_away]
+            x = range(len(cats)); width = 0.34
+            bars_h = axB.bar([i - width/2 for i in x], H, width, label=home_name)
+            bars_a = axB.bar([i + width/2 for i in x], A, width, label=away_name)
+            axB.set_xticks(list(x)); axB.set_xticklabels(cats, fontsize=7)
+            axB.set_ylabel("Pontos", fontsize=7); axB.set_title("Comparativo por fundamento", fontsize=8)
+            axB.legend(loc="best", fontsize=6); axB.grid(True, linestyle='--', alpha=0.35)
+            # números nas barras
+            for bars in (bars_h, bars_a):
+                for b in bars:
+                    h = b.get_height()
+                    axB.text(b.get_x()+b.get_width()/2, h, f"{int(h)}", ha="center", va="bottom", fontsize=7)
+            st.image(fig_to_png_bytes(figB), width=CHART_FUND_PX)
 
     st.markdown("<div class='subtle'>Rallies</div>", unsafe_allow_html=True)
 else:
     st.caption("_Sem rallies no escopo selecionado._")
 
 # =========================
-# Rallies (compacto + seletor de set)
+# Rallies + Placar (evolução)
 # =========================
 if all_df.empty:
     st.info("Sem rallies para este jogo.")
 else:
-    sets_disp_r = sorted(all_df["set_number"].dropna().unique().tolist())
-    fcol1, _ = st.columns([1, 6])
-    with fcol1:
-        set_sel = st.selectbox("Set:", ["Todos"] + [int(s) for s in sets_disp_r], key="hist_rallies_set")
-    if set_sel == "Todos":
-        df_show = all_df
-    else:
-        df_show = current_set_df(frames, sel_id, int(set_sel))
+    sets_disp_r = sorted(all_df["set_number"].dropna().unique().tolist()) if "set_number" in all_df.columns else []
+    left_r, right_r = st.columns([1.2, 1.1])
 
-    cols_keep = ["set_number","rally_no","who_scored","result","action","player_number","score_home","score_away"]
-    cols_existing = [c for c in cols_keep if c in df_show.columns]
-    df_view = df_show[cols_existing].rename(columns={
-        "set_number":"Set","rally_no":"Rally","who_scored":"Quem pontuou",
-        "result":"Resultado","action":"Ação","player_number":"Jog.", "score_home":"Home","score_away":"Away"
-    })
-    display_dataframe(df_view, height=200, use_container_width=True, header_bg="#475569")
+    with left_r:
+        fcol1, _ = st.columns([1, 6])
+        with fcol1:
+            set_sel = st.selectbox("Set:", ["Todos"] + [int(s) for s in sets_disp_r], key="hist_rallies_set")
+        df_show = all_df if set_sel == "Todos" else current_set_df(frames, sel_id, int(set_sel))
 
-# =========================
-# 📈 Placar (evolução) — segundo e ÚNICO outro gráfico
-# =========================
-st.markdown("**📈 Placar (evolução)**")
-if MPL_AVAILABLE:
-    df_evo = df_scope if ('df_scope' in locals() and df_scope is not None and not df_scope.empty) else None
-    if df_evo is not None:
-        fig3, ax3 = plt.subplots(figsize=CHART_EVOL_INCH)
-        ax3.xaxis.set_major_locator(MaxNLocator(integer=True))
-        ax3.yaxis.set_major_locator(MaxNLocator(integer=True))
-        if all(k in df_evo.columns for k in ["rally_no","score_home","score_away"]):
-            ax3.plot(df_evo["rally_no"], df_evo["score_home"], marker="o", markersize=1.6, linewidth=0.7, label=home_name)
-            ax3.plot(df_evo["rally_no"], df_evo["score_away"], marker="o", markersize=1.6, linewidth=0.7, label=away_name)
-        ax3.set_xlabel("Rally", fontsize=7); ax3.set_ylabel("Pontos", fontsize=7)
-        ax3.legend(loc="best", fontsize=6)
-        ax3.grid(True, linestyle='--', alpha=0.6)
-        st.image(fig_to_png_bytes(fig3), width=CHART_EVOL_PX)   # <<< tamanho controlado
-    else:
-        st.caption("_Sem dados para o gráfico de placar._")
-else:
-    st.caption("_Matplotlib não disponível para gerar gráficos_")
+        cols_keep = ["set_number","rally_no","who_scored","result","action","player_number","score_home","score_away"]
+        cols_existing = [c for c in cols_keep if c in df_show.columns]
+        df_view = df_show[cols_existing].rename(columns={
+            "set_number":"Set","rally_no":"Rally","who_scored":"Quem pontuou",
+            "result":"Resultado","action":"Ação","player_number":"Jog.", "score_home":"Home","score_away":"Away"
+        })
+        display_dataframe(df_view, height=520, use_container_width=True, header_bg="#475569")
+
+    with right_r:
+        st.markdown("**📈 Placar (evolução)**")
+        if MPL_AVAILABLE and not df_show.empty:
+            fig3, ax3 = plt.subplots(figsize=CHART_EVOL_INCH)
+            ax3.xaxis.set_major_locator(MaxNLocator(integer=True))
+            ax3.yaxis.set_major_locator(MaxNLocator(integer=True))
+            if all(k in df_show.columns for k in ["rally_no","score_home","score_away"]):
+                ax3.plot(df_show["rally_no"], df_show["score_home"], marker="o", markersize=1.6, linewidth=0.7, label=home_name)
+                ax3.plot(df_show["rally_no"], df_show["score_away"], marker="o", markersize=1.6, linewidth=0.7, label=away_name)
+            ax3.set_xlabel("Rally", fontsize=7); ax3.set_ylabel("Pontos", fontsize=7)
+            ax3.legend(loc="best", fontsize=6); ax3.grid(True, linestyle='--', alpha=0.6)
+            st.image(fig_to_png_bytes(fig3), width=CHART_EVOL_PX)
+        elif not MPL_AVAILABLE:
+            st.caption("_Matplotlib não disponível para gerar gráficos_")
 
 # =========================
-# KPIs por jogadora (partida)
+# KPIs + Acertos x Erros
 # =========================
-left, right = st.columns(2)
+k_left, k_right = st.columns([1, 1.2])
 
-with left:
+with k_left:
     st.markdown("<div class='card-wrap'><div class='card-title title-amber'>🏅 Pontos (nossos)</div></div>", unsafe_allow_html=True)
-    atp = all_df[(all_df["result"]=="PONTO") & (all_df["who_scored"]=="NOS")].copy()
+    atp = all_df[(all_df.get("result")=="PONTO") & (all_df.get("who_scored")=="NOS")].copy() if not all_df.empty else pd.DataFrame()
     if atp.empty:
         st.write("_Sem pontos de ataque._")
     else:
@@ -677,9 +608,8 @@ with left:
         piv = piv[list(col_map.keys())].rename(columns=col_map).reset_index().rename(columns={"player_number":"Jog."})
         display_dataframe(piv, height=160, use_container_width=True, header_bg="#f59e0b")
 
-with right:
     st.markdown("<div class='card-wrap'><div class='card-title title-slate'>⚠️ Erros (nossos)</div></div>", unsafe_allow_html=True)
-    er = all_df[(all_df["result"]=="ERRO") & (all_df["who_scored"]=="ADV")].copy()
+    er = all_df[(all_df.get("result")=="ERRO") & (all_df.get("who_scored")=="ADV")].copy() if not all_df.empty else pd.DataFrame()
     if er.empty:
         st.write("_Sem erros._")
     else:
@@ -692,11 +622,48 @@ with right:
         piv_err["RECEPÇÃO"] = piv_err.get("RECEPÇÃO", 0) + piv_err.get("RECEPCAO", 0)
         order_cols = ["DIAGONAL","LINHA","MEIO","PIPE","SEGUNDA","LOB","SAQUE","BLOQUEIO","RECEPÇÃO"]
         piv_err = piv_err[order_cols].rename(columns={
-            "DIAGONAL":"Diagonal","LINHA":"Paralela","MEIO":"Meio","PIPE":"Pipe",
-            "SEGUNDA":"Segunda","LOB":"Largada","SAQUE":"Saque","BLOQUEIO":"Bloqueio","RECEPÇÃO":"Recepção",
+            "DIAGONAL":"Diagonal","LINHA":"Paralela","MEIO":"Meio","PIPE":"Pipe","SEGUNDA":"Segunda",
+            "LOB":"Largada","SAQUE":"Saque","BLOQUEIO":"Bloqueio","RECEPÇÃO":"Recepção",
         }).reset_index()
         tbl_err = pd.merge(tot, piv_err, on='player_number', how="left").rename(columns={"player_number":"Jog."}).sort_values("Erros", ascending=False)
         display_dataframe(tbl_err, height=160, use_container_width=True, header_bg="#475569")
+
+with k_right:
+    if MPL_AVAILABLE and not all_df.empty:
+        dfx_all = all_df.copy()
+        for c in ["action","result","who_scored"]:
+            if c in dfx_all.columns:
+                dfx_all[c] = dfx_all[c].astype(str).str.strip().str.upper()
+        succ = dfx_all[(dfx_all.get("who_scored","")=="NOS") & (dfx_all.get("result","")=="PONTO")].copy()
+        errs = dfx_all[(dfx_all.get("who_scored","")=="ADV") & (dfx_all.get("result","")=="ERRO")].copy()
+        def _norm_action(s): return str(s).strip().upper()
+        succ["action"] = succ["action"].map(_norm_action)
+        errs["action"] = errs["action"].map(_norm_action)
+
+        order_cols = ["DIAGONAL","LINHA","MEIO","PIPE","SEGUNDA","LOB","SAQUE","BLOQUEIO","RECEPÇÃO","RECEPCAO"]
+        succ_counts = [int((succ["action"]==c).sum()) for c in order_cols]
+        err_counts  = [int((errs["action"]==c).sum()) for c in order_cols]
+        recp_ok = succ_counts[8] + succ_counts[9]
+        recp_er = err_counts[8] + err_counts[9]
+
+        cats2 = ["Diagonal","Paralela","Meio","Pipe","Segunda","Largada","Saque","Bloqueio","Recepção"]
+        succ2 = succ_counts[:8] + [recp_ok]
+        err2  = err_counts[:8]  + [recp_er]
+
+        figC, axC = plt.subplots(figsize=(CHART_FUND_INCH[0], 3.2))
+        x2 = range(len(cats2)); w2 = 0.40
+        bars_ok = axC.bar([i - w2/2 for i in x2], succ2, w2, label="Nossos acertos", color="#166534")
+        bars_er = axC.bar([i + w2/2 for i in x2], err2,  w2, label="Nossos erros",   color="#991b1b")
+        axC.set_xticks(list(x2)); axC.set_xticklabels(cats2, fontsize=7, rotation=15)
+        axC.set_ylabel("Qtde", fontsize=7); axC.set_title("Nossos acertos × nossos erros (por fundamento)", fontsize=8)
+        axC.legend(loc="best", fontsize=6); axC.grid(True, linestyle="--", alpha=0.35)
+        for bars in (bars_ok, bars_er):
+            for b in bars:
+                h = b.get_height()
+                axC.text(b.get_x()+b.get_width()/2, h, f"{int(h)}", ha="center", va="bottom", fontsize=7)
+        st.image(fig_to_png_bytes(figC), width=CHART_FUND_PX)
+    else:
+        st.caption("_Gráfico indisponível (Matplotlib não encontrado ou sem dados)._")
 
 # =========================
 # Últimos rallies do set selecionado (curto)
@@ -716,10 +683,7 @@ except Exception:
 if df_set is not None and not df_set.empty:
     cols_show = [c for c in ["rally_no","player_number","action","result","who_scored","score_home","score_away"] if c in df_set.columns]
     preview = df_set.sort_values("rally_no").tail(12)[cols_show].copy()
-    preview.rename(columns={
-        "rally_no":"#","player_number":"Jog","action":"Ação",
-        "result":"Resultado","who_scored":"Quem","score_home":"H","score_away":"A"
-    }, inplace=True)
+    preview.rename(columns={"rally_no":"#","player_number":"Jog","action":"Ação","result":"Resultado","who_scored":"Quem","score_home":"H","score_away":"A"}, inplace=True)
     display_dataframe(preview, height=160, use_container_width=True, header_bg="#1e293b")
 else:
     st.caption("_Selecione um set para ver os últimos rallies._")

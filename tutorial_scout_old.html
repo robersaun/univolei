@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tutorial de Anotação Rápida – Scout de Vôlei</title>
+  <style>
+    :root{
+      --bg: #0f172a;         /* slate-900 */
+      --panel: #111827;      /* gray-900 */
+      --card: #0b1220;       /* custom */
+      --muted: #cbd5e1;      /* slate-300 */
+      --text: #e5e7eb;       /* gray-200 */
+      --accent: #22c55e;     /* green-500 */
+      --accent2: #60a5fa;    /* blue-400 */
+      --warn: #f59e0b;       /* amber-500 */
+      --danger:#ef4444;      /* red-500 */
+      --chip: #1f2937;       /* gray-800 */
+      --border:#1f2a44;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; background:linear-gradient(180deg,#0b1220 0%, #0f172a 100%);
+      color:var(--text); font: 15px/1.55 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji","Segoe UI Emoji";
+      padding: 24px;
+    }
+    .container{max-width:1100px; margin:0 auto;}
+    h1{font-size:28px; margin:0 0 8px}
+    h2{font-size:20px; margin:18px 0 10px}
+    h3{font-size:16px; margin:14px 0 8px}
+    p{margin:8px 0; color:var(--muted)}
+    code, kbd{
+      background: #0a1222; color:#e8eefb; padding:2px 6px; border-radius:6px; border:1px solid #152444;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 90%;
+    }
+    .grid{display:grid; gap:14px}
+    .g-2{grid-template-columns:repeat(2,1fr)}
+    .g-3{grid-template-columns:repeat(3,1fr)}
+    @media (max-width: 900px){ .g-2,.g-3{grid-template-columns:1fr} }
+    .card{
+      background: rgba(10,18,34,0.8); border:1px solid var(--border); border-radius:14px; padding:14px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+    }
+    .tag{display:inline-block; padding:4px 10px; border-radius:999px; background:var(--chip); color:#c9d3ee; border:1px solid #1b2740; font-size:12px; margin-right:6px}
+    .btn{
+      appearance:none; border:none; background:linear-gradient(180deg,#1b3a7d,#132a57);
+      color:#eaf2ff; padding:8px 12px; border-radius:10px; cursor:pointer; font-weight:600;
+      border:1px solid #25417b; box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 6px 16px rgba(0,0,0,0.35);
+    }
+    .btn.secondary{
+      background:linear-gradient(180deg,#1e3a5f,#12233b);
+      border-color:#1b2e4b;
+    }
+    .btn.warn{ background:linear-gradient(180deg,#8a4a05,#6a3700); border-color:#a95a08; }
+    .list{margin:8px 0 0 18px; color:var(--muted)}
+    .kbd{display:inline-block; background:#0a1222; border:1px solid #1a2e52; border-bottom-width:3px; padding:2px 8px; border-radius:8px}
+    .copy{float:right; font-size:12px; padding:4px 8px}
+    table{width:100%; border-collapse:collapse; margin-top:6px}
+    th,td{border:1px solid #1b2640; padding:8px; text-align:left}
+    th{background:#0f1a32}
+    tr:nth-child(even){background:#0b1427}
+    .muted{color:#a5b4cf}
+    .ok{color:var(--accent)}
+    .no{color:var(--danger)}
+    .pill{
+      display:inline-flex; gap:8px; align-items:center; padding:6px 10px; border-radius:999px; background:#0f1a32; border:1px solid #203058; color:#cfe2ff; font-size:12px
+    }
+    .hr{height:1px; background:linear-gradient(90deg, transparent, #1b2a48, transparent); margin:14px 0}
+    .header-bar{
+      display:flex; gap:10px; align-items:center; justify-content:space-between; margin-bottom:12px
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header-bar">
+      <div>
+        <h1>📘 Tutorial – Anotação Rápida de Scout (Vôlei)</h1>
+        <div class="muted">Compatível com o formato atual (1/0 + texto) e com o formato otimizado abaixo.</div>
+      </div>
+      <div style="display:flex; gap:8px">
+        <a class="btn secondary" href="http://localhost:8501">⬅ Voltar ao Index</a>
+        <button class="btn" onclick="window.print()">🖨️ Imprimir</button>
+        <a class="btn secondary" href="#minhas-notas">📝 Minhas notas</a>
+        </div>
+    </div>
+
+    <!-- TL;DR -->
+    <div class="card">
+      <h2>⚡ TL;DR – Use esta sintaxe curta</h2>
+      <p><span class="tag">lado</span><span class="tag">posição?</span><span class="tag">nº?</span><span class="tag">ação</span><span class="tag">erro?</span></p>
+      <p class="muted">lado: <code>1</code> (nós) · <code>0</code> ou <code>adv</code> (adversário). Posição/nº são opcionais. Se marcar <b>erro</b>, o ponto vai para o <b>outro lado</b>.</p>
+
+      <div class="grid g-3">
+        <div class="card">
+          <h3>✅ Exemplos (ponto nosso)</h3>
+          <button class="btn copy" data-copy="1 p9 d">Copiar</button>
+          <p><code>1 p9 d</code> — ponteira 9 diagonal</p>
+          <button class="btn copy" data-copy="1 op12 l">Copiar</button>
+          <p><code>1 op12 l</code> — oposta 12 linha</p>
+          <button class="btn copy" data-copy="1 sa">Copiar</button>
+          <p><code>1 sa</code> — ace nosso</p>
+        </div>
+        <div class="card">
+          <h3>❌ Exemplos (erro nosso → ponto delas)</h3>
+          <button class="btn copy" data-copy="1 c3 e bl">Copiar</button>
+          <p><code>1 c3 e bl</code> — central 3 bloqueada</p>
+          <button class="btn copy" data-copy="1 sa e">Copiar</button>
+          <p><code>1 sa e</code> — erro de saque</p>
+          <button class="btn copy" data-copy="1 re rs">Copiar</button>
+          <p><code>1 re rs</code> — erro de recepção</p>
+        </div>
+        <div class="card">
+          <h3>👥 Exemplos (adversário)</h3>
+          <button class="btn copy" data-copy="0 b">Copiar</button>
+          <p><code>0 b</code> — bloqueio ponto delas</p>
+          <button class="btn copy" data-copy="0 d">Copiar</button>
+          <p><code>0 d</code> — ataque diagonal delas</p>
+          <button class="btn copy" data-copy="adv re e">Copiar</button>
+          <p><code>adv re e</code> — erro de recepção delas (ponto nosso)</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sintaxe completa -->
+    <div class="grid g-2" style="margin-top:14px">
+      <div class="card">
+        <h2>1) Sintaxe curta (recomendada)</h2>
+        <p><code>&lt;lado&gt; &lt;posicao?&gt;&lt;numero?&gt; &lt;acao&gt; &lt;detalhe_erro?&gt;</code></p>
+        <ul class="list">
+          <li><b>lado</b>: <code>1</code> (nós), <code>0</code> ou <code>adv</code> (adversário)</li>
+          <li><b>posição</b> (opcional): <code>p</code> ponteira, <code>op</code> oposta, <code>c</code> central, <code>lev</code> levantadora, <code>li</code> líbero</li>
+          <li><b>nº</b> (opcional): <code>1–99</code></li>
+          <li><b>ação</b>:
+            <code>d</code> diagonal · <code>l</code> linha · <code>pi</code> pipe · <code>m</code> meio ·
+            <code>seg</code> segunda · <code>lob</code> lob · <code>b</code> bloqueio (ponto) ·
+            <code>sa</code> saque/ace · <code>re</code> recepção · <code>lv</code> levantamento · <code>df</code> defesa
+          </li>
+          <li><b>erro</b> (se houver): <code>fo</code> fora · <code>rd</code> rede · <code>bl</code> bloqueio sofrido · <code>sv</code> saque errado · <code>rs</code> recepção ruim · <code>er</code> genérico</li>
+        </ul>
+        <p class="muted"><span class="ok">Se tiver erro</span>, o ponto é do <b>outro lado</b>. <span class="ok">Se não tiver</span>, é <b>ponto do lado digitado</b>.</p>
+      </div>
+
+      <div class="card">
+        <h2>2) Sintaxe ultra-rápida (opcional)</h2>
+        <p><code>&lt;lado+pos+num&gt; &lt;acao&gt;&lt;-erro?&gt;</code></p>
+        <ul class="list">
+          <li>Junte lado/posição/número: <code>1p9</code>, <code>1c3</code>, <code>0</code>…</li>
+          <li>Erro como sufixo: <code>d-bl</code>, <code>sa-sv</code>, <code>re-er</code></li>
+        </ul>
+        <div>
+          <button class="btn copy" data-copy="1p9 d">Copiar</button>
+          <code>1p9 d</code> — ponteira 9 diagonal (ponto nosso)
+        </div>
+        <div style="margin-top:6px">
+          <button class="btn copy" data-copy="1c3 d-bl">Copiar</button>
+          <code>1c3 d-bl</code> — diagonal bloqueada (erro nosso → ponto delas)
+        </div>
+        <div style="margin-top:6px">
+          <button class="btn copy" data-copy="1 sa-sv">Copiar</button>
+          <code>1 sa-sv</code> — saque errado (ponto delas)
+        </div>
+      </div>
+    </div>
+
+    <!-- Dicionário -->
+    <div class="grid g-3" style="margin-top:14px">
+      <div class="card">
+        <h2>📚 Posições</h2>
+        <table>
+          <tr><th>Atalho</th><th>Descrição</th></tr>
+          <tr><td><code>p</code></td><td>Ponteira</td></tr>
+          <tr><td><code>op</code></td><td>Oposta</td></tr>
+          <tr><td><code>c</code></td><td>Central (meio)</td></tr>
+          <tr><td><code>lev</code></td><td>Levantadora</td></tr>
+          <tr><td><code>li</code></td><td>Líbero</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h2>🎯 Ações</h2>
+        <table>
+          <tr><th>Atalho</th><th>Descrição</th></tr>
+          <tr><td><code>d</code></td><td>Ataque diagonal</td></tr>
+          <tr><td><code>l</code></td><td>Ataque na linha</td></tr>
+          <tr><td><code>pi</code></td><td>Pipe</td></tr>
+          <tr><td><code>m</code></td><td>Meio</td></tr>
+          <tr><td><code>seg</code></td><td>Segunda (levantadora)</td></tr>
+          <tr><td><code>lob</code></td><td>Lob</td></tr>
+          <tr><td><code>b</code></td><td>Bloqueio ponto</td></tr>
+          <tr><td><code>sa</code></td><td>Saque (ace se ponto)</td></tr>
+          <tr><td><code>re</code></td><td>Recepção</td></tr>
+          <tr><td><code>lv</code></td><td>Levantamento</td></tr>
+          <tr><td><code>df</code></td><td>Defesa</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h2>⚠️ Erros</h2>
+        <table>
+          <tr><th>Atalho</th><th>Descrição</th></tr>
+          <tr><td><code>fo</code></td><td>Bola fora</td></tr>
+          <tr><td><code>rd</code></td><td>Toque na rede</td></tr>
+          <tr><td><code>bl</code></td><td>Bloqueio sofrido</td></tr>
+          <tr><td><code>sv</code></td><td>Erro de saque</td></tr>
+          <tr><td><code>rs</code></td><td>Erro de recepção</td></tr>
+          <tr><td><code>er</code></td><td>Erro genérico</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="hr"></div>
+
+    <!-- Regras de decisão -->
+    <div class="card">
+      <h2>🧠 Regras de interpretação</h2>
+      <ul class="list">
+        <li><b>Lado</b> define quem realizou a ação (<code>1</code>=nós, <code>0/adv</code>=elas).</li>
+        <li>Se houver <b>erro</b> (<code>e</code> na sintaxe curta ou sufixo <code>-*</code> na ultra), o <b>ponto vai para o outro lado</b>.</li>
+        <li>Sem erro → <b>ponto do lado digitado</b> (ataque entrou, bloqueio ponto, ace etc.).</li>
+        <li>Se informar <b>número</b> mas não a posição, ela pode vir do cadastro de jogadoras.</li>
+        <li>É válido registrar jogadas do adversário só com a ação: <code>0 d</code>, <code>0 b</code>…</li>
+      </ul>
+    </div>
+
+    <!-- Dicas -->
+    <div class="grid g-2" style="margin-top:14px">
+      <div class="card">
+        <h2>💡 Dicas de produtividade</h2>
+        <ul class="list">
+          <li><b>Repetição rápida</b>: após <code>1 p9 d</code>, você pode digitar só <code>d</code> (se ativarmos a “memória do último jogador” no parser).</li>
+          <li><b>Aliases de time</b>: <code>n</code> = nós, <code>a</code> = adversário (atalhos opcionais de <code>1/0</code>).</li>
+          <li><b>Sufixos de erro</b> na ultra-rápida: <code>d-bl</code>, <code>sa-sv</code>, <code>re-er</code>.</li>
+          <li><b>Flexível</b>: caixa (maiúscula/minúscula) e múltiplos espaços não importam.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h2>🧩 Exemplos extra</h2>
+        <p><button class="btn copy" data-copy="1 9 d">Copiar</button> <code>1 9 d</code> — usa posição da 9 (via cadastro) e registra diagonal</p>
+        <p><button class="btn copy" data-copy="0 re e">Copiar</button> <code>0 re e</code> — erro de recepção delas → ponto nosso</p>
+        <p><button class="btn copy" data-copy="1 lv e">Copiar</button> <code>1 lv e</code> — erro de levantamento nosso → ponto delas</p>
+        <p><button class="btn copy" data-copy="adv d">Copiar</button> <code>adv d</code> — ataque diagonal adversário (ponto delas)</p>
+      </div>
+    </div>
+
+    <div class="hr"></div>
+
+    <!-- Evolução / Notas -->
+    <div id="minhas-notas" class="card">
+      <h2>🔧 Evolução das regras (suas anotações)</h2>
+      <p class="muted">Use este bloco para <b>anotar combinações novas</b> (ex.: “<code>1 li df</code> = defesa salvando rally”), ou decidir <b>atalhos da sua equipe</b>. As notas ficam salvas no seu navegador (LocalStorage).</p>
+      <textarea id="notes" rows="8" style="width:100%; background:#07112a; color:#e7eefc; border:1px solid #193056; border-radius:10px; padding:10px"></textarea>
+      <div style="display:flex; gap:8px; margin-top:8px">
+        <button class="btn" onclick="saveNotes()">💾 Salvar notas</button>
+        <button class="btn secondary" onclick="loadNotes()">↻ Recarregar</button>
+        <button class="btn warn" onclick="clearNotes()">🗑️ Limpar</button>
+      </div>
+    </div>
+
+    <p class="muted" style="margin-top:14px">Dica: Imprima este guia e deixe ao lado da prancheta. Durante o jogo, priorize a <b>sintaxe curta</b> — é a que dá o melhor equilíbrio entre velocidade e detalhamento.</p>
+  </div>
+
+  <script>
+    // Copiar exemplos
+    document.querySelectorAll('.copy').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        const text = btn.getAttribute('data-copy');
+        navigator.clipboard.writeText(text).then(()=>{
+          const old = btn.textContent;
+          btn.textContent = 'Copiado!';
+          setTimeout(()=>btn.textContent = old, 900);
+        });
+      });
+    });
+
+    // Notas (LocalStorage)
+    const KEY = 'tutorial_scout_notas';
+    function loadNotes(){
+      const t = localStorage.getItem(KEY) || '';
+      document.getElementById('notes').value = t;
+    }
+    function saveNotes(){
+      const v = document.getElementById('notes').value || '';
+      localStorage.setItem(KEY, v);
+    }
+    function clearNotes(){
+      if(confirm('Apagar suas notas salvas?')){
+        localStorage.removeItem(KEY);
+        loadNotes();
+      }
+    }
+    // init
+    loadNotes();
+  </script>
+</body>
+</html>
