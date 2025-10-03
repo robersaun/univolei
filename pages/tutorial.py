@@ -1,5 +1,7 @@
+
 import os
 from pathlib import Path
+from typing import Optional
 import streamlit as st
 
 # --- Tentativa de usar PIL para obter dimensões das imagens (opcional) ---
@@ -17,9 +19,10 @@ st.set_page_config(
 
 # ===== Helpers =====
 BASE_DIR = Path(__file__).resolve().parent
-IMG_DIR = BASE_DIR / "../imgs"
+# Resolve caminho para a pasta de imagens (compatível com execução local/Cloud)
+IMG_DIR = (BASE_DIR / ".." / "imgs").resolve()
 
-def img_width_scaled(path: Path, scale: float = 0.6) -> int | None:
+def img_width_scaled(path: Path, scale: float = 0.6) -> Optional[int]:
     """
     Retorna a largura em px escalada pelo 'scale' (ex.: 0.6 = 60% do tamanho original).
     Se PIL não estiver disponível ou falhar, retorna None (Streamlit cuida do fallback).
@@ -112,7 +115,7 @@ with tab1:
               - **Jogo** → iniciar ou continuar uma partida em andamento.
               - **Tutorial** → abre esta página de instruções.
               - **Histórico** → acessar estatísticas e análises de jogos anteriores.
-            
+
             ---
             O aplicativo salva dados em **Excel, DuckDB e Google Sheets** (quando habilitado), garantindo backup e histórico.
             """,
