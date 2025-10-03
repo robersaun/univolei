@@ -37,3 +37,8 @@ Thumbs.db
 python-version
 config.ini
 config.ini
+
+
+# Não subindo mais bases de dados locais
+*.xlsx
+*.dv

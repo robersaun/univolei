@@ -1,3 +1,4 @@
+
 import os
 import base64
 from pathlib import Path
@@ -39,18 +40,16 @@ st.markdown(
   .stTabs [role="tablist"]{
     border: 2px solid #1e3a8a;
     border-radius: 12px;
-    /* +20% mais "respiro" e largura */
-    padding: 8px;              /* antes: 6px */
-    gap: 10px;                 /* antes: 6px */
+    padding: 6px;
+    gap: 6px;
     width: fit-content;
-    margin: 0 auto 10px auto;  /* centraliza o menu */
+    margin: 0 auto 8px auto; /* centraliza o menu */
     background: #ffffff;
   }
   .stTabs [role="tab"]{
     border: 1px solid #93c5fd;
     border-radius: 10px;
-    /* títulos das abas um pouco mais largos (~+20% via padding) */
-    padding: 8px 16px;         /* antes: 6px 12px */
+    padding: 6px 12px;
     background: #ffffff;
     color: #0f172a;
   }
@@ -64,16 +63,16 @@ st.markdown(
   .uv-tabbox{
     border: 3px solid #1e3a8a;
     border-radius: 14px;
-    padding: 16px;                  /* leve ajuste no padding */
-    margin: 10px auto 20px auto;
+    padding: 14px;
+    margin: 8px auto 18px auto;
     background: #ffffff;
-    max-width: 1440px;              /* antes: 1200px  (+20%) */
+    max-width: 1200px;   /* evita ocupar a tela inteira */
   }
-  .uv-wrap{ max-width: 1320px; margin: 0 auto; } /* antes: 1100px (+20%) */
+  .uv-wrap{ max-width: 1100px; margin: 0 auto; }
 
   /* Linha de conteúdo padrão (texto à esquerda / imagem à direita) */
   .uv-tabrow{
-    display: flex; gap: 24px; align-items: flex-start; /* gap um pouco maior */
+    display: flex; gap: 20px; align-items: flex-start;
   }
   .uv-l{ flex: 3 1 0; min-width: 360px; }
   .uv-r{ flex: 2 1 0; min-width: 260px; display:flex; justify-content:flex-end; }
@@ -82,18 +81,16 @@ st.markdown(
   .uv-r img.uv-img-std{ max-width: 504px; height: auto; border-radius: 10px; display: block; }
   .uv-r img.uv-img-3{   max-width: 588px; height: auto; border-radius: 10px; display: block; }
 
-  /* Remover a linha cinza (qualquer <hr/> interno dos blocos) */
-  .uv-tabbox hr{ display: none !important; }  /* antes tinha margin e aparecia a linha */
-
+  .uv-tabbox hr{ margin: 8px 0; }
   .uv-tabbox [data-testid="stMarkdownContainer"] p{ margin: .25rem 0; }
 
   /* Rodízio: 2 cards por linha com alturas iguais e centralizado */
   .uv-grid{
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 18px;                /* antes: 14px */
+    gap: 14px;
     align-items: stretch;
-    max-width: 1320px;        /* antes: 1100px (+20%) */
+    max-width: 1100px;
     margin: 2px auto 0 auto;
   }
   .uv-col{ display: flex; min-width: 420px; }
@@ -101,9 +98,9 @@ st.markdown(
     border: 1px solid #3b82f6;
     border-radius: 12px;
     background: #f8fafc;
-    padding: 14px;            /* leve ajuste */
+    padding: 12px;
     display: flex;
-    gap: 18px;                /* um pouco mais largo */
+    gap: 16px;
     align-items: flex-start;
     width: 100%;
     height: 100%;
@@ -121,19 +118,7 @@ st.markdown(
   .uv-txt ul{ margin: 0; padding-left: 1.1rem; }
 
   /* Barra do botão fechar no topo */
-  .topbar-row{
-    display: flex; justify-content: flex-end;
-    max-width: 1440px;  /* antes: 1200 (+20%) */
-    margin: 0 auto;
-  }
-
-  /* --- Tabelas/DataFrames globais com largura ~+20% e centralizadas --- */
-  .stTable, .stDataFrame{
-    max-width: 1320px;           /* aplica-se às páginas que tiverem tabelas */
-    margin-left: auto;
-    margin-right: auto;
-  }
-  .stDataFrame > div{ width: 100% !important; }
+  .topbar-row{ display: flex; justify-content: flex-end; max-width: 1200px; margin: 0 auto; }
 </style>
     """,
     unsafe_allow_html=True,
@@ -163,89 +148,95 @@ tab1, tab2, tab3, tab4 = st.tabs(["Início", "Modo Jogo", "Histórico", "Rodízi
 # ---------------- Tab 1 ----------------
 with tab1:
     img = img_to_data_uri(IMG_DIR / "print_1.jpg")
-    html = (
-        "<div class='uv-tabbox'><div class='uv-wrap'>"
-        "<div class='uv-tabrow'>"
-        "<div class='uv-l'>"
-        "<h3>🔹 Acesso inicial</h3>"
-        "<ul>"
-        "<li>Entre no endereço: <b>https://univolei-scout.streamlit.app/</b></li>"
-        "<li>Caso exista <b>jogo em aberto</b>, o título e a data aparecerão automaticamente no cabeçalho.</li>"
-        "<li>Na <b>primeira linha</b> você encontra os botões principais:"
-        "<ul>"
-        "<li><b>Time</b> → cadastrar/editar o time e jogadoras.</li>"
-        "<li><b>Jogo</b> → iniciar ou continuar uma partida em andamento.</li>"
-        "<li><b>Tutorial</b> → abre esta página de instruções.</li>"
-        "<li><b>Histórico</b> → acessar estatísticas e análises de jogos anteriores.</li>"
-        "</ul>"
-        "</li>"
-        "</ul>"
-        # (linha cinza removida via CSS)
-        "O aplicativo salva dados em <b>Excel, DuckDB e Google Sheets</b> (quando habilitado), garantindo backup e histórico."
-        "</div>"
-        "<div class='uv-r'>"
-        f"{('<img class=\"uv-img-std\" src=\"' + img + '\" alt=\"Tela inicial do aplicativo\"/>') if img else '<em>Imagem não encontrada (print_1.jpg)</em>'}"
-        "</div>"
-        "</div>"
-        "</div></div>"
-    )
+    img_html_1 = (f'<img class="uv-img-std" src="{img}" alt="Tela inicial do aplicativo"/>' 
+                  if img else '<em>Imagem não encontrada (print_1.jpg)</em>')
+    html = f"""
+<div class='uv-tabbox'><div class='uv-wrap'>
+  <div class='uv-tabrow'>
+    <div class='uv-l'>
+      <h3>🔹 Acesso inicial</h3>
+      <ul>
+        <li>Entre no endereço: <b>https://univolei-scout.streamlit.app/</b></li>
+        <li>Caso exista <b>jogo em aberto</b>, o título e a data aparecerão automaticamente no cabeçalho.</li>
+        <li>Na <b>primeira linha</b> você encontra os botões principais:
+          <ul>
+            <li><b>Time</b> → cadastrar/editar o time e jogadoras.</li>
+            <li><b>Jogo</b> → iniciar ou continuar uma partida em andamento.</li>
+            <li><b>Tutorial</b> → abre esta página de instruções.</li>
+            <li><b>Histórico</b> → acessar estatísticas e análises de jogos anteriores.</li>
+          </ul>
+        </li>
+      </ul>
+      O aplicativo salva dados em <b>Excel, DuckDB e Google Sheets</b> (quando habilitado), garantindo backup e histórico.
+    </div>
+    <div class='uv-r'>
+      {img_html_1}
+    </div>
+  </div>
+</div></div>
+"""
     st.markdown(html, unsafe_allow_html=True)
+
 
 # ---------------- Tab 2 ----------------
 with tab2:
     img = img_to_data_uri(IMG_DIR / "print_2.jpg")
-    html = (
-        "<div class='uv-tabbox'><div class='uv-wrap'>"
-        "<div class='uv-tabrow'>"
-        "<div class='uv-l'>"
-        "<h3>🔹 Modo Jogo (principal)</h3>"
-        "<p>O <b>Modo Jogo</b> é o coração do sistema: é aqui que você registra todas as jogadas da partida.</p>"
-        "<ul>"
-        "<li><b>Botões de Jogadoras</b> → clique para marcar quem participou do rally."
-        "<ul><li>1º clique = <b>Acerto</b> ✅</li><li>2º clique = <b>Erro</b> ❌</li></ul>"
-        "</li>"
-        "<li><b>Botão ADV</b> → registra pontos do adversário.</li>"
-        "<li><b>Quadra Interativa (Heatmap)</b> → clique na quadra para marcar a região de cada ação.</li>"
-        "<li><b>Placar em tempo real</b> → exibido sempre acima da quadra.</li>"
-        "<li><b>Gestão de Sets</b> → abrir, fechar e finalizar sets; remover set vazio quando necessário.</li>"
-        "</ul>"
-        # (linha cinza removida via CSS)
-        "🔑 <b>Importante:</b> O <b>Modo Jogo</b> é o principal local de marcação de pontos. "
-        "Cada ação registrada aqui alimenta as estatísticas do <b>Histórico</b> e direciona os treinos."
-        "</div>"
-        "<div class='uv-r'>"
-        f"{('<img class=\"uv-img-std\" src=\"' + img + '\" alt=\"Modo Jogo — principal área de marcação de pontos\"/>') if img else '<em>Imagem não encontrada (print_2.jpg)</em>'}"
-        "</div>"
-        "</div>"
-        "</div></div>"
-    )
+    img_html_2 = (f'<img class="uv-img-std" src="{img}" alt="Modo Jogo — principal área de marcação de pontos"/>' 
+                  if img else '<em>Imagem não encontrada (print_2.jpg)</em>')
+    html = f"""
+<div class='uv-tabbox'><div class='uv-wrap'>
+  <div class='uv-tabrow'>
+    <div class='uv-l'>
+      <h3>🔹 Modo Jogo (principal)</h3>
+      <p>O <b>Modo Jogo</b> é o coração do sistema: é aqui que você registra todas as jogadas da partida.</p>
+      <ul>
+        <li><b>Botões de Jogadoras</b> → clique para marcar quem participou do rally.
+          <ul><li>1º clique = <b>Acerto</b> ✅</li><li>2º clique = <b>Erro</b> ❌</li></ul>
+        </li>
+        <li><b>Botão ADV</b> → registra pontos do adversário.</li>
+        <li><b>Quadra Interativa (Heatmap)</b> → clique na quadra para marcar a região de cada ação.</li>
+        <li><b>Placar em tempo real</b> → exibido sempre acima da quadra.</li>
+        <li><b>Gestão de Sets</b> → abrir, fechar e finalizar sets; remover set vazio quando necessário.</li>
+      </ul>
+      🔑 <b>Importante:</b> O <b>Modo Jogo</b> é o principal local de marcação de pontos. 
+      Cada ação registrada aqui alimenta as estatísticas do <b>Histórico</b> e direciona os treinos.
+    </div>
+    <div class='uv-r'>
+      {img_html_2}
+    </div>
+  </div>
+</div></div>
+"""
     st.markdown(html, unsafe_allow_html=True)
+
 
 # ---------------- Tab 3 ----------------
 with tab3:
     img = img_to_data_uri(IMG_DIR / "print_3.jpg")
-    html = (
-        "<div class='uv-tabbox'><div class='uv-wrap'>"
-        "<div class='uv-tabrow'>"
-        "<div class='uv-l'>"
-        "<h3>🔹 Histórico de Jogos</h3>"
-        "<p>O <b>Histórico</b> é o <b>dashboard central de análise</b>.</p>"
-        "<ul>"
-        "<li>📋 <b>Lista de jogos</b>: ID, data, adversário, sets e status (aberto/fechado).</li>"
-        "<li>✅ <b>Resultado</b>: Vitória, Derrota ou Empate.</li>"
-        "<li>🔍 <b>Filtros e buscas</b> por ID, data, adversário e status.</li>"
-        "<li>📊 <b>Estatísticas detalhadas</b>: evolução do placar, comparativo por fundamento, erros por categoria, mapas de calor.</li>"
-        "</ul>"
-        # (linha cinza removida via CSS)
-        "💡 <b>Reforço:</b> O <b>Histórico</b> é o local-chave para análise de desempenho e definição de treinos específicos."
-        "</div>"
-        "<div class='uv-r'>"
-        f"{('<img class=\"uv-img-3\" src=\"' + img + '\" alt=\"Histórico — visão analítica\"/>') if img else '<em>Imagem não encontrada (print_3.jpg)</em>'}"
-        "</div>"
-        "</div>"
-        "</div></div>"
-    )
+    img_html_3 = (f'<img class="uv-img-3" src="{img}" alt="Histórico — visão analítica"/>' 
+                  if img else '<em>Imagem não encontrada (print_3.jpg)</em>')
+    html = f"""
+<div class='uv-tabbox'><div class='uv-wrap'>
+  <div class='uv-tabrow'>
+    <div class='uv-l'>
+      <h3>🔹 Histórico de Jogos</h3>
+      <p>O <b>Histórico</b> é o <b>dashboard central de análise</b>.</p>
+      <ul>
+        <li>📋 <b>Lista de jogos</b>: ID, data, adversário, sets e status (aberto/fechado).</li>
+        <li>✅ <b>Resultado</b>: Vitória, Derrota ou Empate.</li>
+        <li>🔍 <b>Filtros e buscas</b> por ID, data, adversário e status.</li>
+        <li>📊 <b>Estatísticas detalhadas</b>: evolução do placar, comparativo por fundamento, erros por categoria, mapas de calor.</li>
+      </ul>
+      💡 <b>Reforço:</b> O <b>Histórico</b> é o local-chave para análise de desempenho e definição de treinos específicos.
+    </div>
+    <div class='uv-r'>
+      {img_html_3}
+    </div>
+  </div>
+</div></div>
+"""
     st.markdown(html, unsafe_allow_html=True)
+
 
 # ---------------- Tab 4 — Rodízio 5x1 ----------------
 with tab4:
