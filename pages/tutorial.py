@@ -1,86 +1,148 @@
-
 import os
+import base64
 from pathlib import Path
 from typing import Optional
 import streamlit as st
 
-# --- Tentativa de usar PIL para obter dimensões das imagens (opcional) ---
-try:
-    from PIL import Image
-    PIL_OK = True
-except Exception:
-    PIL_OK = False
-
+# ===== Config =====
 st.set_page_config(
     page_title="Tutorial — UniVolei Live Scout",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="collapsed",
 )
 
 # ===== Helpers =====
 BASE_DIR = Path(__file__).resolve().parent
-# Resolve caminho para a pasta de imagens (compatível com execução local/Cloud)
 IMG_DIR = (BASE_DIR / ".." / "imgs").resolve()
 
-def img_width_scaled(path: Path, scale: float = 0.6) -> Optional[int]:
-    """
-    Retorna a largura em px escalada pelo 'scale' (ex.: 0.6 = 60% do tamanho original).
-    Se PIL não estiver disponível ou falhar, retorna None (Streamlit cuida do fallback).
-    """
-    if not PIL_OK:
-        return None
+def img_to_data_uri(path: Path) -> Optional[str]:
+    # Converte imagem local para data URI (base64) para embutir em HTML.
     try:
-        with Image.open(path) as im:
-            w, _ = im.size
-        w_scaled = max(1, int(w * scale))
-        return w_scaled
+        ext = path.suffix.lower()
+        mime = "image/png" if ext == ".png" else "image/jpeg"
+        b64 = base64.b64encode(path.read_bytes()).decode("ascii")
+        return f"data:{mime};base64,{b64}"
     except Exception:
         return None
 
-# ===== Título =====
+# ===== Title =====
 st.markdown(
-    "<h1 style='text-align:center; color:#1e3a8a; margin-top: .25rem'>📘 Tutorial UniVolei Live Scout</h1>",
-    unsafe_allow_html=True
+    "<h1 style='text-align:center; color:#1e3a8a; margin-top:.25rem'>📘 Tutorial UniVolei Live Scout</h1>",
+    unsafe_allow_html=True,
 )
 
-# ===== Estilos extras =====
+# ===== Styles (centralização + tamanhos + paleta azul escura) =====
 st.markdown(
     """
-    <style>
-      .uv-card {
-        background: #ffffff;
-        border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        box-shadow: 0 1px 4px rgba(15,23,42,.06);
-        padding: 14px;
-      }
-      .uv-note {
-        background:#eef2ff; border:1px solid #c7d2fe; padding:10px 12px; border-radius:10px;
-      }
-      .uv-muted { color:#64748b; }
-      .uv-rodizio-text {
-        font-size: 3em;              /* 3x maior */
-        line-height: 1.15;
-        font-weight: 700;
-        color: #0f172a;
-        margin-top: .25rem;
-        margin-bottom: 1rem;
-      }
-      .uv-list li { margin: .25rem 0; }
-      .uv-section-title {
-        margin: .3rem 0 .8rem 0;
-        font-weight: 800;
-        color: #0f172a;
-      }
-    </style>
+<style>
+  /* --- Tab menu bonito com borda arredondada e azul mais escuro --- */
+  .stTabs [role="tablist"]{
+    border: 2px solid #1e3a8a;
+    border-radius: 12px;
+    /* +20% mais "respiro" e largura */
+    padding: 8px;              /* antes: 6px */
+    gap: 10px;                 /* antes: 6px */
+    width: fit-content;
+    margin: 0 auto 10px auto;  /* centraliza o menu */
+    background: #ffffff;
+  }
+  .stTabs [role="tab"]{
+    border: 1px solid #93c5fd;
+    border-radius: 10px;
+    /* títulos das abas um pouco mais largos (~+20% via padding) */
+    padding: 8px 16px;         /* antes: 6px 12px */
+    background: #ffffff;
+    color: #0f172a;
+  }
+  .stTabs [aria-selected="true"]{
+    background: #93c5fd;     /* azul mais escuro (blue-400) */
+    border-color: #2563eb;   /* blue-600 */
+    color: #0f172a;
+  }
+
+  /* Área centralizada que evita largura total e reduz espaços */
+  .uv-tabbox{
+    border: 3px solid #1e3a8a;
+    border-radius: 14px;
+    padding: 16px;                  /* leve ajuste no padding */
+    margin: 10px auto 20px auto;
+    background: #ffffff;
+    max-width: 1440px;              /* antes: 1200px  (+20%) */
+  }
+  .uv-wrap{ max-width: 1320px; margin: 0 auto; } /* antes: 1100px (+20%) */
+
+  /* Linha de conteúdo padrão (texto à esquerda / imagem à direita) */
+  .uv-tabrow{
+    display: flex; gap: 24px; align-items: flex-start; /* gap um pouco maior */
+  }
+  .uv-l{ flex: 3 1 0; min-width: 360px; }
+  .uv-r{ flex: 2 1 0; min-width: 260px; display:flex; justify-content:flex-end; }
+
+  /* Tamanhos das imagens (1 e 2 +20%, 3 +40% em relação ao anterior de 420px) */
+  .uv-r img.uv-img-std{ max-width: 504px; height: auto; border-radius: 10px; display: block; }
+  .uv-r img.uv-img-3{   max-width: 588px; height: auto; border-radius: 10px; display: block; }
+
+  /* Remover a linha cinza (qualquer <hr/> interno dos blocos) */
+  .uv-tabbox hr{ display: none !important; }  /* antes tinha margin e aparecia a linha */
+
+  .uv-tabbox [data-testid="stMarkdownContainer"] p{ margin: .25rem 0; }
+
+  /* Rodízio: 2 cards por linha com alturas iguais e centralizado */
+  .uv-grid{
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;                /* antes: 14px */
+    align-items: stretch;
+    max-width: 1320px;        /* antes: 1100px (+20%) */
+    margin: 2px auto 0 auto;
+  }
+  .uv-col{ display: flex; min-width: 420px; }
+  .uv-card{
+    border: 1px solid #3b82f6;
+    border-radius: 12px;
+    background: #f8fafc;
+    padding: 14px;            /* leve ajuste */
+    display: flex;
+    gap: 18px;                /* um pouco mais largo */
+    align-items: flex-start;
+    width: 100%;
+    height: 100%;
+  }
+  .uv-title{
+    font-size: 1.12rem; font-weight: 700; margin: 2px 0 8px 0; color: #0f172a;
+  }
+  .uv-rodizio-text{ font-size: 1.05rem; line-height: 1.45; margin: 0; color: #0f172a; }
+  .uv-img{ width: 40%; min-width: 220px; max-width: 520px; }
+  .uv-img img{
+    width: 100%; height: auto; border-radius: 10px; display: block;
+    max-height: 420px; object-fit: contain;
+  }
+  .uv-txt{ flex: 1 1 auto; display: flex; flex-direction: column; }
+  .uv-txt ul{ margin: 0; padding-left: 1.1rem; }
+
+  /* Barra do botão fechar no topo */
+  .topbar-row{
+    display: flex; justify-content: flex-end;
+    max-width: 1440px;  /* antes: 1200 (+20%) */
+    margin: 0 auto;
+  }
+
+  /* --- Tabelas/DataFrames globais com largura ~+20% e centralizadas --- */
+  .stTable, .stDataFrame{
+    max-width: 1320px;           /* aplica-se às páginas que tiverem tabelas */
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .stDataFrame > div{ width: 100% !important; }
+</style>
     """,
-    unsafe_allow_html=True
+    unsafe_allow_html=True,
 )
 
+# ===== Close button row =====
 st.markdown("<div class='topbar-row'>", unsafe_allow_html=True)
-# Spacer gigante + coluna do botão
-spacer, c_close = st.columns([12, 1])  # aumente o 12 se quiser mais “empurro” para a direita
-with c_close:
+sp, closec = st.columns([12, 1])
+with closec:
     def _back_index():
         try:
             st.switch_page("index.py")
@@ -98,134 +160,166 @@ st.markdown("</div>", unsafe_allow_html=True)
 # ===== Tabs =====
 tab1, tab2, tab3, tab4 = st.tabs(["Início", "Modo Jogo", "Histórico", "Rodízio 5x1"])
 
-# -------------------------------
-# Tab 1 - Início (texto à esquerda, imagem à direita)
-# -------------------------------
+# ---------------- Tab 1 ----------------
 with tab1:
-    c_text, c_img = st.columns([3, 2], gap="large")
-
-    with c_text:
-        st.markdown("### 🔹 Acesso inicial", help="Informações básicas de navegação")
-        st.markdown(
-            """
-            - Entre no endereço: **https://univolei-scout.streamlit.app/**  
-            - Caso exista **jogo em aberto**, o título e a data aparecerão automaticamente no cabeçalho.  
-            - Na **primeira linha** você encontra os botões principais:
-              - **Time** → cadastrar/editar o time e jogadoras.
-              - **Jogo** → iniciar ou continuar uma partida em andamento.
-              - **Tutorial** → abre esta página de instruções.
-              - **Histórico** → acessar estatísticas e análises de jogos anteriores.
-
-            ---
-            O aplicativo salva dados em **Excel, DuckDB e Google Sheets** (quando habilitado), garantindo backup e histórico.
-            """,
-            unsafe_allow_html=True
-        )
-
-    with c_img:
-        img_path = IMG_DIR / "print_1.jpg"
-        # Sem esticar: manter tamanho natural
-        if img_path.exists():
-            st.image(str(img_path), caption="Tela inicial do aplicativo", use_container_width=False)
-        else:
-            st.warning(f"Imagem não encontrada: {img_path}")
-
-# -------------------------------
-# Tab 2 - Modo Jogo (texto à esquerda, imagem à direita)
-# -------------------------------
-with tab2:
-    c_text, c_img = st.columns([3, 2], gap="large")
-
-    with c_text:
-        st.markdown("### 🔹 Modo Jogo (principal)", help="Área de marcação de pontos")
-        st.markdown(
-            """
-            O **Modo Jogo** é o coração do sistema: é aqui que você registra todas as jogadas da partida.  
-
-            - **Botões de Jogadoras** → clique para marcar quem participou do rally.  
-              - 1º clique = **Acerto** ✅  
-              - 2º clique = **Erro** ❌  
-            - **Botão ADV** → registra pontos do adversário.  
-            - **Quadra Interativa (Heatmap)** → clique na quadra para marcar a região de cada ação.  
-            - **Placar em tempo real** → exibido sempre acima da quadra.  
-            - **Gestão de Sets** → abrir, fechar e finalizar sets; remover set vazio quando necessário.
-
-            ---
-            🔑 **Importante:**  
-            O **Modo Jogo é o principal local de marcação de pontos**.  
-            Cada ação registrada aqui alimenta as estatísticas do **Histórico** e direciona os treinos.
-            """,
-            unsafe_allow_html=True
-        )
-
-    with c_img:
-        img_path = IMG_DIR / "print_2.jpg"
-        # Sem esticar: manter tamanho natural
-        if img_path.exists():
-            st.image(str(img_path), caption="Modo Jogo — principal área de marcação de pontos", use_container_width=False)
-        else:
-            st.warning(f"Imagem não encontrada: {img_path}")
-
-# -------------------------------
-# Tab 3 - Histórico (sem imagem, apenas descrição)
-# -------------------------------
-with tab3:
-    st.markdown("### 🔹 Histórico de Jogos", help="Dashboard analítico")
-    st.markdown(
-        """
-        O **Histórico** é o **dashboard central de análise**.  
-
-        **Principais recursos:**
-        - 📋 **Lista de jogos**: ID, data, adversário, sets e status (aberto/fechado).  
-        - ✅ Resultado destacado: Vitória, Derrota ou Empate.  
-        - 🔍 **Filtros e buscas** por ID, data, adversário e status.  
-        - 📊 **Estatísticas detalhadas** de cada partida:
-          - Evolução do placar ao longo dos sets.
-          - Comparativo por fundamento (ataque, passe, saque etc.).
-          - Erros cometidos organizados em tabela.
-          - Mapas de calor das jogadas (zonas de ataque/defesa).
-
-        ---
-        💡 **Reforço:**  
-        O **Histórico é o local-chave para análise de desempenho e definição de treinos específicos**.  
-        """,
-        unsafe_allow_html=True
+    img = img_to_data_uri(IMG_DIR / "print_1.jpg")
+    html = (
+        "<div class='uv-tabbox'><div class='uv-wrap'>"
+        "<div class='uv-tabrow'>"
+        "<div class='uv-l'>"
+        "<h3>🔹 Acesso inicial</h3>"
+        "<ul>"
+        "<li>Entre no endereço: <b>https://univolei-scout.streamlit.app/</b></li>"
+        "<li>Caso exista <b>jogo em aberto</b>, o título e a data aparecerão automaticamente no cabeçalho.</li>"
+        "<li>Na <b>primeira linha</b> você encontra os botões principais:"
+        "<ul>"
+        "<li><b>Time</b> → cadastrar/editar o time e jogadoras.</li>"
+        "<li><b>Jogo</b> → iniciar ou continuar uma partida em andamento.</li>"
+        "<li><b>Tutorial</b> → abre esta página de instruções.</li>"
+        "<li><b>Histórico</b> → acessar estatísticas e análises de jogos anteriores.</li>"
+        "</ul>"
+        "</li>"
+        "</ul>"
+        # (linha cinza removida via CSS)
+        "O aplicativo salva dados em <b>Excel, DuckDB e Google Sheets</b> (quando habilitado), garantindo backup e histórico."
+        "</div>"
+        "<div class='uv-r'>"
+        f"{('<img class=\"uv-img-std\" src=\"' + img + '\" alt=\"Tela inicial do aplicativo\"/>') if img else '<em>Imagem não encontrada (print_1.jpg)</em>'}"
+        "</div>"
+        "</div>"
+        "</div></div>"
     )
+    st.markdown(html, unsafe_allow_html=True)
 
-# -------------------------------
-# Tab 4 - Rodízio 5x1 (imagens 40% menores + textos 3x maiores)
-# -------------------------------
+# ---------------- Tab 2 ----------------
+with tab2:
+    img = img_to_data_uri(IMG_DIR / "print_2.jpg")
+    html = (
+        "<div class='uv-tabbox'><div class='uv-wrap'>"
+        "<div class='uv-tabrow'>"
+        "<div class='uv-l'>"
+        "<h3>🔹 Modo Jogo (principal)</h3>"
+        "<p>O <b>Modo Jogo</b> é o coração do sistema: é aqui que você registra todas as jogadas da partida.</p>"
+        "<ul>"
+        "<li><b>Botões de Jogadoras</b> → clique para marcar quem participou do rally."
+        "<ul><li>1º clique = <b>Acerto</b> ✅</li><li>2º clique = <b>Erro</b> ❌</li></ul>"
+        "</li>"
+        "<li><b>Botão ADV</b> → registra pontos do adversário.</li>"
+        "<li><b>Quadra Interativa (Heatmap)</b> → clique na quadra para marcar a região de cada ação.</li>"
+        "<li><b>Placar em tempo real</b> → exibido sempre acima da quadra.</li>"
+        "<li><b>Gestão de Sets</b> → abrir, fechar e finalizar sets; remover set vazio quando necessário.</li>"
+        "</ul>"
+        # (linha cinza removida via CSS)
+        "🔑 <b>Importante:</b> O <b>Modo Jogo</b> é o principal local de marcação de pontos. "
+        "Cada ação registrada aqui alimenta as estatísticas do <b>Histórico</b> e direciona os treinos."
+        "</div>"
+        "<div class='uv-r'>"
+        f"{('<img class=\"uv-img-std\" src=\"' + img + '\" alt=\"Modo Jogo — principal área de marcação de pontos\"/>') if img else '<em>Imagem não encontrada (print_2.jpg)</em>'}"
+        "</div>"
+        "</div>"
+        "</div></div>"
+    )
+    st.markdown(html, unsafe_allow_html=True)
+
+# ---------------- Tab 3 ----------------
+with tab3:
+    img = img_to_data_uri(IMG_DIR / "print_3.jpg")
+    html = (
+        "<div class='uv-tabbox'><div class='uv-wrap'>"
+        "<div class='uv-tabrow'>"
+        "<div class='uv-l'>"
+        "<h3>🔹 Histórico de Jogos</h3>"
+        "<p>O <b>Histórico</b> é o <b>dashboard central de análise</b>.</p>"
+        "<ul>"
+        "<li>📋 <b>Lista de jogos</b>: ID, data, adversário, sets e status (aberto/fechado).</li>"
+        "<li>✅ <b>Resultado</b>: Vitória, Derrota ou Empate.</li>"
+        "<li>🔍 <b>Filtros e buscas</b> por ID, data, adversário e status.</li>"
+        "<li>📊 <b>Estatísticas detalhadas</b>: evolução do placar, comparativo por fundamento, erros por categoria, mapas de calor.</li>"
+        "</ul>"
+        # (linha cinza removida via CSS)
+        "💡 <b>Reforço:</b> O <b>Histórico</b> é o local-chave para análise de desempenho e definição de treinos específicos."
+        "</div>"
+        "<div class='uv-r'>"
+        f"{('<img class=\"uv-img-3\" src=\"' + img + '\" alt=\"Histórico — visão analítica\"/>') if img else '<em>Imagem não encontrada (print_3.jpg)</em>'}"
+        "</div>"
+        "</div>"
+        "</div></div>"
+    )
+    st.markdown(html, unsafe_allow_html=True)
+
+# ---------------- Tab 4 — Rodízio 5x1 ----------------
 with tab4:
-    st.markdown("### 🔹 Rodízio 5x1 — Referência visual e explicativa")
+    st.markdown("<div class='uv-tabbox'><div class='uv-wrap'>", unsafe_allow_html=True)
+    st.markdown("### 🔹 Rodízio 5x1 — Movimentações básicas por rotação")
 
-    # Lista de (arquivo, texto)
-    rod_items = [
-        ("p1.jpg", "**P1 (Levantadora):** posição 1, arma jogadas rápidas, cobre defesa direita."),
-        ("p2.jpg", "**P2 (Oposta):** atacante pela direita, responsável também por bolas de fundo."),
-        ("p3.jpg", "**P3 (Central):** ataque rápido pelo meio, foco em bloqueios centrais."),
-        ("p4.jpg", "**P4 (Ponteira):** atacante pela esquerda, importante no passe e coberturas."),
-        ("p5.jpg", "**P5 (Defensora/Ponteira):** fundo esquerdo, prioridade em recepção."),
-        ("p6.jpg", "**P6 (Líbero ou Ponteira de fundo):** fundo central, defesa principal e recepção de saque."),
+    rotacoes = [
+        ("p1.jpg", "Rotação com a (P1) Levantadora no fundo direito", [
+            "(P1) Levantadora: sai do fundo direito e se desloca rapidamente para a zona de levantamento (próxima à P2/P3, na rede).",
+            "(P2) Central: avança para meio de rede (posição 3) para atacar bola rápida.",
+            "(P3) Oposta: assume a rede direita como opção de ataque.",
+            "(P4) Ponteira 1: permanece como atacante da entrada esquerda.",
+            "(P5) Ponteira 2: cobre fundo esquerdo, ajuda na recepção.",
+            "(P6) Líbero: cobre fundo central, principal responsável pela defesa/recepção.",
+        ]),
+        ("p2.jpg", "Rotação com a (P2) Levantadora na rede direita", [
+            "(P2) Levantadora: já posicionada na rede direita para levantar.",
+            "(P3) Central: preparado no meio de rede para ataque rápido.",
+            "(P4) Oposta: desloca-se para o fundo esquerdo, cobrindo defesa.",
+            "(P5) Ponteira 1: cobre fundo esquerdo, pode vir para recepção.",
+            "(P6) Ponteira 2: cobre fundo central, apoio na recepção.",
+            "(P1) Líbero: cobre fundo direito.",
+        ]),
+        ("p3.jpg", "Rotação com a (P3) Levantadora no meio de rede", [
+            "(P3) Levantadora: desloca-se lateralmente para o lado direito da rede (posição 2) para levantar.",
+            "(P4) Central: entra pelo fundo esquerdo, participando da recepção.",
+            "(P5) Oposta: cobre fundo esquerdo, pode atacar fundo.",
+            "(P6) Ponteira 1: defesa no fundo central.",
+            "(P1) Ponteira 2: cobre fundo direito.",
+            "(P2) Líbero: cobre bolas curtas, apoio defensivo próximo à rede.",
+        ]),
+        ("p4.jpg", "Rotação com a (P4) Levantadora na rede esquerda", [
+            "(P4) Levantadora: desloca-se da rede esquerda para a rede direita (zona 2) para armar.",
+            "(P5) Central: atua no fundo esquerdo, participando da recepção.",
+            "(P6) Oposta: cobre fundo central, com opção de ataque pipe.",
+            "(P1) Ponteira 1: fundo direito, defesa/recepção.",
+            "(P2) Ponteira 2: sobe para rede direita, atua como atacante auxiliar.",
+            "(P3) Líbero: entra para cobrir o fundo central, se aplicável.",
+        ]),
+        ("p5.jpg", "Rotação com a (P5) Levantadora no fundo esquerdo", [
+            "(P5) Levantadora: desloca-se do fundo esquerdo para rede direita (zona 2).",
+            "(P6) Central: fundo central, apoio na recepção.",
+            "(P1) Oposta: fundo direito, possível ataque de fundo.",
+            "(P2) Ponteira 1: sobe para rede direita, apoio de ataque.",
+            "(P3) Ponteira 2: central na rede, ataque rápido.",
+            "(P4) Líbero: cobre fundo esquerdo, reforço da recepção.",
+        ]),
+        ("p6.jpg", "Rotação com a (P6) Levantadora no fundo central", [
+            "(P6) Levantadora: desloca-se do fundo central para rede direita (zona 2).",
+            "(P1) Central: fundo direito, possível recepção.",
+            "(P2) Oposta: sobe para rede direita, ataque principal.",
+            "(P3) Ponteira 1: central de rede, ataque rápido.",
+            "(P4) Ponteira 2: atacante de entrada esquerda.",
+            "(P5) Líbero: fundo esquerdo, reforço da defesa.",
+        ]),
     ]
 
-    for fname, txt in rod_items:
-        img_path = IMG_DIR / fname
-
-        # Layout: imagem à esquerda (menor), texto gigante à direita
-        c_img, c_txt = st.columns([2, 3], gap="large")
-
-        with c_img:
-            if img_path.exists():
-                # Tenta calcular largura ~60% do original (40% menor)
-                width_scaled = img_width_scaled(img_path, scale=0.6)
-                if width_scaled is not None:
-                    st.image(str(img_path), caption=f"Rodízio — {fname[:-4].upper()}", width=width_scaled)
-                else:
-                    # Fallback: se não conseguir medir, usa container_width com clamp via column
-                    st.image(str(img_path), caption=f"Rodízio — {fname[:-4].upper()}", use_container_width=False)
-            else:
-                st.warning(f"Imagem não encontrada: {img_path}")
-
-        with c_txt:
-            # Texto 3x maior (CSS)
-            st.markdown(f"<div class='uv-rodizio-text'>{txt}</div>", unsafe_allow_html=True)
+    parts = ["<div class='uv-grid'>"]
+    for fname, titulo, bullets in rotacoes:
+        img = img_to_data_uri(IMG_DIR / fname)
+        lis = "".join([f"<li>{b}</li>" for b in bullets])
+        img_html = f'<img src="{img}" alt="{fname}"/>' if img else f'<em>Imagem não encontrada ({fname})</em>'
+        card = (
+            "<div class='uv-col'>"
+            "<div class='uv-card'>"
+            f"<div class='uv-img'>{img_html}</div>"
+            "<div class='uv-txt'>"
+            f"<div class='uv-title'>{titulo}</div>"
+            f"<ul class='uv-rodizio-text'>{lis}</ul>"
+            "</div>"
+            "</div>"
+            "</div>"
+        )
+        parts.append(card)
+    parts.append("</div>")  # fecha grid
+    st.markdown("".join(parts), unsafe_allow_html=True)
+    st.markdown("</div></div>", unsafe_allow_html=True)  # fecha uv-wrap + uv-tabbox

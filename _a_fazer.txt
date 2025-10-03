@@ -4,8 +4,7 @@ v2 -> com camera e movimento?
 streamlit run index.py
 ***************************************
 
-
-
+registro de sets mostrar qyem ganhou durante o jogo
 
 VER	
 2	layout jogo menor???
