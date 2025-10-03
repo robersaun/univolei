@@ -17,7 +17,7 @@ BASE_DIR = Path(__file__).resolve().parent
 IMG_DIR = (BASE_DIR / ".." / "imgs").resolve()
 
 def img_to_data_uri(path: Path) -> Optional[str]:
-    # Converte imagem local para data URI (base64) para embutir em HTML.
+    """Converte imagem local para data URI (base64) para embutir em HTML."""
     try:
         ext = path.suffix.lower()
         mime = "image/png" if ext == ".png" else "image/jpeg"
@@ -28,7 +28,8 @@ def img_to_data_uri(path: Path) -> Optional[str]:
 
 # ===== Title =====
 st.markdown(
-    "<h1 style='text-align:center; color:#1e3a8a; margin-top:.25rem'>📘 Tutorial UniVolei Live Scout</h1>",
+    "<h1 style='text-align:center; color:#1e3a8a; margin-top:.25rem'>📘 Tutorial UniVolei Live Scout</h1>"
+    "<span id='uv-close'></span>",
     unsafe_allow_html=True,
 )
 
@@ -40,16 +41,16 @@ st.markdown(
   .stTabs [role="tablist"]{
     border: 2px solid #1e3a8a;
     border-radius: 12px;
-    padding: 6px;
-    gap: 6px;
+    padding: 8px;              /* +20% mais "respiro" */
+    gap: 10px;
     width: fit-content;
-    margin: 0 auto 8px auto; /* centraliza o menu */
+    margin: 0 auto 10px auto;  /* centraliza o menu */
     background: #ffffff;
   }
   .stTabs [role="tab"]{
     border: 1px solid #93c5fd;
     border-radius: 10px;
-    padding: 6px 12px;
+    padding: 8px 16px;         /* títulos das abas um pouco mais largos (~+20%) */
     background: #ffffff;
     color: #0f172a;
   }
@@ -63,34 +64,35 @@ st.markdown(
   .uv-tabbox{
     border: 3px solid #1e3a8a;
     border-radius: 14px;
-    padding: 14px;
-    margin: 8px auto 18px auto;
+    padding: 16px;
+    margin: 10px auto 20px auto;
     background: #ffffff;
-    max-width: 1200px;   /* evita ocupar a tela inteira */
+    max-width: 1440px;              /* antes: 1200px  (+20%) */
   }
-  .uv-wrap{ max-width: 1100px; margin: 0 auto; }
+  .uv-wrap{ max-width: 1320px; margin: 0 auto; } /* antes: 1100px (+20%) */
 
   /* Linha de conteúdo padrão (texto à esquerda / imagem à direita) */
   .uv-tabrow{
-    display: flex; gap: 20px; align-items: flex-start;
+    display: flex; gap: 24px; align-items: flex-start; /* gap um pouco maior */
   }
   .uv-l{ flex: 3 1 0; min-width: 360px; }
   .uv-r{ flex: 2 1 0; min-width: 260px; display:flex; justify-content:flex-end; }
 
-  /* Tamanhos das imagens (1 e 2 +20%, 3 +40% em relação ao anterior de 420px) */
+  /* Tamanhos das imagens (1 e 2 +20%, 3 +40%) */
   .uv-r img.uv-img-std{ max-width: 504px; height: auto; border-radius: 10px; display: block; }
   .uv-r img.uv-img-3{   max-width: 588px; height: auto; border-radius: 10px; display: block; }
 
-  .uv-tabbox hr{ margin: 8px 0; }
+  /* Remover a linha cinza (qualquer <hr/>) */
+  .uv-tabbox hr{ display: none !important; }
   .uv-tabbox [data-testid="stMarkdownContainer"] p{ margin: .25rem 0; }
 
   /* Rodízio: 2 cards por linha com alturas iguais e centralizado */
   .uv-grid{
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px;
+    gap: 18px;                /* um pouco mais largo */
     align-items: stretch;
-    max-width: 1100px;
+    max-width: 1320px;        /* +20% */
     margin: 2px auto 0 auto;
   }
   .uv-col{ display: flex; min-width: 420px; }
@@ -98,9 +100,9 @@ st.markdown(
     border: 1px solid #3b82f6;
     border-radius: 12px;
     background: #f8fafc;
-    padding: 12px;
+    padding: 14px;
     display: flex;
-    gap: 16px;
+    gap: 18px;
     align-items: flex-start;
     width: 100%;
     height: 100%;
@@ -118,7 +120,49 @@ st.markdown(
   .uv-txt ul{ margin: 0; padding-left: 1.1rem; }
 
   /* Barra do botão fechar no topo */
-  .topbar-row{ display: flex; justify-content: flex-end; max-width: 1200px; margin: 0 auto; }
+  .topbar-row{
+    display: flex; justify-content: flex-end;
+    max-width: 1440px;  /* +20% */
+    margin: 0 auto;
+  }
+
+  /* --- Tabelas/DataFrames globais centralizadas --- */
+  .stTable, .stDataFrame{
+    max-width: 1320px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .stDataFrame > div{ width: 100% !important; }
+
+  /* === Lightbox (zoom ao clicar) === */
+  .uv-zoom-thumb { cursor: zoom-in; display:block; }
+  #uv-close { display:block; height:0; width:0; overflow:hidden; }
+  .uv-lightbox{
+    position: fixed; inset: 0; display: none;
+    background: rgba(0,0,0,.88);
+    z-index: 9999;
+    align-items: center; justify-content: center;
+    padding: 24px;
+  }
+  .uv-lightbox:target{ display: flex; }
+  .uv-lightbox__bg{
+    position: fixed; inset: 0; display:block;
+  }
+  .uv-lightbox .uv-content{
+    position: relative;
+    z-index: 1;
+    max-width: 96vw; max-height: 96vh;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .uv-lightbox img{
+    max-width: 92vw; max-height: 92vh; border-radius: 14px;
+    box-shadow: 0 6px 28px rgba(0,0,0,.5);
+  }
+  .uv-lightbox a.uv-close{
+    position: absolute; top: 10px; right: 14px;
+    font-size: 34px; color: #fff; text-decoration: none; line-height: 1;
+    z-index: 2;
+  }
 </style>
     """,
     unsafe_allow_html=True,
@@ -177,7 +221,6 @@ with tab1:
 """
     st.markdown(html, unsafe_allow_html=True)
 
-
 # ---------------- Tab 2 ----------------
 with tab2:
     img = img_to_data_uri(IMG_DIR / "print_2.jpg")
@@ -209,7 +252,6 @@ with tab2:
 """
     st.markdown(html, unsafe_allow_html=True)
 
-
 # ---------------- Tab 3 ----------------
 with tab3:
     img = img_to_data_uri(IMG_DIR / "print_3.jpg")
@@ -237,8 +279,7 @@ with tab3:
 """
     st.markdown(html, unsafe_allow_html=True)
 
-
-# ---------------- Tab 4 — Rodízio 5x1 ----------------
+# ---------------- Tab 4 — Rodízio 5x1 (com zoom e fechar) ----------------
 with tab4:
     st.markdown("<div class='uv-tabbox'><div class='uv-wrap'>", unsafe_allow_html=True)
     st.markdown("### 🔹 Rodízio 5x1 — Movimentações básicas por rotação")
@@ -295,14 +336,28 @@ with tab4:
     ]
 
     parts = ["<div class='uv-grid'>"]
-    for fname, titulo, bullets in rotacoes:
+    overlays = []
+    for i, (fname, titulo, bullets) in enumerate(rotacoes, start=1):
+        zoom_id = f"uvzoom-{i}"
         img = img_to_data_uri(IMG_DIR / fname)
         lis = "".join([f"<li>{b}</li>" for b in bullets])
-        img_html = f'<img src="{img}" alt="{fname}"/>' if img else f'<em>Imagem não encontrada ({fname})</em>'
+        if img:
+            img_thumb = f'<a href="#{zoom_id}" class="uv-zoom-thumb"><img src="{img}" alt="{fname}"/></a>'
+            overlay = f"""<div id="{zoom_id}" class="uv-lightbox">
+  <a href="#uv-close" class="uv-lightbox__bg" aria-label="Fechar"></a>
+  <div class="uv-content">
+    <a href="#uv-close" class="uv-close" aria-label="Fechar">×</a>
+    <img src="{img}" alt="Zoom {fname} — {titulo}"/>
+  </div>
+</div>"""
+            overlays.append(overlay)
+        else:
+            img_thumb = f'<em>Imagem não encontrada ({fname})</em>'
+
         card = (
             "<div class='uv-col'>"
             "<div class='uv-card'>"
-            f"<div class='uv-img'>{img_html}</div>"
+            f"<div class='uv-img'>{img_thumb}</div>"
             "<div class='uv-txt'>"
             f"<div class='uv-title'>{titulo}</div>"
             f"<ul class='uv-rodizio-text'>{lis}</ul>"
@@ -312,5 +367,6 @@ with tab4:
         )
         parts.append(card)
     parts.append("</div>")  # fecha grid
-    st.markdown("".join(parts), unsafe_allow_html=True)
+    # Renderiza a grade + lightboxes
+    st.markdown("".join(parts) + "".join(overlays), unsafe_allow_html=True)
     st.markdown("</div></div>", unsafe_allow_html=True)  # fecha uv-wrap + uv-tabbox
