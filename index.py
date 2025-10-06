@@ -11,10 +11,9 @@ import time as _time
 from datetime import date, datetime
 import pandas as pd
 import pandas as _pd_real  # não conflitar com _pd já usado
-from typing import Optional, Dict
 from db_duck import ensure_db as duck_ensure, replace_all as duck_replace
 import logging, os
-from gsheets_sync import is_enabled as gs_is_enabled, read_all as gs_read_all 
+import gsheets_sync
 from io import BytesIO
 from parser_free import parse_line
 from string import Template
@@ -23,6 +22,7 @@ import configparser, os as _os
 from pathlib import Path as _P
 import duckdb as _duck
 import os
+import gspread
 import base64
 from pathlib import Path
 import base64, mimetypes, os
@@ -31,102 +31,7 @@ from db_excel import (
     init_or_load, save_all, add_set,
     append_rally, last_open_match, finalize_match
 )   
-
-
-def uv_preloader(kind: str = "gs") -> _UvOverlayPreloader:
-    print("@@@ FN uv_preloader kind ", kind)
-
-    if DEBUG_PRINTS:
-        """
-        kind:
-        - 'gs'          -> 'Salvando informações...'
-        - 'set_close'   -> 'Fechar Set...'
-        - 'set_open'    -> 'Fechar Set...'
-        - 'match_close' -> 'Finalizar partida...'
-        - outro         -> 'Processando...'
-        """
-
-    if kind in ("set_close", "set_open"):
-        msg = "Fechando Set..."
-    elif kind == "match_close":
-        msg = "Finalizando partida..."
-    elif kind == "gs":
-        msg = "Salvando informações..."
-    else:
-        msg = "Processando..."
-    return _UvOverlayPreloader(msg)
-
-
-
-# =========================
-# Pre-Loader overlay central (texto no meio da tela) 
-# =========================
-class _UvOverlayPreloader:
-    """
-    Context manager para exibir um overlay de "processando" sem bagunçar a UI.
-    Uso: with _UvOverlayPreloader("Salvando..."): ...operações...
-    """
-    def __init__(self, message: str = "Processando..."):
-        self.message = message
-        self._ph = None  # placeholder para permitir limpar o overlay sem depender de rerun
-
-    def __enter__(self):
-        import streamlit as st
-        st.session_state["_uv__overlay_active"] = True
-        self._ph = st.empty()  # <<< render controlado
-
-        overlay_css = """
-        <style>
-        .uv-preloader-backdrop {
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.35);
-            z-index: 999999;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .uv-preloader-card {
-            background: #fff;
-            border-radius: 14px;
-            padding: 22px 28px;
-            box-shadow: 0 10px 30px rgba(0,0,0,.25);
-            font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
-            text-align: center;
-            max-width: 420px;
-        }
-        .uv-spinner {
-            width: 28px; height: 28px;
-            border: 3px solid #e3e3e3; border-top-color: #4a90e2;
-            border-radius: 50%;
-            animation: uvspin 0.9s linear infinite;
-            margin: 0 auto 12px auto;
-        }
-        @keyframes uvspin { to { transform: rotate(360deg); } }
-        </style>
-        """
-        overlay_html = f'''
-        <div class="uv-preloader-backdrop">
-          <div class="uv-preloader-card">
-            <div class="uv-spinner"></div>
-            <div><strong>{self.message}</strong></div>
-          </div>
-        </div>
-        '''
-        # Renderiza o overlay dentro do placeholder
-        self._ph.markdown(overlay_css + overlay_html, unsafe_allow_html=True)
-        return self
-
-    def __exit__(self, exc_type, exc, tb):
-        import streamlit as st
-        st.session_state["_uv__overlay_active"] = False
-        try:
-            if self._ph is not None:
-                self._ph.empty()  # <<< remove o overlay imediatamente, sem precisar de rerun
-        except Exception:
-            pass
-        return False
-
+    
 # --- UV Excel engine monkey-patch (garante engine ao abrir Excel) ---
 def _uv_pick_engine(_path_str: str):
     _s = str(_path_str).lower()
@@ -411,7 +316,6 @@ if _cfg_path.exists():
 GOOGLE_DRIVE_ROOT_FOLDER_URL = "https://drive.google.com/drive/folders/10PDkcUb4yGhrEmiNKwNo7mzZBGJIN_5r"
 GOOGLE_SHEETS_SPREADSHEET_ID = "1FLBTjIMAgQjGM76XbNZT3U_lIDGUsWQbea2QCmdXbYI"
 GOOGLE_WEBHOOK_URL = ""
-os.environ.setdefault("UV_GSHEET_ID", GOOGLE_SHEETS_SPREADSHEET_ID)
 # >>> Valores devem vir SOMENTE do config.ini
 
 # >>> SE QUISER PUXAR DO CONFIG.INI ->> MAS ESTAVA DANDO ERRO AO SUBIR NO STREAMLIT, GIT, ETC...
@@ -440,28 +344,395 @@ def load_css(filename: str = "univolei.css"):
     return None
 _css_path = load_css("univolei.css")
 
-
 # =========================
-# Carregamento de dados google
+# Chamadas GOOGLE_DRIVE
 # =========================
-def _bootstrap_frames():
-    if "frames" in st.session_state:
-        return
-    if "gsheets_enable" not in st.session_state:
-        st.session_state["gsheets_enable"] = bool(gs_is_enabled())
-    if "persist_google_enabled" not in st.session_state:
-        st.session_state["persist_google_enabled"] = st.session_state["gsheets_enable"]
+def _normalize_gsheet_id(raw_id):
+    """
+    Normaliza ID da planilha - versão corrigida e mais permissiva
+    """
+    if not raw_id:
+        return ""
+    
+    s = str(raw_id).strip()
+    print(f"🔍 [NORMALIZE DEBUG] Input: '{s}'")
+    
+    # Se for URL completa, extrai o ID
+    if "spreadsheets/d/" in s:
+        parts = s.split("spreadsheets/d/")
+        if len(parts) > 1:
+            id_part = parts[1].split("/")[0]
+            print(f"🔍 [NORMALIZE DEBUG] Extraído de URL: '{id_part}'")
+            
+            # Verificação básica de ID válido
+            if id_part and len(id_part) >= 10:
+                return id_part
+    
+    # Se já parece um ID (mais permissivo)
+    if s and len(s) >= 10:
+        # Remove caracteres problemáticos mas mantém o ID
+        clean_id = ''.join(c for c in s if c.isalnum() or c in '_-')
+        if clean_id:
+            print(f"🔍 [NORMALIZE DEBUG] ID limpo: '{clean_id}'")
+            return clean_id
+    
+    print(f"🔍 [NORMALIZE DEBUG] ID inválido, retornando vazio")
+    return ""
 
-    if st.session_state["gsheets_enable"]:
-        with uv_preloader("Carregando dados do Google Sheets..."):
-            st.session_state.frames = gs_read_all()
-        st.session_state["frames_origin"] = "gsheets"
-    else:
-        _dbp = Path(st.session_state.get("db_path", "volei_base_dados.xlsx"))
-        st.session_state.frames = init_or_load(_dbp)
-        st.session_state["frames_origin"] = "xlsx"
+def _get_spreadsheet_id():
+    """
+    Obtém o ID da planilha - PRIORIZA a variável fixa
+    """
+    # PRIMEIRO tenta a variável fixa
+    fixed_id = GOOGLE_SHEETS_SPREADSHEET_ID
+    if fixed_id and len(fixed_id) >= 10:
+        normalized = _normalize_gsheet_id(fixed_id)
+        if normalized:
+            print(f"🔍 [GET_ID] Usando ID FIXO: {normalized}")
+            return normalized
+    
+    # DEPOIS tenta outras fontes (fallback)
+    try:
+        # Streamlit secrets
+        if hasattr(st, 'secrets'):
+            if 'gsheet_id' in st.secrets:
+                id_from_secrets = _normalize_gsheet_id(st.secrets['gsheet_id'])
+                if id_from_secrets:
+                    print(f"🔍 [GET_ID] Usando Secrets: {id_from_secrets}")
+                    return id_from_secrets
+            if 'online' in st.secrets and 'gsheet_id' in st.secrets['online']:
+                id_from_secrets = _normalize_gsheet_id(st.secrets['online']['gsheet_id'])
+                if id_from_secrets:
+                    print(f"🔍 [GET_ID] Usando Secrets online: {id_from_secrets}")
+                    return id_from_secrets
+        
+        # config.ini
+        from pathlib import Path
+        import configparser
+        
+        config_path = Path(__file__).parent / "config.ini"
+        if config_path.exists():
+            config = configparser.ConfigParser()
+            config.read(config_path)
+            if config.has_section('online'):
+                gsheet_id = config.get('online', 'gsheet_id', fallback='').strip()
+                id_from_config = _normalize_gsheet_id(gsheet_id)
+                if id_from_config:
+                    print(f"🔍 [GET_ID] Usando config.ini: {id_from_config}")
+                    return id_from_config
+                
+    except Exception as e:
+        print(f"🔍 [GET_ID] Erro ao obter ID de outras fontes: {e}")
+    
+    print("🔍 [GET_ID] Nenhum ID válido encontrado")
+    return None
 
-_bootstrap_frames()
+def debug_gsheet_validation():
+    """
+    Função temporária para debug
+    """
+    spreadsheet_id = _get_spreadsheet_id()
+    print(f"🔍 [DEBUG] ID obtido: '{spreadsheet_id}'")
+    print(f"🔍 [DEBUG] Tipo: {type(spreadsheet_id)}")
+    print(f"🔍 [DEBUG] Tamanho: {len(spreadsheet_id) if spreadsheet_id else 0}")
+    
+    # Testa a normalização
+    normalized = _normalize_gsheet_id(spreadsheet_id)
+    print(f"🔍 [DEBUG] Normalizado: '{normalized}'")
+    
+    return normalized
+
+def sync_all(frames):
+    """
+    Sincroniza todos os frames com Google Sheets - versão corrigida
+    Retorna string de status.
+    """
+    try:
+        if not is_enabled():
+            return "Google Sheets não habilitado"
+        
+        spreadsheet_id = _get_spreadsheet_id()
+        
+        # DEBUG - Log para verificar o ID
+        print(f"🔍 [GSHEETS DEBUG] ID obtido: '{spreadsheet_id}'")
+        
+        if not spreadsheet_id:
+            return "ID da planilha não configurado"
+        
+        # Verificação mais permissiva do ID
+        if len(spreadsheet_id) < 10 or not all(c.isalnum() or c in '_-' for c in spreadsheet_id):
+            return f"GSHEETS: ID inválido - '{spreadsheet_id}'"
+        
+        print(f"🔍 [GSHEETS DEBUG] ID validado: {spreadsheet_id}")
+        
+        client = _get_gspread_client()
+        if not client:
+            return "GSHEETS: erro (gspread/credenciais ausentes)"
+
+        # Tenta abrir a planilha
+        try:
+            print(f"🔍 [GSHEETS DEBUG] Tentando abrir planilha...")
+            sh = client.open_by_key(spreadsheet_id)
+            print(f"🔍 [GSHEETS DEBUG] Planilha aberta: {sh.title}")
+        except Exception as e:
+            error_msg = str(e)
+            print(f"🔍 [GSHEETS DEBUG] Erro ao abrir: {error_msg}")
+            
+            if "This operation is not supported for this document" in error_msg:
+                return ("GSHEETS: erro — o gsheet_id aponta para um item que NÃO é uma "
+                        "planilha do Google Sheets (pode ser Doc/Slide/Pasta/XLSX). "
+                        "Use o ID de uma planilha nativa: /spreadsheets/d/<ID>/edit")
+            elif "not found" in error_msg.lower() or "Unable to open spreadsheet" in error_msg:
+                return f"GSHEETS: erro — planilha não encontrada. Verifique o ID: {spreadsheet_id}"
+            else:
+                return f"GSHEETS: erro ao abrir planilha ({error_msg})"
+
+        # Sincroniza cada frame
+        success_count = 0
+        error_messages = []
+        
+        for tab_name, df in frames.items():
+            if not isinstance(df, pd.DataFrame) or df.empty:
+                continue
+
+            try:
+                # Normaliza nome da aba
+                ws_title = str(tab_name)[:95].replace("/", "_").replace("\\", "_").replace(":", " ")
+                print(f"🔍 [GSHEETS DEBUG] Processando aba: {ws_title}")
+
+                # Tenta abrir a worksheet; se não existir, cria
+                try:
+                    ws = sh.worksheet(ws_title)
+                    print(f"🔍 [GSHEETS DEBUG] Aba existente: {ws_title}")
+                except Exception:
+                    print(f"🔍 [GSHEETS DEBUG] Criando nova aba: {ws_title}")
+                    ws = sh.add_worksheet(
+                        title=ws_title, 
+                        rows=max(1000, len(df) + 100), 
+                        cols=max(26, len(df.columns) + 10)
+                    )
+
+                # Limpa a worksheet completamente
+                ws.clear()
+                print(f"🔍 [GSHEETS DEBUG] Aba limpa: {ws_title}")
+
+                # Prepara valores: cabeçalho + dados
+                values = [df.columns.tolist()]  # Cabeçalho
+                if not df.empty:
+                    # Converte dados para string, tratando NaN
+                    df_strings = df.astype(object).where(pd.notna(df), "").astype(str)
+                    values.extend(df_strings.values.tolist())
+                
+                print(f"🔍 [GSHEETS DEBUG] Dados preparados: {len(values)} linhas, {len(values[0]) if values else 0} colunas")
+
+                # Ajusta tamanho se a API permitir
+                try:
+                    rows_needed = max(100, len(values) + 50)
+                    cols_needed = max(26, len(values[0]) if values else 10)
+                    ws.resize(rows=rows_needed, cols=cols_needed)
+                    print(f"🔍 [GSHEETS DEBUG] Tamanho ajustado: {rows_needed} rows, {cols_needed} cols")
+                except Exception as resize_error:
+                    print(f"🔍 [GSHEETS DEBUG] Não foi possível ajustar tamanho: {resize_error}")
+
+                # Envia dados para o Google Sheets
+                if values:
+                    print(f"🔍 [GSHEETS DEBUG] Enviando dados...")
+                    ws.update("A1", values, value_input_option="RAW")
+                    print(f"🔍 [GSHEETS DEBUG] Dados enviados com sucesso")
+                
+                success_count += 1
+                print(f"🔍 [GSHEETS DEBUG] ✅ Aba {ws_title} sincronizada")
+
+            except Exception as e:
+                error_msg = f"Erro na aba '{ws_title}': {str(e)}"
+                error_messages.append(error_msg)
+                print(f"🔍 [GSHEETS DEBUG] ❌ {error_msg}")
+
+        # Prepara resultado final
+        if success_count > 0 and not error_messages:
+            result = f"GSHEETS: ok ({success_count} abas) -> {spreadsheet_id}"
+        elif success_count > 0 and error_messages:
+            result = f"GSHEETS: parcial ({success_count} ok, {len(error_messages)} erros) -> {spreadsheet_id}. Erros: {'; '.join(error_messages[:3])}"
+        else:
+            result = f"GSHEETS: falha total -> {spreadsheet_id}. Erros: {'; '.join(error_messages[:3])}"
+        
+        print(f"🔍 [GSHEETS DEBUG] Resultado final: {result}")
+        return result
+
+    except Exception as e:
+        error_msg = f"GSHEETS: erro geral ({str(e)})"
+        print(f"🔍 [GSHEETS DEBUG] ❌ ERRO GERAL: {error_msg}")
+        return error_msg
+    
+def _get_gspread_client():
+    """
+    Retorna cliente gspread autenticado - PRIORIZA Streamlit Secrets
+    """
+    try:        
+        scopes = [
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive",
+        ]
+
+        # 1) PRIMEIRO: Streamlit Secrets (funciona no Streamlit Cloud)
+        try:
+            if hasattr(st, 'secrets') and 'gcp_service_account' in st.secrets:
+                sa_info = dict(st.secrets["gcp_service_account"])
+                print("🔍 [AUTH] Usando Streamlit Secrets")
+                creds = Credentials.from_service_account_info(sa_info, scopes=scopes)
+                return gspread.authorize(creds)
+        except Exception as e:
+            print(f"🔍 [AUTH] Erro com Streamlit Secrets: {e}")
+
+        # 2) SEGUNDO: Variável de ambiente (fallback)
+        try:
+            cred_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "").strip()
+            if cred_path and os.path.exists(cred_path):
+                print(f"🔍 [AUTH] Usando variável de ambiente: {cred_path}")
+                creds = Credentials.from_service_account_file(cred_path, scopes=scopes)
+                return gspread.authorize(creds)
+        except Exception as e:
+            print(f"🔍 [AUTH] Erro com variável de ambiente: {e}")
+
+        # 3) TERCEIRO: config.ini (último recurso)
+        try:
+            gcp_cfg = CONFIG.get("gcp", {})
+            mode = (gcp_cfg.get("credentials_mode") or "").strip().lower()
+            if mode == "path":
+                cpath = (gcp_cfg.get("credentials_path") or "").strip()
+                if cpath and os.path.exists(cpath):
+                    print(f"🔍 [AUTH] Usando config.ini path: {cpath}")
+                    creds = Credentials.from_service_account_file(cpath, scopes=scopes)
+                    return gspread.authorize(creds)
+            elif mode == "inline":
+                inline = gcp_cfg.get("inline_json")
+                if inline:
+                    print("🔍 [AUTH] Usando config.ini inline JSON")
+                    sa_info = _json.loads(inline)
+                    creds = Credentials.from_service_account_info(sa_info, scopes=scopes)
+                    return gspread.authorize(creds)
+        except Exception as e:
+            print(f"🔍 [AUTH] Erro com config.ini: {e}")
+
+        print("🔍 [AUTH] Nenhum método de autenticação funcionou")
+        return None
+        
+    except Exception as e:
+        print(f"🔍 [AUTH] Erro geral: {e}")
+        return None
+
+def debug_google_auth():
+    """Debug detalhado da autenticação Google"""
+    try:
+        st.sidebar.subheader("🔧 Debug Google Auth")
+        
+        # Verifica secrets
+        if hasattr(st, 'secrets'):
+            st.sidebar.write("✅ Streamlit Secrets disponível")
+            
+            if 'gcp_service_account' in st.secrets:
+                sa = st.secrets['gcp_service_account']
+                st.sidebar.write(f"✅ Service Account encontrado")
+                st.sidebar.write(f"📧 Client Email: {sa.get('client_email', 'Não encontrado')}")
+                st.sidebar.write(f"🆔 Project ID: {sa.get('project_id', 'Não encontrado')}")
+                
+                # Verifica private_key
+                pk = sa.get('private_key', '')
+                if pk:
+                    st.sidebar.write(f"🔑 Private Key: {len(pk)} caracteres")
+                    if 'BEGIN PRIVATE KEY' in pk:
+                        st.sidebar.write("✅ Formato da private_key parece correto")
+                    else:
+                        st.sidebar.write("❌ Formato da private_key pode estar errado")
+            else:
+                st.sidebar.write("❌ gcp_service_account não encontrado")
+        else:
+            st.sidebar.write("❌ Streamlit Secrets não disponível")
+        
+        # Testa autenticação
+        client = _get_gspread_client()
+        if client:
+            st.sidebar.success("✅ Autenticação Google Sheets: SUCESSO")
+            return True
+        else:
+            st.sidebar.error("❌ Autenticação Google Sheets: FALHOU")
+            return False
+            
+    except Exception as e:
+        st.sidebar.error(f"❌ Erro no debug: {e}")
+        return False
+    
+def _persist_to_gsheets(frames, reason: str) -> str | None:
+    """
+    Sincroniza frames -> Google Sheets (uma aba por frame) usando gspread.
+    Respeita CONFIG['online']['gsheet_id'].
+    Se não houver gspread/credenciais, retorna string de erro (para log) e
+    o fluxo seguirá para o fallback (Webhook) no _persist_all.
+    """
+    raw_id = (CONFIG["online"].get("gsheet_id") or "").strip()
+    spreadsheet_id = _normalize_gsheet_id(raw_id)
+    if not spreadsheet_id:
+        return ("GSHEETS: erro — o gsheet_id aponta para um item que NÃO é uma planilha do Google Sheets "
+                "(pode ser Doc/Slide/Pasta/XLSX). Use o ID de uma planilha nativa: /spreadsheets/d/<ID>/edit")
+
+    # 1) Tenta cliente gspread
+    gc = _get_gspread_client()
+    if gc is None:
+        return "GSHEETS: erro (gspread/credenciais ausentes)"
+
+    try:
+        sh = gc.open_by_key(spreadsheet_id)
+    except Exception as e:
+        msg = str(e)
+        if "This operation is not supported for this document" in msg:
+            return ("GSHEETS: erro — o gsheet_id aponta para um item que NÃO é uma "
+                    "planilha do Google Sheets (pode ser Doc/Slide/Pasta/XLSX). "
+                    "Use o ID de uma planilha nativa: /spreadsheets/d/<ID>/edit")
+        return f"GSHEETS: erro ao abrir planilha ({e!s})"
+
+    # 2) Para cada frame (DataFrame), cria/limpa a worksheet e escreve tudo
+    try:
+        for tab_name, df in frames.items():
+            if not isinstance(df, _pd.DataFrame):
+                continue
+
+            # Normaliza nome de aba (Google Sheets tem limites de 100 chars e proíbe alguns caracteres)
+            ws_title = str(tab_name)[:95].replace("/", "_").replace("\\", "_").replace(":", " ")
+
+            # Tenta abrir a worksheet; se não existir, cria
+            try:
+                try:
+                    ws = sh.worksheet(ws_title)
+                except Exception:
+                    ws = sh.add_worksheet(title=ws_title, rows=max(1000, len(df) + 10), cols=max(26, len(df.columns) + 5))
+
+                # Limpa a worksheet (melhor para evitar sujeira de tamanhos diferentes)
+                ws.clear()
+
+                # Prepara valores: cabeçalho + dados
+                values = [list(map(str, df.columns.tolist()))]
+                if not df.empty:
+                    values += df.astype(object).where(_pd.notna(df), "").astype(str).values.tolist()
+
+                # Redimensiona a planilha (para evitar erro de range)
+                # Ajuste mínimo para evitar "exceeded grid limits"
+                rows_needed = max(100, len(values) + 5)
+                cols_needed = max(26, len(values[0]) if values else 1)
+                try:
+                    ws.resize(rows=rows_needed, cols=cols_needed)
+                except Exception:
+                    pass  # alguns ambientes não permitem resize frequente; segue com update
+
+                # Escreve a partir de A1
+                ws.update("A1", values, value_input_option="RAW")
+
+            except Exception as e:
+                return f"GSHEETS: erro na aba '{ws_title}' ({e!s})"
+
+        return f"GSHEETS: ok (reason={reason}) -> {spreadsheet_id}"
+
+    except Exception as e:
+        return f"GSHEETS: erro geral ({e!s})"
 
 # =========================
 # Quadra BTNS
@@ -906,6 +1177,7 @@ def _persist_to_webhook(frames, reason: str) -> str|None:
         url = CONFIG["online"].get("webhook_url","").strip()
         if not url:
             return None
+        import requests, pandas as pd
         rl = frames.get("rallies", pd.DataFrame())
         if rl is None or rl.empty:
             data_rows, cols = [], []
@@ -928,6 +1200,100 @@ def _persist_to_webhook(frames, reason: str) -> str|None:
         except Exception:
             pass
         return None
+
+# =========================
+# Pre-Loader overlay central (texto no meio da tela) 
+# =========================
+class _UvOverlayPreloader:
+    """
+    Context manager para exibir um overlay de "processando" sem bagunçar a UI.
+    Uso: with _UvOverlayPreloader("Salvando..."): ...operações...
+    """
+    def __init__(self, message: str = "Processando..."):
+        self.message = message
+        self._ph = None  # placeholder para permitir limpar o overlay sem depender de rerun
+
+    def __enter__(self):
+        import streamlit as st
+        st.session_state["_uv__overlay_active"] = True
+        self._ph = st.empty()  # <<< render controlado
+
+        overlay_css = """
+        <style>
+        .uv-preloader-backdrop {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.35);
+            z-index: 999999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .uv-preloader-card {
+            background: #fff;
+            border-radius: 14px;
+            padding: 22px 28px;
+            box-shadow: 0 10px 30px rgba(0,0,0,.25);
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+            text-align: center;
+            max-width: 420px;
+        }
+        .uv-spinner {
+            width: 28px; height: 28px;
+            border: 3px solid #e3e3e3; border-top-color: #4a90e2;
+            border-radius: 50%;
+            animation: uvspin 0.9s linear infinite;
+            margin: 0 auto 12px auto;
+        }
+        @keyframes uvspin { to { transform: rotate(360deg); } }
+        </style>
+        """
+        overlay_html = f'''
+        <div class="uv-preloader-backdrop">
+          <div class="uv-preloader-card">
+            <div class="uv-spinner"></div>
+            <div><strong>{self.message}</strong></div>
+          </div>
+        </div>
+        '''
+        # Renderiza o overlay dentro do placeholder
+        self._ph.markdown(overlay_css + overlay_html, unsafe_allow_html=True)
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        import streamlit as st
+        st.session_state["_uv__overlay_active"] = False
+        try:
+            if self._ph is not None:
+                self._ph.empty()  # <<< remove o overlay imediatamente, sem precisar de rerun
+        except Exception:
+            pass
+        return False
+
+# UniVolei Live Scout – index.py (versão completa e estável)
+
+def uv_preloader(kind: str = "gs") -> _UvOverlayPreloader:
+    print("@@@ FN uv_preloader kind ", kind)
+
+    if DEBUG_PRINTS:
+        """
+        kind:
+        - 'gs'          -> 'Salvando informações...'
+        - 'set_close'   -> 'Fechar Set...'
+        - 'set_open'    -> 'Fechar Set...'
+        - 'match_close' -> 'Finalizar partida...'
+        - outro         -> 'Processando...'
+        """
+
+    if kind in ("set_close", "set_open"):
+        msg = "Fechando Set..."
+    elif kind == "match_close":
+        msg = "Finalizando partida..."
+    elif kind == "gs":
+        msg = "Salvando informações..."
+    else:
+        msg = "Processando..."
+    return _UvOverlayPreloader(msg)
 
 # =========================
 # “Excel principal (sempre)” — grava o XLSX no caminho de st.session_state.db_path (por padrão algo como BASE_DIR/volei_base_dados.xlsx).
@@ -1848,23 +2214,7 @@ if st.session_state.match_id is None:
             c1, c2 = st.columns([1,1])
             with c1:
                 if st.button("Carregar jogo", use_container_width=True):
-                    mid = None
-                    if isinstance(pick, int):
-                        mid = pick
-                    elif isinstance(pick, str):
-                        m = re.match(r"\s*(\d+)", pick.strip())
-                        if m: mid = int(m.group(1))
-                    elif isinstance(pick, (list, tuple)) and pick:
-                        s = str(pick[0])
-                        m = re.match(r"\s*(\d+)", s.strip())
-                        if m: mid = int(m.group(1))
-
-                    if mid is None:
-                        st.warning("Seleção de partida inválida. Escolha um jogo válido.")
-                        st.stop()
-
-                    st.session_state.match_id = mid
-                    st.session_state.set_number = 1
+                    st.session_state.match_id = int(pick); st.session_state.set_number = 1
                     st.session_state._do_rerun_after = True
             with c2:
                 if st.button("Fechar", use_container_width=True):
@@ -3795,38 +4145,17 @@ except Exception:
 # =========================
 # Chamada inicial: Verificar salvamentos e bases de dados
 # =========================
-
 p = Path(st.session_state.get("db_path", ""))
-gsheet_on = bool(
-    st.session_state.get("persist_google_enabled")
-    or st.session_state.get("gsheets_enable")
-    or st.session_state.get("salvar_google")
-)
+gsheet_on = bool(st.session_state.get("persist_google_enabled") or st.session_state.get("gsheets_enable") or st.session_state.get("salvar_google"))
 
-origin = st.session_state.get("frames_origin", "desconhecida")
-
-# tenta pegar a URL da planilha se estivermos usando Sheets
-sheet_url = ""
-try:
-    # se você importou: from gsheets_sync import get_sheet_url, is_enabled as gs_is_enabled
-    if gsheet_on and origin == "gsheets":
-        sheet_url = get_sheet_url() or ""
-except Exception:
-    pass
-
-msg = (
+st.info(
     "📦 **INFORMAÇÕES TEMPORÁRIAS: Fonte atual de dados**\n\n"
-    f"- **Origem (detectada)**: {origin}\n"
-    f"- **Google Sheets ativo (flags)**: {gsheet_on}\n"
     f"- **db_path**: `{p}` (existe: {p.exists() if p else False})\n"
     f"- **Tamanho**: {p.stat().st_size if p and p.exists() else 'N/A'} bytes\n"
-    f"- **Backup dir**: `{st.session_state.get('backups_dir', 'backups')}`\n"
+    f"- **Google Sheets ativo**: {gsheet_on}\n"
+    f"- **Backup dir**: `{st.session_state.get('backups_dir', 'backups')}`\n",
+    icon="ℹ️"
 )
-
-if sheet_url:
-    msg += f"- **Planilha**: {sheet_url}\n"
-
-st.info(msg)  # sem icon= para compatibilidade
 
 
 # tenta ler uma célula “assinatura” da aba 'amistosos' para mostrar a origem
