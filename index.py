@@ -906,7 +906,6 @@ def _persist_to_webhook(frames, reason: str) -> str|None:
         url = CONFIG["online"].get("webhook_url","").strip()
         if not url:
             return None
-        import requests, pandas as pd
         rl = frames.get("rallies", pd.DataFrame())
         if rl is None or rl.empty:
             data_rows, cols = [], []
@@ -1849,7 +1848,23 @@ if st.session_state.match_id is None:
             c1, c2 = st.columns([1,1])
             with c1:
                 if st.button("Carregar jogo", use_container_width=True):
-                    st.session_state.match_id = int(pick); st.session_state.set_number = 1
+                    mid = None
+                    if isinstance(pick, int):
+                        mid = pick
+                    elif isinstance(pick, str):
+                        m = re.match(r"\s*(\d+)", pick.strip())
+                        if m: mid = int(m.group(1))
+                    elif isinstance(pick, (list, tuple)) and pick:
+                        s = str(pick[0])
+                        m = re.match(r"\s*(\d+)", s.strip())
+                        if m: mid = int(m.group(1))
+
+                    if mid is None:
+                        st.warning("Seleção de partida inválida. Escolha um jogo válido.")
+                        st.stop()
+
+                    st.session_state.match_id = mid
+                    st.session_state.set_number = 1
                     st.session_state._do_rerun_after = True
             with c2:
                 if st.button("Fechar", use_container_width=True):
