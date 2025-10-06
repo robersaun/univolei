@@ -170,6 +170,58 @@ def _prepare_dataframe_for_sheets(df):
     
     return values
 
+def read_all(sheet_map: dict[str, str] | None = None):
+    """
+    Lê todas as abas da planilha e retorna um dict[str, pd.DataFrame].
+    Se 'sheet_map' for fornecido, usa o mapeamento {nome_tabela: nome_aba}.
+    Caso contrário, lê todas as worksheets e usa seus títulos como chaves.
+    """
+    import pandas as pd
+    frames: dict[str, pd.DataFrame] = {}
+
+    if not is_enabled():
+        raise RuntimeError("Google Sheets não habilitado")
+
+    spreadsheet_id = _get_spreadsheet_id()
+    if not spreadsheet_id:
+        raise RuntimeError("ID da planilha não configurado")
+
+    client = _get_gspread_client()
+    if not client:
+        raise RuntimeError("Falha na autenticação do Google Sheets")
+
+    spreadsheet = client.open_by_key(spreadsheet_id)
+
+    if sheet_map:
+        # Lê apenas as abas mapeadas
+        for table_name, ws_title in sheet_map.items():
+            try:
+                ws = spreadsheet.worksheet(ws_title)
+                values = ws.get_all_values()
+                if not values:
+                    frames[table_name] = pd.DataFrame()
+                    continue
+                header, data = values[0], values[1:]
+                df = pd.DataFrame(data, columns=header)
+                frames[table_name] = df
+            except Exception:
+                frames[table_name] = pd.DataFrame()
+    else:
+        # Lê todas as abas
+        for ws in spreadsheet.worksheets():
+            try:
+                values = ws.get_all_values()
+                if not values:
+                    frames[ws.title] = pd.DataFrame()
+                    continue
+                header, data = values[0], values[1:]
+                df = pd.DataFrame(data, columns=header)
+                frames[ws.title] = df
+            except Exception:
+                frames[ws.title] = pd.DataFrame()
+
+    return frames
+
 def sync_all(frames):
     """
     Sincroniza todos os frames com Google Sheets.
@@ -340,6 +392,8 @@ def sync_to_gsheets(frames, reason="manual"):
     Função compatível com o código do index.py.
     """
     return sync_all(frames)
+
+
 
 # Teste básico
 if __name__ == "__main__":
