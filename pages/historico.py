@@ -1,7 +1,5 @@
 
 from __future__ import annotations
-
-# ===== Imports no topo =====
 from pathlib import Path
 import io
 import math
@@ -9,6 +7,26 @@ import pandas as pd
 import streamlit as st
 import streamlit.components.v1 as components
 from db_excel import init_or_load
+from zipfile import BadZipFile as _BadZipFile
+
+# --- Excel engine patch: escolhe engine automaticamente por extensão (antes de importar db_excel) ---
+def __uv_pick_engine(_p):
+    s = str(_p).lower()
+    if s.endswith(('.xlsx','.xlsm','.xltx','.xltm')): return 'openpyxl'
+    if s.endswith('.xls'): return 'xlrd'
+    if s.endswith('.xlsb'): return 'pyxlsb'
+    if s.endswith('.ods'): return 'odf'
+    return None
+
+_pd_ExcelFile__orig = pd.ExcelFile
+
+def __uv_ExcelFile_patched(path, *args, **kwargs):
+    if 'engine' not in kwargs:
+        _eng = __uv_pick_engine(path)
+        if _eng: kwargs['engine'] = _eng
+    return _pd_ExcelFile__orig(path, *args, **kwargs)
+pd.ExcelFile = __uv_ExcelFile_patched
+# ----------------------------------------------------------------------------------------------
 
 # Matplotlib (opcional)
 try:
@@ -32,9 +50,39 @@ def _base_dir() -> Path:
 def _default_db_path() -> Path:
     return _base_dir() / "volei_base_dados.xlsx"
 
+
 def load_frames():
     db_path = st.session_state.get("db_path", str(_default_db_path()))
-    return init_or_load(Path(db_path))
+    _p = Path(db_path)
+    try:
+        return init_or_load(_p)
+    except ImportError as _e:
+        _msg = str(_e)
+        if "openpyxl" in _msg or "xlrd" in _msg or "pyxlsb" in _msg or "odf" in _msg:
+            st.error("Falta engine do Excel. Para .xlsx, instale 'openpyxl' (adicione ao requirements.txt em produção).")
+            st.stop()
+        raise
+    except ValueError as _e:
+        # Caso de formato não determinado (extensão desconhecida) ou outros problemas de inferência
+        if "Excel file format cannot be determined" in str(_e):
+            st.error(f"Não consegui identificar engine para '{_p.name}'. Use extensão .xlsx/.xls/.xlsb/.ods e garanta biblioteca instalada.")
+            st.stop()
+        raise
+    except _BadZipFile:
+        # Tenta restaurar de backup porque o .xlsx atual não é um ZIP válido (corrompido)
+        bdir = Path(st.session_state.get("backups_dir", _base_dir() / "backups"))
+        cands = sorted(bdir.glob("*.xlsx"), reverse=True) if bdir.exists() else []
+        for bf in cands:
+            try:
+                frames = init_or_load(bf)
+                st.session_state["db_path"] = str(bf)
+                st.warning(f"Base corrompida ({_p.name}). Carregado backup: {bf.name}")
+                return frames
+            except Exception:
+                continue
+        st.error("Arquivo Excel base inválido/corrompido e nenhum backup válido encontrado. Substitua o arquivo base.")
+        st.stop()
+
 
 def team_name_by_id(fr: dict, team_id: int | None) -> str:
     eq = fr.get("equipes", pd.DataFrame())
@@ -426,7 +474,7 @@ else:
     show_df = gl.head(12).copy()
 
 def _row_status(r):
-    is_closed = bool(r.get("__StatusTxt__","Aberto") == "Fechado" or r.get("is_closed", False))
+    is_closed = (r.get("is_closed") is True) or (r.get("is_closed") == 1)
     return "<span class='hg-pill ok'>Fechado</span>" if is_closed else "<span class='hg-pill open'>Aberto</span>"
 
 show_df["Status"] = show_df.apply(_row_status, axis=1)

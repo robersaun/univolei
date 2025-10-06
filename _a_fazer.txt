@@ -6,6 +6,8 @@ streamlit run index.py
 
 registro de sets mostrar qyem ganhou durante o jogo
 
+CUIDADO - RESETANDO DADOS TODA VEZ???
+
 VER	
 2	layout jogo menor???
 3	Fazer side out ? Quem inicia no set e pontu
@@ -13,6 +15,36 @@ VER
 
 4	UNIFICAR unir uv_init_state e uv_ensure_state?
 5	bugs e 	erro carregamento preloader zoando componentes
+
+
+Bugs 
+1
+. Salvar informacoes tirar componentes e colocar logo fundo?
+
+2. Visualizacao no cadastrar jogo e preloader
+
+3. Tutorial nao ficando responsivo no celular. Histórico 2 tabelas nao tb
+
+4. Ao finalizar a partida o placar nao zerou 
+
+
+
+1. Mostrar vencedores qtd set (informacao no placar)
+ 2. Centralizar placar
+
+3. Reduzir e editar layout e botões (tirar texto atalhos ?)
+
+
+
+
+
+1. meu codigo está funcional, mas contem alguns bugs, por exemplo ao salvar informacoes e mostra o preloader, os componentes de baixo ficam todos bagunçados, acredito que pela lógica de meu codigo que acaba se perdendo e mostrando componentes parciais ou sem css. Gostaria que vc montasse uma lógica de disparoa, se possível e se for melhor com funcoes em  sequencia.. mas vc é quem tem que me indicar a melhor forma, pois seu que o streamlit usa componentes e estados de variaveis .. mas seria muito melhor se todas as "Chamada inicial: " que coloquei e outras que estao avulsas, sendo lidas a todo momento tivessem uma sequencia logica organizada
+2. revise as funcoes _nvj_apply_match_type_meta e def _nvj_get_match_meta (e outras semelhantes se houverem que nao estao sendo usada). Mas antes de confirmar se é possível excluir elas, veja se nao sao uteis realmente, se nao deveriam existir, se nao podem ser mescladas com outras para melhorar a lógica
+3. verifique se a salvagoogle e a _persist_to_gsheets e até outras nao fazem a mesma coisa e tem outras funcoes duplicadas que podem ser unidas/sintetizadas/melhoradas
+4. organize meu codigo com as variaveis todas em cima e depois as chamadas de css e as que forem julgadas necessárias vir primeiro
+5. é possíve trazer todas as funcoes minimizadas no vscode? como faço para fazer isso de uma vez só?
+6. meu codigo tem muitas funcoes de debug, acho que podemos reduzir e simplificar... fazer uma ou no maixmo duas só com todos os debugs
+consegue fazer tudo isso com extremo cuidado e me enviar o codigo revisado e revitalizado pronto sem retirar funcionalidades e melhor organizado/estruturado? ele tem mais de 4030 linhas atualmente
 
 
 1. Config qtd max sets

@@ -1,3 +1,4 @@
+# UniVolei Live Scout – index.py (versão completa e estável)
 from __future__ import annotations
 from pathlib import Path
 import re
@@ -10,7 +11,6 @@ import numpy as np
 import time as _time
 from datetime import date, datetime
 import pandas as pd
-import pandas as _pd_real  # não conflitar com _pd já usado
 from db_duck import ensure_db as duck_ensure, replace_all as duck_replace
 import logging, os
 import gsheets_sync
@@ -31,24 +31,7 @@ from db_excel import (
     init_or_load, save_all, add_set,
     append_rally, last_open_match, finalize_match
 )   
-    
-# --- UV Excel engine monkey-patch (garante engine ao abrir Excel) ---
-def _uv_pick_engine(_path_str: str):
-    _s = str(_path_str).lower()
-    if _s.endswith(('.xlsx','.xlsm','.xltx','.xltm')): return 'openpyxl'
-    if _s.endswith('.xls'): return 'xlrd'
-    if _s.endswith('.xlsb'): return 'pyxlsb'
-    if _s.endswith('.ods'): return 'odf'
-    return None
 
-_pd_ExcelFile_original = _pd_real.ExcelFile
-def _pd_ExcelFile_patched(path, *args, **kwargs):
-    if 'engine' not in kwargs:
-        _eng = _uv_pick_engine(path)
-        if _eng: kwargs['engine'] = _eng
-    return _pd_ExcelFile_original(path, *args, **kwargs)
-_pd_real.ExcelFile = _pd_ExcelFile_patched
-# --------------------------------------------------------------------
 # === UV STATE & ACTIONS (aplicado aos botões reais) ===
 def uv_init_state():
     st.session_state.setdefault('uv_active_player', None)      # número ativo
@@ -140,6 +123,7 @@ os.environ["STREAMLIT_SERVER_FILE_WATCHER"] = "false"
     # 5) Log final + prints na UI Log final + prints na UI
 #VER ESSE # [2] Offline: Journal append-only (NDJSON) por lance
 # =========================
+
 # =========================
 # DEBUG: console + UI
 # =========================
@@ -1051,59 +1035,7 @@ def display_dataframe(df, height=None, width='content', extra_class: str = ""):
 # =========================
 DEFAULT_DB = str(BASE_DIR / "volei_base_dados.xlsx")
 if "db_path" not in st.session_state: st.session_state.db_path = DEFAULT_DB
-if "frames" not in st.session_state:
-    # --- Guard robusto p/ carregar Excel base ---
-    import zipfile as _zip
-    try:
-        _dbp = Path(st.session_state.db_path)
-        if not _dbp.exists():
-            st.error(f"Arquivo Excel base não encontrado: {_dbp}")
-            st.stop()
-        if _dbp.is_dir():
-            st.error(f"O caminho do Excel aponta para uma pasta: {_dbp}")
-            st.stop()
-        if _dbp.suffix.lower() not in (".xlsx",".xlsm",".xltx",".xltm",".xls",".xlsb",".ods"):
-            st.error(f"O caminho do Excel não parece válido: {_dbp.name}")
-            st.info("Use um arquivo .xlsx/.xls/.xlsb/.ods e garanta que o engine correspondente está instalado (ex.: openpyxl para .xlsx).")
-            st.stop()
-        # Tenta carregar normalmente
-        st.session_state.frames = init_or_load(_dbp)
-        st.session_state["db_path_in_use"] = str(_dbp)
-    except (ValueError, ImportError, _zip.BadZipFile) as _e:
-        _msg = str(_e)
-        # Se engine ausente
-        if "Missing optional dependency 'openpyxl'" in _msg or "Excel file format cannot be determined" in _msg:
-            st.error("Falha ao abrir o Excel base: falta engine. Para .xlsx, adicione 'openpyxl' ao requirements.txt.")
-            st.stop()
-        # Se arquivo corrompido/inválido (.xlsx precisa ser um ZIP válido)
-        _need_backup = isinstance(_e, _zip.BadZipFile) or "File is not a zip file" in _msg
-        if _need_backup:
-            # Tenta restaurar a partir do backup mais recente
-            _bdir = Path(st.session_state.get("backups_dir", "backups"))
-            if _bdir.exists():
-                _cands = sorted(_bdir.glarg("*.xlsx"), reverse=True)
-            else:
-                _cands = []
-            _restored = False
-            for _bf in _cands:
-                try:
-                    _frames = init_or_load(_bf)
-                    st.session_state.frames = _frames
-                    st.session_state["db_path_in_use"] = str(_bf)
-                    st.warning(f"Arquivo base parece corrompido ({_dbp.name}). Carregado backup: {_bf.name}")
-                    _restored = True
-                    break
-                except Exception:
-                    pass
-            if not _restored:
-                st.error("Arquivo Excel base inválido/corrompido e nenhum backup válido encontrado. Substitua o arquivo base ou verifique permissões.")
-                st.stop()
-        else:
-            # Outros erros são propagados
-            raise
-
-
-
+if "frames" not in st.session_state: st.session_state.frames = init_or_load(Path(st.session_state.db_path))
 
 if "duck_path" not in st.session_state: st.session_state.duck_path = str(DEFAULT_DUCK)
 if "match_id" not in st.session_state: st.session_state.match_id = None
@@ -1111,13 +1043,13 @@ if "set_number" not in st.session_state: st.session_state.set_number = None
 if "auto_close" not in st.session_state: st.session_state.auto_close = True
 if "graph_filter" not in st.session_state: st.session_state.graph_filter = "Ambos"
 st.session_state.setdefault("data_rev", 0)
-options = ["Quem Sacou"]  # ou ["Front", "Back"], etc.
+options = ["Quem Sacou"]  # ou ["Frente", "Fundo"], etc.
 st.session_state.setdefault("quemsacou", options[0])
 # auxiliares
 st.session_state.setdefault("q_side", "Nós")
 st.session_state.setdefault("q_result", "Acerto")
 st.session_state.setdefault("q_action", "d")
-st.session_state.setdefault("q_position", "Front")
+st.session_state.setdefault("q_position", "Frente")
 st.session_state.setdefault("last_selected_player", None)
 st.session_state.setdefault("show_cadastro", False)
 st.session_state.setdefault("show_tutorial", False)
@@ -1205,72 +1137,95 @@ def _persist_to_webhook(frames, reason: str) -> str|None:
 # Pre-Loader overlay central (texto no meio da tela) 
 # =========================
 class _UvOverlayPreloader:
-    """
-    Context manager para exibir um overlay de "processando" sem bagunçar a UI.
-    Uso: with _UvOverlayPreloader("Salvando..."): ...operações...
-    """
-    def __init__(self, message: str = "Processando..."):
-        self.message = message
-        self._ph = None  # placeholder para permitir limpar o overlay sem depender de rerun
+    """Mostra um overlay central com o texto enquanto a ação ocorre."""
+    def __init__(self, msg: str):
+        self.msg = msg
+        self._ph = None
 
     def __enter__(self):
-        import streamlit as st
-        st.session_state["_uv__overlay_active"] = True
-        self._ph = st.empty()  # <<< render controlado
-
-        overlay_css = """
-        <style>
-        .uv-preloader-backdrop {
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.35);
-            z-index: 999999;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .uv-preloader-card {
-            background: #fff;
-            border-radius: 14px;
-            padding: 22px 28px;
-            box-shadow: 0 10px 30px rgba(0,0,0,.25);
-            font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
-            text-align: center;
-            max-width: 420px;
-        }
-        .uv-spinner {
-            width: 28px; height: 28px;
-            border: 3px solid #e3e3e3; border-top-color: #4a90e2;
-            border-radius: 50%;
-            animation: uvspin 0.9s linear infinite;
-            margin: 0 auto 12px auto;
-        }
-        @keyframes uvspin { to { transform: rotate(360deg); } }
-        </style>
-        """
-        overlay_html = f'''
-        <div class="uv-preloader-backdrop">
-          <div class="uv-preloader-card">
-            <div class="uv-spinner"></div>
-            <div><strong>{self.message}</strong></div>
-          </div>
-        </div>
-        '''
-        # Renderiza o overlay dentro do placeholder
-        self._ph.markdown(overlay_css + overlay_html, unsafe_allow_html=True)
+        self._ph = st.empty()
+        self._ph.markdown(
+            f"""
+            <div id="uv-overlay">
+              <div class="uv-box">{self.msg}</div>
+            </div>
+            <style>
+              /* Overlay ocupa a viewport inteira e fica acima de tudo */
+              #uv-overlay {{
+                position: fixed; inset: 0; z-index: 999999;
+                background: rgba(255,255,255,0.92);
+                display: flex; align-items: center; justify-content: center;
+              }}
+              /* Caixa do texto (discreta, mas visível) */
+              #uv-overlay .uv-box {{
+                font-family: inherit; font-size: 20px; font-weight: 700;
+                color: #111; background: #fff;
+                border: 1px solid rgba(0,0,0,.06);
+                padding: 14px 18px; border-radius: 12px;
+                box-shadow: 0 8px 30px rgba(0,0,0,.06);
+              }}
+              /* Tema escuro (se houver) */
+              @media (prefers-color-scheme: dark) {{
+                #uv-overlay {{ background: rgba(0,0,0,0.55); }}
+                #uv-overlay .uv-box {{ color:#fff; background:#111; border-color:#333; }}
+              }}
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+        # Retorna self apenas para compatibilidade; o "com" funciona normalmente
         return self
 
     def __exit__(self, exc_type, exc, tb):
-        import streamlit as st
-        st.session_state["_uv__overlay_active"] = False
-        try:
-            if self._ph is not None:
-                self._ph.empty()  # <<< remove o overlay imediatamente, sem precisar de rerun
-        except Exception:
-            pass
+        if self._ph is not None:
+            self._ph.empty()
+        # Não suprime exceções
         return False
 
-# UniVolei Live Scout – index.py (versão completa e estável)
+class _UvOverlayPreloader:
+    """Mostra um overlay central com o texto enquanto a ação ocorre."""
+    def __init__(self, msg: str):
+        self.msg = msg
+        self._ph = None
+
+    def __enter__(self):
+        self._ph = st.empty()
+        self._ph.markdown(
+            f"""
+            <div id="uv-overlay">
+              <div class="uv-box">{self.msg}</div>
+            </div>
+            <style>
+              /* Overlay ocupa a viewport e fica acima de tudo
+                 0.3 = 70% transparente (30% opaco) */
+              #uv-overlay {{
+                position: fixed; inset: 0; z-index: 999999;
+                background: rgba(255, 255, 255, 0.30);
+                display: flex; align-items: center; justify-content: center;
+              }}
+              /* Caixa do texto */
+              #uv-overlay .uv-box {{
+                font-family: inherit; font-size: 20px; font-weight: 700;
+                color: #111; background: #fff;
+                border: 1px solid rgba(0,0,0,.06);
+                padding: 14px 18px; border-radius: 12px;
+                box-shadow: 0 8px 30px rgba(0,0,0,.06);
+              }}
+              /* Tema escuro */
+              @media (prefers-color-scheme: dark) {{
+                #uv-overlay {{ background: rgba(0, 0, 0, 0.30); }}
+                #uv-overlay .uv-box {{ color:#fff; background:#111; border-color:#333; }}
+              }}
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        if self._ph is not None:
+            self._ph.empty()
+        return False
 
 def uv_preloader(kind: str = "gs") -> _UvOverlayPreloader:
     print("@@@ FN uv_preloader kind ", kind)
@@ -1295,12 +1250,6 @@ def uv_preloader(kind: str = "gs") -> _UvOverlayPreloader:
         msg = "Processando..."
     return _UvOverlayPreloader(msg)
 
-# =========================
-# “Excel principal (sempre)” — grava o XLSX no caminho de st.session_state.db_path (por padrão algo como BASE_DIR/volei_base_dados.xlsx).
-# Backup Excel ao fechar set/partida — gera um arquivo com timestamp em ./backups/volei_base_dados_YYYYMMDD_HHMMSS.xlsx.
-# DuckDB — atualiza as tabelas no arquivo .duckdb.
-# Google Sheets — quando a flag estiver habilitada
-# =========================
 def _persist_all(frames, reason: str = "rally"):
     # 1) Salva Excel sempre; DuckDB e Google Sheets quando possível.
     statuses = []  # coleta mensagens para print/log
@@ -1358,6 +1307,7 @@ def _persist_all(frames, reason: str = "rally"):
     _perf_step(_perf, "DUCKDB", t)
 
     # 4) Google Sheets (condicional por flag e intervalo de pontos)
+        # 4) Google Sheets (condicional por flag e intervalo de pontos)
     if SAVE_TO_GOOGLE:
         should_gs = False
         # calcula rcount e N uma vez
@@ -1366,13 +1316,17 @@ def _persist_all(frames, reason: str = "rally"):
         except Exception:
             rcount = 0
         N = int(st.session_state.get("QTD_PONTOS_SALVAR_GOOGLE", QTD_PONTOS_SALVAR_GOOGLE))
+
         print("********** CHAMA QTD_PONTOS_SALVAR_GOOGLE ", QTD_PONTOS_SALVAR_GOOGLE , " reason = ",reason)
         if reason in ("set_open", "set_close", "match_close", "manual"):
             should_gs = True
         elif reason == "rally":
             if N > 0 and rcount > 0 and (rcount % N == 0):
                 should_gs = True
+        
         print("********** reason ", reason , " N = ",N, " should_gs ",should_gs)
+        
+
         if should_gs:
             # Define a mensagem do preloader conforme o motivo
             if reason in ("set_open", "set_close"):
@@ -1530,15 +1484,20 @@ if "jogadoras" in frames:
 # =========================
 OUR_TEAM_ID = 1
 # Ações
+ACT_MAP = {
+    "d": "Diagonal","l": "Paralela","m": "Meio","lob": "Largada","seg": "Segunda",
+    "pi": "Pipe","re": "Recepção","b": "Bloqueio","sa": "Saque","rede": "Rede"
+}
+REVERSE_ACT_MAP = {v: k for k, v in ACT_MAP.items()}
 ACTION_CODE_TO_NAME = {
-    "d": "DIAGONAL","l": "LINHA","m": "MEIO","larg": "LOB","seg": "SEGUNDA",
+    "d": "DIAGONAL","l": "LINHA","m": "MEIO","lob": "LOB","seg": "SEGUNDA",
     "pi": "PIPE","re": "RECEPÇÃO","b": "BLOQUEIO","sa": "SAQUE","rede": "REDE"
 }
 ACTION_SYNONYM_TO_NAME = {
     "diagonal":"DIAGONAL","diag":"DIAGONAL",
     "linha":"LINHA","paralela":"LINHA",
     "meio":"MEIO",
-    "largada":"LOB","larg":"LOB",
+    "largada":"LOB","lob":"LOB",
     "segunda":"SEGUNDA","seg":"SEGUNDA",
     "pipe":"PIPE","pi":"PIPE",
     "recepcao":"RECEPÇÃO","recepção":"RECEPÇÃO","re":"RECEPÇÃO",
@@ -1546,6 +1505,8 @@ ACTION_SYNONYM_TO_NAME = {
     "saque":"SAQUE","sa":"SAQUE",
     "rede":"REDE"
 }
+ATTACK_ACTIONS = ["DIAGONAL","LINHA","PIPE","SEGUNDA","LOB","MEIO"]
+
 def team_name_by_id(fr: dict, team_id: int | None) -> str:
     eq = fr.get("equipes", pd.DataFrame())
     if eq.empty or team_id is None: return "Equipe"
@@ -1846,7 +1807,7 @@ def _fast_apply_scores_to_row(row: dict):
     row["score_home"] = home; row["score_away"] = away
     return row
 
-# >>> Persistir Front/Back mesmo que DB ignore colunas soltas
+# >>> Persistir Frente/Fundo mesmo que DB ignore colunas soltas
 def _persist_fb_on_last_rally(fb_upper: str):
     try:
         fr = st.session_state.frames
@@ -1861,9 +1822,9 @@ def _persist_fb_on_last_rally(fb_upper: str):
         fr["rallies"] = rl
         st.session_state.frames = fr
         save_all(Path(st.session_state.db_path), fr)
-        dbg_print(f"Persistido Front/Back='{fb_upper}' no rally_id={last_id}.")
+        dbg_print(f"Persistido Frente/Fundo='{fb_upper}' no rally_id={last_id}.")
     except Exception as e:
-        dbg_print(f"Falha ao persistir Front/Back: {e}")
+        dbg_print(f"Falha ao persistir Frente/Fundo: {e}")
         
 def quick_register_line(raw_line: str):
     if not raw_line.strip():
@@ -1873,7 +1834,7 @@ def quick_register_line(raw_line: str):
     row = _fix_who_scored_from_raw_and_row(raw_line, row)
     row = _normalize_action_in_row(row)
 
-    fb = str(st.session_state.get("q_position","Front")).strip().upper()
+    fb = str(st.session_state.get("q_position","Frente")).strip().upper()
     row["position_zone"] = fb
 
     row = _fast_apply_scores_to_row(row)
@@ -2189,6 +2150,7 @@ def _list_open_matches(frames: dict) -> list[int]:
     return [int(x) for x in pd.to_numeric(mt["match_id"], errors="coerce").dropna().astype(int).tolist()]
 open_mid = last_open_match(frames)
 
+
 # =========================
 # Chamada inicial: Verificação de jogos em aberto
 # =========================
@@ -2338,26 +2300,17 @@ with st.container():
 
     bar1, bar2, bar3 = st.columns([1.6, 2.5, 2.0])
     with bar1:
-        stf = frames["sets"]; sm = stf[stf["match_id"] == st.session_state.match_id]
-        home_sets_w = int((sm["winner_team_id"] == 1).sum())
-        away_sets_w = int((sm["winner_team_id"] == 2).sum())
-        st.markdown(
-        (
-            f'<div class="gm-title-wrap" style="display:flex;justify-content:center;margin-top:10px;">'  # ↑ espaço acima
-            f'  <div class="badge gm-title" style="display:inline-flex;flex-direction:column;align-items:center;gap:4px;padding:10px 16px 10px;line-height:1.2;">'  # ↑ padding no topo
-            f'    <div><b>{home_name}</b>&nbsp; X &nbsp;<b>{away_name}</b> — '
-            f'    {(datetime.strptime(date_str, "%Y-%m-%d") if isinstance(date_str, str) else date_str).strftime("%d/%m/%Y")}</div>'
-            f'    <div class="gm-subline" style="font-weight:500;font-size:18px;opacity:.85;margin-top:2px;">'
-            f'      Sets: <b>{home_sets_w}</b> × <b>{away_sets_w}</b> | Set atual: <b>{st.session_state.set_number}</b>'
-            f'    </div>'
-            f'  </div>'
-            f'</div>'
-        ),
-        unsafe_allow_html=True
-    )
-
+        if home_name and away_name:
+            st.markdown(
+                (
+                    f'<div class="badge"><b>{home_name}</b> &nbsp; X &nbsp; <b>{away_name}</b> — '
+                    f'{(datetime.strptime(date_str, "%Y-%m-%d") if isinstance(date_str, str) else date_str).strftime("%d/%m/%Y")}'
+                    f'</div>'
+                ),
+                unsafe_allow_html=True
+            )
     with bar2:
-        st.session_state.game_mode = st.toggle("🎮 **Jogo**", value=st.session_state.game_mode, key="game_mode_toggle") 
+        st.session_state.game_mode = st.toggle("🎮 **Modo Jogo**", value=st.session_state.game_mode, key="game_mode_toggle") 
     #with bar3:
         # 2) Radio imediatamente antes do seu texto (mesma linha via CSS acima)
      #   options = ["Saque Nosso", "Saque Adv"]  # "—" = sem seleção
@@ -2462,7 +2415,7 @@ def _reopen_set():
     # 1) Descobrir qual set reabrir (sn)
     sn = None
     try:
-        # se set_picked existir no escopo glargal, usa-o
+        # se set_picked existir no escopo global, usa-o
         sn = int(set_picked)  # noqa: F821  (pode não existir em alguns fluxos)
     except Exception:
         pass
@@ -2665,16 +2618,16 @@ if not st.session_state.game_mode:
     with top6:
         set_picked = st.selectbox("Set:", sel_vals, label_visibility="collapsed", key="set_select")
     with top7:
-        st.button("🔓 Reabre Set", use_container_width=True, key="reopen_btn", on_click=_reopen_set)
+        st.button("🔓 Reabrir Set", use_container_width=True, key="reopen_btn", on_click=_reopen_set)
         st.markdown('</div>', unsafe_allow_html=True)
     with top8:
-        st.button("✅ Fecha Set", use_container_width=True, key="close_set_btn", on_click=_close_set)
+        st.button("✅ Fechar Set", use_container_width=True, key="close_set_btn", on_click=_close_set)
         st.markdown('</div>', unsafe_allow_html=True)
     with top9:
-        st.button("🗑️ Remove Set Vazio", use_container_width=True, key="remove_empty_set_btn", on_click=_remove_empty_set)
+        st.button("🗑️ Remover Set Vazio", use_container_width=True, key="remove_empty_set_btn", on_click=_remove_empty_set)
         st.markdown('</div>', unsafe_allow_html=True)
     with top10:
-        st.button("🏁 Finaliza Partida", use_container_width=True, on_click=_finalizar_partida)
+        st.button("🏁 Finalizar Partida", use_container_width=True, on_click=_finalizar_partida)
         
 
 # =========================
@@ -3203,66 +3156,65 @@ def _create_new_match(opp_name: str, dt: date, meta: dict | None = None):
         'tournament_stage': 'Classificatório' | 'Semi-final' | 'Final' | None
       }
     """
-    with uv_preloader("Criando jogo..."):
-        frames_local = st.session_state.frames
+    frames_local = st.session_state.frames
 
-        # Garante colunas novas na aba 'amistosos'
-        _nvj_upgrade_amistosos_schema(frames_local)
+    # Garante colunas novas na aba 'amistosos' (se você já colou _nvj_upgrade_amistosos_schema, deixa assim)
+    _nvj_upgrade_amistosos_schema(frames_local)
 
-        mt = frames_local.get("amistosos", pd.DataFrame())
-        if mt.empty:
-            mt = pd.DataFrame(columns=[
-                "match_id","away_team_id","date","home_sets","away_sets","status","finished_at","is_closed","closed_at",
-                # novas:
-                "match_type","tournament_name","tournament_stage"
-            ])
-            next_mid = 1
-        else:
-            next_mid = int(pd.to_numeric(mt["match_id"], errors="coerce").max() or 0) + 1
-
-        away_id = _get_or_create_team_id_by_name(frames_local, opp_name or "Adversário")
-
-        # Lê meta do session_state se não vier por parâmetro
-        if meta is None:
-            meta = st.session_state.get("new_match_meta", {}) or {}
-        mtype = _nvj_normalize_match_type(meta.get("match_type", "amistoso"))
-        tname = meta.get("tournament_name") if mtype == "campeonato" else None
-        tstage = meta.get("tournament_stage") if mtype == "campeonato" else None
-
-        new_row = {
-            "match_id": next_mid,
-            "away_team_id": away_id,
-            "date": str(dt),
-            "home_sets": 0,
-            "away_sets": 0,
-            "status": None,
-            "finished_at": None,
-            "is_closed": None,
-            "closed_at": None,
+    mt = frames_local.get("amistosos", pd.DataFrame())
+    if mt.empty:
+        mt = pd.DataFrame(columns=[
+            "match_id","away_team_id","date","home_sets","away_sets","status","finished_at","is_closed","closed_at",
             # novas:
-            "match_type": mtype,
-            "tournament_name": tname,
-            "tournament_stage": tstage,
-        }
-        mt = pd.concat([mt, pd.DataFrame([new_row])], ignore_index=True)
-        frames_local["amistosos"] = mt
+            "match_type","tournament_name","tournament_stage"
+        ])
+        next_mid = 1
+    else:
+        next_mid = int(pd.to_numeric(mt["match_id"], errors="coerce").max() or 0) + 1
 
-        # Primeiro set
-        add_set(frames_local, match_id=next_mid, set_number=1)
+    away_id = _get_or_create_team_id_by_name(frames_local, opp_name or "Adversário")
 
-        # Persistência local
-        save_all(Path(st.session_state.db_path), frames_local)
+    # Lê meta do session_state se não vier por parâmetro
+    if meta is None:
+        meta = st.session_state.get("new_match_meta", {}) or {}
+    mtype = _nvj_normalize_match_type(meta.get("match_type", "amistoso"))
+    tname = meta.get("tournament_name") if mtype == "campeonato" else None
+    tstage = meta.get("tournament_stage") if mtype == "campeonato" else None
 
-        # Atualiza estado
-        st.session_state.frames = frames_local
-        st.session_state.match_id = next_mid
-        st.session_state.set_number = 1
-        st.session_state.show_cadastro = False
+    new_row = {
+        "match_id": next_mid,
+        "away_team_id": away_id,
+        "date": str(dt),
+        "home_sets": 0,
+        "away_sets": 0,
+        "status": None,
+        "finished_at": None,
+        "is_closed": None,
+        "closed_at": None,
+        # novas:
+        "match_type": mtype,
+        "tournament_name": tname,
+        "tournament_stage": tstage,
+    }
+    mt = pd.concat([mt, pd.DataFrame([new_row])], ignore_index=True)
+    frames_local["amistosos"] = mt
 
-    # Mensagem (após fechar o preloader)
-    opp_label = opp_name or team_name_by_id(st.session_state.frames, away_id)
+    # Primeiro set
+    add_set(frames_local, match_id=next_mid, set_number=1)
+
+    # Persistência local
+    save_all(Path(st.session_state.db_path), frames_local)
+
+    # Atualiza estado
+    st.session_state.frames = frames_local
+    st.session_state.match_id = next_mid
+    st.session_state.set_number = 1
+    st.session_state.show_cadastro = False
+
+    # Mensagem
+    opp_label = opp_name or team_name_by_id(frames_local, away_id)
     extra = f" — {tname} ({tstage})" if mtype == "campeonato" and tname else ""
-    st.success(f"Novo jogo criado: {team_name_by_id(st.session_state.frames, OUR_TEAM_ID)} x {opp_label} — tipo: {mtype}{extra}")
+    st.success(f"Novo jogo criado: {team_name_by_id(frames_local, OUR_TEAM_ID)} x {opp_label} — tipo: {mtype}{extra}")
 
 
 # =========================
@@ -3308,48 +3260,44 @@ if (st.session_state.match_id is None or st.session_state.show_cadastro) and not
 # _criaBtnsJogadoras
 # =========================
 def _criaBtnsJogadoras():
-    # 1) Garante chaves ANTES de ler/usar (evita “pulo” no 1º clique)
-    uv_init_state()
-
-    # 2) CSS – injeta apenas uma vez por sessão (evita reflow a cada rerun)
-    if not st.session_state.get("_uv_css_players_injected"):
-        st.markdown("""
-        <style>
-        /* deixa o bloco do radio inline e sem margem extra */
-        .element-container:has(> div[data-testid="stRadio"]) {
-            display: inline-block;
-            margin: 0 10px 0 0 !important;
-            vertical-align: middle;
-        }
-        /* deixa o bloco desse markdown inline também */
-        .element-container:has(> div.stMarkdown) {
-            display: inline-block;
-            margin: 0 !important;
-            vertical-align: middle;
-        }
-        /* estiliza o grupo do radio para ficar compacto */
-        div[data-testid="stRadio"] label { margin: 0 !important; }
-        div[data-testid="stRadio"] > div[role="radiogroup"] { display: inline-flex; gap: 8px; }
-        </style>
-        """, unsafe_allow_html=True)
-        st.session_state["_uv_css_players_injected"] = True
-
-    # 3) Header de estado (texto + pills)
     sel_num   = st.session_state.get("uv_active_player")
     adv_state = st.session_state.get("uv_adv_state", "neutral")
+    # Texto da seleção (como já era)
     if sel_num is not None:
         sel_txt = f"#{sel_num}"
     elif adv_state in ("ok", "err"):
         sel_txt = "ADV"
     else:
         sel_txt = "-"
-
+    # Cores dinâmicas conforme q_result (ativo forte, inativo claro)
     is_ok  = (st.session_state.get("q_result", "Acerto") == "Acerto")
     ok_bg  = f"rgba(22,163,74,{1.0 if is_ok else 0.25})"
     ok_bd  = f"rgba(21,128,61,{1.0 if is_ok else 0.35})"
     err_bg = f"rgba(185,28,28,{1.0 if not is_ok else 0.25})"
     err_bd = f"rgba(127,29,29,{1.0 if not is_ok else 0.35})"
+    # Linha: "Jogadora Selecionada: ..." + pills Acerto/Erro
+    # 1) CSS: coloca o container do radio e o container do markdown lado a lado
+    st.markdown("""
+    <style>
+    /* deixa o bloco do radio inline e sem margem extra */
+    .element-container:has(> div[data-testid="stRadio"]) {
+    display: inline-block;
+    margin: 0 10px 0 0 !important;
+    vertical-align: middle;
+    }
+    /* deixa o bloco desse markdown inline também */
+    .element-container:has(> div.stMarkdown) {
+    display: inline-block;
+    margin: 0 !important;
+    vertical-align: middle;
+    }
+    /* estiliza o grupo do radio para ficar compacto */
+    div[data-testid="stRadio"] label { margin: 0 !important; }
+    div[data-testid="stRadio"] > div[role="radiogroup"] { display: inline-flex; gap: 8px; }
+    </style>
+    """, unsafe_allow_html=True)
 
+    # 3) Seu HTML SEM <div>, só <span> (continua na mesma linha)
     st.markdown(
         f"""
         <span>Jogadora Selecionada:
@@ -3365,8 +3313,11 @@ def _criaBtnsJogadoras():
         unsafe_allow_html=True
     )
 
-    # 4) Callbacks (sem uv_init_state aqui!)
+    # Garante estado
+    uv_init_state()
+    # Callbacks: exclusividade e atualização de q_result
     def _click_player(n: int):
+        uv_init_state()
         # reset ADV
         st.session_state["uv_adv_state"] = "neutral"
         # reset jogadora anterior se diferente
@@ -3386,8 +3337,8 @@ def _criaBtnsJogadoras():
         cur_state = st.session_state.get("uv_player_state", {}).get(n, "neutral")
         if cur_state in ("ok", "err"):
             st.session_state["q_result"] = "Acerto" if cur_state == "ok" else "Erro"
-
     def _click_adv():
+        uv_init_state()
         # reset jogadora ativa
         cur = st.session_state["uv_active_player"]
         if cur is not None:
@@ -3399,41 +3350,25 @@ def _criaBtnsJogadoras():
         st.session_state["q_side"] = "Adv"
         # resultado conforme ADV
         st.session_state["q_result"] = "Acerto" if st.session_state["uv_adv_state"] == "ok" else "Erro"
-
-    # 5) Dados (com cache leve por partida → evita custo no 1º clique pós-rerun)
+    # Dados e label mode
     frames = st.session_state.frames
-    mid = st.session_state.get("match_id")
-    cache = st.session_state.setdefault("_uv_roster_cache", {})
-    cache_key = ("roster", mid)
-
-    if cache_key in cache:
-        nums, name_map = cache[cache_key]
-    else:
-        try:
-            nums = resolve_our_roster_numbers(frames)
-        except Exception:
-            nums = list(range(1, 13))
-        try:
-            name_map = {r["number"]: r["name"] for r in roster_for_ui(frames)}
-        except Exception:
-            name_map = {}
-        cache[cache_key] = (nums, name_map)
+    try:
+        nums = resolve_our_roster_numbers(frames)
+    except Exception:
+        nums = list(range(1, 13))
+    try:
+        name_map = {r["number"]: r["name"] for r in roster_for_ui(frames)}
+    except Exception:
+        name_map = {}
 
     label_mode = st.session_state.get("player_label_mode", "Número")
-
-    # 6) Grade estável: define nº de colunas uma única vez por sessão/partida
-    if "_uv_grid_cols" not in st.session_state:
-        st.session_state["_uv_grid_cols"] = min(12, max(1, len(nums) + 1))
-    grid_cols = st.session_state["_uv_grid_cols"]
-
     if nums:
         st.markdown('<div class="jogadoras-container">', unsafe_allow_html=True)
-
-        jcols = st.columns(grid_cols)
-        # Botões das jogadoras
+        # colunas (máx 12) + ADV
+        jcols = st.columns(min(12, max(1, len(nums) + 1)))
         for i, n in enumerate(nums):
             label_txt = str(n) if label_mode == "Número" else (name_map.get(n) or str(n))
-            with jcols[i % grid_cols]:
+            with jcols[i % len(jcols)]:
                 st.button(
                     label_txt,
                     key=f"pill_main_{n}",
@@ -3441,14 +3376,12 @@ def _criaBtnsJogadoras():
                     args=(n,),
                     use_container_width=True
                 )
-        # Botão ADV
-        with jcols[(len(nums)) % grid_cols]:
+        # ADV
+        with jcols[(len(nums)) % len(jcols)]:
             st.button("ADV", key="pill_main_adv", on_click=_click_adv, use_container_width=True)
-
-        # 7) Cores nos próprios botões (após renderizar)
+        # === Cores nos próprios botões (após renderizar) ===
         def _esc(label: str) -> str:
             return str(label).replace("\\", "\\\\").replace('"', '\\"')
-
         rules = []
         states = st.session_state["uv_player_state"]
         for n in nums:
@@ -3465,13 +3398,11 @@ def _criaBtnsJogadoras():
                     f'.stButton button[aria-label="{lab_esc}"] {{ '
                     f'background:#b91c1c !important; color:#fff !important; border:1px solid #7f1d1d !important; }}'
                 )
-
         adv_state = st.session_state.get("uv_adv_state", "neutral")
         if adv_state == "ok":
             rules.append('.stButton button[aria-label="ADV"] { background:#16a34a !important; color:#fff !important; border:1px solid #15803d !important; }')
         elif adv_state == "err":
             rules.append('.stButton button[aria-label="ADV"] { background:#b91c1c !important; color:#fff !important; border:1px solid #7f1d1d !important; }')
-
         if rules:
             st.markdown("<style>\n" + "\n".join(rules) + "\n</style>", unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
@@ -3481,21 +3412,21 @@ def _criaBtnsJogadoras():
 def _criaBtnsAtalhos():
     # ----------------- Atalhos -----------------
     st.markdown('<div class="gm-quick-row">', unsafe_allow_html=True)
-    #st.markdown("**Atalhos**")
+    st.markdown("**Atalhos**")
     atalho_specs = [
         ("d",    "Diag"),
         ("l",    "Par"),
-        ("m",    "Mei"),
-        ("larg", "Larg"),
+        ("m",    "Meio"),
+        ("lob",  "Lob"),
         ("seg",  "Seg"),
         ("pi",   "Pipe"),
-        ("re",   "Recp"),
+        ("re",   "Recep"),
         ("b",    "Bloq"),
-        ("sa",   "Saq"),
-        ("rede", "Red"),
+        ("sa",   "Saque"),
+        ("rede", "Rede"),
     ]
 
-    # --- Linha de Atalhos + [Front/Back] + [↩️] na MESMA linha ---
+    # --- Linha de Atalhos + [Frente/Fundo] + [↩️] na MESMA linha ---
     max_cols = 12  # grade "fictícia" de 12
     n_btns = len(atalho_specs)
 
@@ -3520,8 +3451,8 @@ def _criaBtnsAtalhos():
     # Rádio na penúltima coluna
     with row1[-2]:
         st.session_state.q_position = st.radio(
-            "", ["Front", "Back"], horizontal=True,
-            index=["Front", "Back"].index(st.session_state.q_position),
+            "", ["Frente", "Fundo"], horizontal=True,
+            index=["Frente", "Fundo"].index(st.session_state.q_position),
             key="gm_q_position", label_visibility="collapsed"
         )
 
@@ -3546,123 +3477,6 @@ def _criaBtnsAtalhos():
 
     _paint_adv_rede_buttons()
 
-def _criaPlacar():
-    # --- LINHA DO PLACAR + QUADRA + FILTROS (MODO JOGO) — ULTRA COMPACT (sem :has) ---
-    try:
-        _df_for_score = df_hm if 'df_hm' in locals() else current_set_df(
-            st.session_state.frames, st.session_state.match_id, st.session_state.set_number
-        )
-        _home_pts, _away_pts = set_score_from_df(_df_for_score)
-        _set_raw = st.session_state.get("set_number"); _setn = 1
-        if _set_raw is not None:
-            _s = str(_set_raw).strip()
-            if _s.isdigit(): _setn = int(_s)
-        st.markdown(
-            f"<div class='gm-preline'><strong>Set {_setn} — Placar: {_home_pts} x {_away_pts}</strong></div>", unsafe_allow_html=True
-        )
-        df_hm = current_set_df(st.session_state.frames, st.session_state.match_id, st.session_state.set_number)
-    except Exception:
-        df_hm = None
-
-    show_success_gm = bool(st.session_state.get("gm_show_succ", True))
-    show_errors_gm  = bool(st.session_state.get("gm_show_err", True))
-    show_adv_pts_gm = bool(st.session_state.get("gm_show_adv_ok", True))
-    show_adv_errs_gm= bool(st.session_state.get("gm_show_adv_err", True))
-    _picked = st.session_state.get("gm_players_filter", "Todas")
-    _sel_players_gm = None if _picked == "Todas" else [_picked]
-
-    pts_succ, pts_errs, pts_adv, pts_adv_err = build_heat_points(
-        df_hm,
-        selected_players=_sel_players_gm,
-        include_success=show_success_gm,
-        include_errors=show_errors_gm,
-        include_adv_points=show_adv_pts_gm,
-        include_adv_errors=show_adv_errs_gm,
-        return_debug=False
-    )
-
-    # ===== Centralização real (reduz espaços) – funciona no mobile =====
-    st.markdown("""
-    <style>
-      .uv-scorebar{
-        display:flex; justify-content:center; align-items:flex-end;
-        gap:10px; margin:4px 0 0 0;            /* menos espaço vertical no desktop */
-      }
-      .uv-scorebar .score-box{
-        display:flex; flex-direction:column; align-items:center;
-      }
-      .uv-scorebar .score-team{
-        font-weight:700; text-align:center; font-size:32px;  /* maior no desktop */
-        line-height:1.1;
-      }
-      .uv-scorebar .score-points{
-        font-size:56px; line-height:1; margin-top:2px;       /* maior no desktop */
-      }
-      .uv-scorebar .score-x{
-        font-size:28px; line-height:1; opacity:.9;
-      }
-
-      /* Mobile */
-      @media (max-width: 600px){
-        .uv-scorebar{ gap:8px; margin:0; }                   /* tira espaço em cima no mobile */
-        .uv-scorebar .score-team{ font-size:20px; }          /* ajuste fino no mobile */
-        .uv-scorebar .score-points{ font-size:40px; }        /* corrigido 40px (antes 40x) */
-        .uv-scorebar .score-x{ font-size:22px; }
-        .gm-preline{ margin-bottom:4px !important; }         /* reduz espaço logo acima do placar */
-      }
-    </style>
-    """, unsafe_allow_html=True)
-
-    frames = st.session_state.frames
-    df_set = current_set_df(frames, st.session_state.match_id, st.session_state.set_number)
-    home_pts, away_pts = set_score_from_df(df_set)
-
-    stf = frames["sets"]; sm = stf[stf["match_id"] == st.session_state.match_id]
-    home_sets_w = int((sm["winner_team_id"] == 1).sum())
-    away_sets_w = int((sm["winner_team_id"] == 2).sum())
-
-    # Nomes (com contagem de sets vencidos ao lado se > 0)
-    try:
-        _home_label_base = html.escape(home_name or "Nós")
-    except Exception:
-        _home_label_base = "Nós"
-    try:
-        _away_label_base = html.escape(away_name)
-    except Exception:
-        _away_label_base = "ADV"
-
-    _home_label = _home_label_base + (f" ({home_sets_w})" if home_sets_w > 0 else "")
-    _away_label = _away_label_base + (f" ({away_sets_w})" if away_sets_w > 0 else "")
-
-    # --- Render do placar, agora sem colunas (zero “espaço fantasma”) ---
-    st.markdown(
-        f"""
-        <div class="uv-scorebar">
-          <div class="score-box">
-            <div class="score-team">{_home_label}</div>
-            <div class="score-points">{home_pts}</div>
-          </div>
-          <div class="score-x">×</div>
-          <div class="score-box">
-            <div class="score-team">{_away_label}</div>
-            <div class="score-points">{away_pts}</div>
-          </div>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
-
-    # (Set summary opcional estava comentado na sua versão; mantive assim)
-    # st.markdown(
-    #     f"<div class='set-summary'>Sets: <b>{home_sets_w}</b> × <b>{away_sets_w}</b>  |  Set atual: <b>{st.session_state.set_number}</b></div>",
-    #     unsafe_allow_html=True
-    # )
-
-    render_court_html(
-        pts_succ, pts_errs, pts_adv, pts_adv_err,
-        enable_click=True, key="gm", show_numbers=st.session_state.show_heat_numbers
-    )
-
 def uv_apply_game_mode_branding(our_team_id: int | None = None) -> None:
     """
     Aplica a marca visual no Modo Jogo:
@@ -3684,7 +3498,7 @@ def uv_apply_game_mode_branding(our_team_id: int | None = None) -> None:
             eq = st.session_state.frames.get("equipes", pd.DataFrame())
             tid = our_team_id if our_team_id is not None else st.session_state.get("OUR_TEAM_ID")
             if not tid:
-                tid = glargals().get("OUR_TEAM_ID", None)
+                tid = globals().get("OUR_TEAM_ID", None)
             if isinstance(eq, pd.DataFrame) and not eq.empty and "team_logo_path" in eq.columns and tid is not None:
                 row = eq[eq["team_id"] == tid]
                 if not row.empty:
@@ -3773,7 +3587,70 @@ if st.session_state.game_mode:
         uv_init_state()
         _criaBtnsJogadoras()
         _criaBtnsAtalhos()
-        _criaPlacar()
+    # --- LINHA DO PLACAR + QUADRA + FILTROS (MODO JOGO) — ULTRA COMPACT (sem :has) ---
+    try:
+        _df_for_score = df_hm if 'df_hm' in locals() else current_set_df(
+            st.session_state.frames, st.session_state.match_id, st.session_state.set_number
+        )
+        _home_pts, _away_pts = set_score_from_df(_df_for_score)
+        _set_raw = st.session_state.get("set_number"); _setn = 1
+        if _set_raw is not None:
+            _s = str(_set_raw).strip()
+            if _s.isdigit(): _setn = int(_s)
+        st.markdown(
+            f"<div class='gm-preline'><strong>Set {_setn} — Placar: {_home_pts} x {_away_pts}</strong></div>",
+            unsafe_allow_html=True
+        )
+        df_hm = current_set_df(st.session_state.frames, st.session_state.match_id, st.session_state.set_number)
+    except Exception:
+        df_hm = None
+
+    show_success_gm = bool(st.session_state.get("gm_show_succ", True))
+    show_errors_gm  = bool(st.session_state.get("gm_show_err", True))
+    show_adv_pts_gm = bool(st.session_state.get("gm_show_adv_ok", True))
+    show_adv_errs_gm= bool(st.session_state.get("gm_show_adv_err", True))
+    _picked = st.session_state.get("gm_players_filter", "Todas")
+    _sel_players_gm = None if _picked == "Todas" else [_picked]
+
+    pts_succ, pts_errs, pts_adv, pts_adv_err = build_heat_points(
+        df_hm,
+        selected_players=_sel_players_gm,
+        include_success=show_success_gm,
+        include_errors=show_errors_gm,
+        include_adv_points=show_adv_pts_gm,
+        include_adv_errors=show_adv_errs_gm,
+        return_debug=False
+    )
+
+    st.markdown('<div class="gm-score-row">', unsafe_allow_html=True)
+    frames = st.session_state.frames
+    df_set = current_set_df(frames, st.session_state.match_id, st.session_state.set_number)
+    home_pts, away_pts = set_score_from_df(df_set)
+    stf = frames["sets"]; sm = stf[stf["match_id"] == st.session_state.match_id]
+    home_sets_w = int((sm["winner_team_id"] == 1).sum()); away_sets_w = int((sm["winner_team_id"] == 2).sum())
+
+    sc1, sc2, sc3, sc4 = st.columns([1.1, .8, 1.1, 2.2])
+    with sc1:
+        st.markdown(
+            f"<div class='score-box'><div class='score-team'>{html.escape(home_name or 'Nós')}</div><div class='score-points'>{home_pts}</div></div>", unsafe_allow_html=True
+        )
+    with sc2:
+        st.markdown("<div class='score-box'><div class='score-x'>×</div></div>", unsafe_allow_html=True)
+    with sc3:
+        st.markdown(
+            f"<div class='score-box'><div class='score-team'>{away_name}</div><div class='score-points'>{away_pts}</div></div>", unsafe_allow_html=True
+        )
+    with sc4:
+        st.markdown(
+            f"<div class='set-summary'>Sets: <b>{home_sets_w}</b> × <b>{away_sets_w}</b>  |  Set atual: <b>{st.session_state.set_number}</b></div>", unsafe_allow_html=True
+        )
+    st.markdown('</div>', unsafe_allow_html=True)  # fecha .gm-score-row
+
+    render_court_html(
+        pts_succ, pts_errs, pts_adv, pts_adv_err,
+        enable_click=True, key="gm", show_numbers=st.session_state.show_heat_numbers
+    )
+
     # FECHA o wrapper do Modo Jogo (DEPOIS de renderizar tudo)
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -4140,35 +4017,6 @@ try:
 except Exception:
     pass
 
-
-#///////////////////////////////////////////////
-# =========================
-# Chamada inicial: Verificar salvamentos e bases de dados
-# =========================
-p = Path(st.session_state.get("db_path", ""))
-gsheet_on = bool(st.session_state.get("persist_google_enabled") or st.session_state.get("gsheets_enable") or st.session_state.get("salvar_google"))
-
-st.info(
-    "📦 **INFORMAÇÕES TEMPORÁRIAS: Fonte atual de dados**\n\n"
-    f"- **db_path**: `{p}` (existe: {p.exists() if p else False})\n"
-    f"- **Tamanho**: {p.stat().st_size if p and p.exists() else 'N/A'} bytes\n"
-    f"- **Google Sheets ativo**: {gsheet_on}\n"
-    f"- **Backup dir**: `{st.session_state.get('backups_dir', 'backups')}`\n",
-    icon="ℹ️"
-)
-
-
-# tenta ler uma célula “assinatura” da aba 'amistosos' para mostrar a origem
-try:
-    frames = st.session_state.frames
-    amistosos = frames.get("amistosos")
-    origem_hint = "frames em memória"
-    if amistosos is not None and len(amistosos) > 0:
-        st.caption(f"Aba 'amistosos' carregada: {len(amistosos)} linhas ({origem_hint}).")
-except Exception as e:
-    st.warning(f"Não consegui inspecionar frames: {e}")
-
-#///////////////////////////////////////////////
 # =========================
 # Chamada inicial: Boot para Render
 # =========================

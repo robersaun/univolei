@@ -23,6 +23,7 @@ def _empty_frames(team_name: str = "Nosso Time") -> dict[str, pd.DataFrame]:
     }
 
 def init_or_load(db_path: Path, team_name: str = "Nosso Time") -> dict[str, pd.DataFrame]:
+    print("@@@FN init_or_load db_path = ", db_path)
     """Cria (se preciso) e carrega todas as abas esperadas."""
     db_path = Path(db_path)
     if not db_path.exists():

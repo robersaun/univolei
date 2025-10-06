@@ -188,7 +188,6 @@ st.markdown("</div>", unsafe_allow_html=True)
 
 # ===== Tabs =====
 tab1, tab2, tab3, tab4 = st.tabs(["Início", "Modo Jogo", "Histórico", "Rodízio 5x1"])
-
 # ---------------- Tab 1 ----------------
 with tab1:
     img = img_to_data_uri(IMG_DIR / "print_1.jpg")
@@ -220,7 +219,6 @@ with tab1:
 </div></div>
 """
     st.markdown(html, unsafe_allow_html=True)
-
 # ---------------- Tab 2 ----------------
 with tab2:
     img = img_to_data_uri(IMG_DIR / "print_2.jpg")
@@ -251,7 +249,6 @@ with tab2:
 </div></div>
 """
     st.markdown(html, unsafe_allow_html=True)
-
 # ---------------- Tab 3 ----------------
 with tab3:
     img = img_to_data_uri(IMG_DIR / "print_3.jpg")
@@ -278,7 +275,6 @@ with tab3:
 </div></div>
 """
     st.markdown(html, unsafe_allow_html=True)
-
 # ---------------- Tab 4 — Rodízio 5x1 (com zoom e fechar) ----------------
 with tab4:
     st.markdown("<div class='uv-tabbox'><div class='uv-wrap'>", unsafe_allow_html=True)

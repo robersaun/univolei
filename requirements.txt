@@ -12,4 +12,5 @@ google-api-python-client>=2.100,<3
 gspread-dataframe>=3.3,<4
 streamlit-aggrid>=0.3.4.post3,<0.4
 tzdata>=2023.3
+openpyxl
 
