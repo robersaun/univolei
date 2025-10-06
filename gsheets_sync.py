@@ -4,6 +4,8 @@ import streamlit as st
 import logging
 from datetime import datetime
 import json
+from typing import Optional, Dict
+
 
 # Configurar logger
 _logger = logging.getLogger("gsheets_sync")
@@ -170,7 +172,7 @@ def _prepare_dataframe_for_sheets(df):
     
     return values
 
-def read_all(sheet_map: dict[str, str] | None = None):
+def read_all(sheet_map: Optional[Dict[str, str]] = None):
     """
     Lê todas as abas da planilha e retorna um dict[str, pd.DataFrame].
     Se 'sheet_map' for fornecido, usa o mapeamento {nome_tabela: nome_aba}.
