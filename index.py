@@ -11,6 +11,7 @@ import time as _time
 from datetime import date, datetime
 import pandas as pd
 import pandas as _pd_real  # não conflitar com _pd já usado
+from typing import Optional, Dict
 from db_duck import ensure_db as duck_ensure, replace_all as duck_replace
 import logging, os
 from gsheets_sync import is_enabled as gs_is_enabled, read_all as gs_read_all 
@@ -30,7 +31,31 @@ from db_excel import (
     init_or_load, save_all, add_set,
     append_rally, last_open_match, finalize_match
 )   
-    
+
+
+def uv_preloader(kind: str = "gs") -> _UvOverlayPreloader:
+    print("@@@ FN uv_preloader kind ", kind)
+
+    if DEBUG_PRINTS:
+        """
+        kind:
+        - 'gs'          -> 'Salvando informações...'
+        - 'set_close'   -> 'Fechar Set...'
+        - 'set_open'    -> 'Fechar Set...'
+        - 'match_close' -> 'Finalizar partida...'
+        - outro         -> 'Processando...'
+        """
+
+    if kind in ("set_close", "set_open"):
+        msg = "Fechando Set..."
+    elif kind == "match_close":
+        msg = "Finalizando partida..."
+    elif kind == "gs":
+        msg = "Salvando informações..."
+    else:
+        msg = "Processando..."
+    return _UvOverlayPreloader(msg)
+
 # --- UV Excel engine monkey-patch (garante engine ao abrir Excel) ---
 def _uv_pick_engine(_path_str: str):
     _s = str(_path_str).lower()
@@ -902,31 +927,6 @@ class _UvOverlayPreloader:
         except Exception:
             pass
         return False
-
-# UniVolei Live Scout – index.py (versão completa e estável)
-
-def uv_preloader(kind: str = "gs") -> _UvOverlayPreloader:
-    print("@@@ FN uv_preloader kind ", kind)
-
-    if DEBUG_PRINTS:
-        """
-        kind:
-        - 'gs'          -> 'Salvando informações...'
-        - 'set_close'   -> 'Fechar Set...'
-        - 'set_open'    -> 'Fechar Set...'
-        - 'match_close' -> 'Finalizar partida...'
-        - outro         -> 'Processando...'
-        """
-
-    if kind in ("set_close", "set_open"):
-        msg = "Fechando Set..."
-    elif kind == "match_close":
-        msg = "Finalizando partida..."
-    elif kind == "gs":
-        msg = "Salvando informações..."
-    else:
-        msg = "Processando..."
-    return _UvOverlayPreloader(msg)
 
 # =========================
 # “Excel principal (sempre)” — grava o XLSX no caminho de st.session_state.db_path (por padrão algo como BASE_DIR/volei_base_dados.xlsx).
