@@ -13,7 +13,7 @@ import pandas as pd
 import pandas as _pd_real  # não conflitar com _pd já usado
 from db_duck import ensure_db as duck_ensure, replace_all as duck_replace
 import logging, os
-from gsheets_sync import is_enabled as gs_is_enabled, read_all as gs_read_all, sync_all as gs_sync_all
+from gsheets_sync import is_enabled as gs_is_enabled, read_all as gs_read_all 
 from io import BytesIO
 from parser_free import parse_line
 from string import Template

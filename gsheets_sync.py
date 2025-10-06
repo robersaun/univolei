@@ -222,7 +222,7 @@ def read_all(sheet_map: dict[str, str] | None = None):
 
     return frames
 
-def sync_all(frames):
+def _sync_all(frames):
     """
     Sincroniza todos os frames com Google Sheets.
     Retorna string de status.
@@ -391,7 +391,7 @@ def sync_to_gsheets(frames, reason="manual"):
     """
     Função compatível com o código do index.py.
     """
-    return sync_all(frames)
+    return _sync_all(frames)
 
 
 
