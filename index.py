@@ -56,6 +56,77 @@ def uv_preloader(kind: str = "gs") -> _UvOverlayPreloader:
         msg = "Processando..."
     return _UvOverlayPreloader(msg)
 
+
+
+# =========================
+# Pre-Loader overlay central (texto no meio da tela) 
+# =========================
+class _UvOverlayPreloader:
+    """
+    Context manager para exibir um overlay de "processando" sem bagunçar a UI.
+    Uso: with _UvOverlayPreloader("Salvando..."): ...operações...
+    """
+    def __init__(self, message: str = "Processando..."):
+        self.message = message
+        self._ph = None  # placeholder para permitir limpar o overlay sem depender de rerun
+
+    def __enter__(self):
+        import streamlit as st
+        st.session_state["_uv__overlay_active"] = True
+        self._ph = st.empty()  # <<< render controlado
+
+        overlay_css = """
+        <style>
+        .uv-preloader-backdrop {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.35);
+            z-index: 999999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .uv-preloader-card {
+            background: #fff;
+            border-radius: 14px;
+            padding: 22px 28px;
+            box-shadow: 0 10px 30px rgba(0,0,0,.25);
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+            text-align: center;
+            max-width: 420px;
+        }
+        .uv-spinner {
+            width: 28px; height: 28px;
+            border: 3px solid #e3e3e3; border-top-color: #4a90e2;
+            border-radius: 50%;
+            animation: uvspin 0.9s linear infinite;
+            margin: 0 auto 12px auto;
+        }
+        @keyframes uvspin { to { transform: rotate(360deg); } }
+        </style>
+        """
+        overlay_html = f'''
+        <div class="uv-preloader-backdrop">
+          <div class="uv-preloader-card">
+            <div class="uv-spinner"></div>
+            <div><strong>{self.message}</strong></div>
+          </div>
+        </div>
+        '''
+        # Renderiza o overlay dentro do placeholder
+        self._ph.markdown(overlay_css + overlay_html, unsafe_allow_html=True)
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        import streamlit as st
+        st.session_state["_uv__overlay_active"] = False
+        try:
+            if self._ph is not None:
+                self._ph.empty()  # <<< remove o overlay imediatamente, sem precisar de rerun
+        except Exception:
+            pass
+        return False
+
 # --- UV Excel engine monkey-patch (garante engine ao abrir Excel) ---
 def _uv_pick_engine(_path_str: str):
     _s = str(_path_str).lower()
@@ -858,75 +929,6 @@ def _persist_to_webhook(frames, reason: str) -> str|None:
         except Exception:
             pass
         return None
-
-# =========================
-# Pre-Loader overlay central (texto no meio da tela) 
-# =========================
-class _UvOverlayPreloader:
-    """
-    Context manager para exibir um overlay de "processando" sem bagunçar a UI.
-    Uso: with _UvOverlayPreloader("Salvando..."): ...operações...
-    """
-    def __init__(self, message: str = "Processando..."):
-        self.message = message
-        self._ph = None  # placeholder para permitir limpar o overlay sem depender de rerun
-
-    def __enter__(self):
-        import streamlit as st
-        st.session_state["_uv__overlay_active"] = True
-        self._ph = st.empty()  # <<< render controlado
-
-        overlay_css = """
-        <style>
-        .uv-preloader-backdrop {
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.35);
-            z-index: 999999;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .uv-preloader-card {
-            background: #fff;
-            border-radius: 14px;
-            padding: 22px 28px;
-            box-shadow: 0 10px 30px rgba(0,0,0,.25);
-            font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
-            text-align: center;
-            max-width: 420px;
-        }
-        .uv-spinner {
-            width: 28px; height: 28px;
-            border: 3px solid #e3e3e3; border-top-color: #4a90e2;
-            border-radius: 50%;
-            animation: uvspin 0.9s linear infinite;
-            margin: 0 auto 12px auto;
-        }
-        @keyframes uvspin { to { transform: rotate(360deg); } }
-        </style>
-        """
-        overlay_html = f'''
-        <div class="uv-preloader-backdrop">
-          <div class="uv-preloader-card">
-            <div class="uv-spinner"></div>
-            <div><strong>{self.message}</strong></div>
-          </div>
-        </div>
-        '''
-        # Renderiza o overlay dentro do placeholder
-        self._ph.markdown(overlay_css + overlay_html, unsafe_allow_html=True)
-        return self
-
-    def __exit__(self, exc_type, exc, tb):
-        import streamlit as st
-        st.session_state["_uv__overlay_active"] = False
-        try:
-            if self._ph is not None:
-                self._ph.empty()  # <<< remove o overlay imediatamente, sem precisar de rerun
-        except Exception:
-            pass
-        return False
 
 # =========================
 # “Excel principal (sempre)” — grava o XLSX no caminho de st.session_state.db_path (por padrão algo como BASE_DIR/volei_base_dados.xlsx).
